@@ -295,7 +295,7 @@ function summarizeDebugEvent(type, data) {
 }
 
 // 【追平帧判定（2026-09-11 v9）】两种"历史帧"标记同等对待：
-//  - evt.replay：宿主 /dsh-femo/events 新连接重放环帧（信封顶层标记）；
+//  - evt.replay：宿主 /femo-plugin/events 新连接重放环帧（信封顶层标记）；
 //  - evt._replayed：画布尚未恢复时前端自己缓冲的补放帧。
 // 追平帧只恢复状态（节点/断点/运行态），**绝不弹浮层**——浮层只由"此刻的
 // 活事件"或 /session-state 权威快照触发。
@@ -312,7 +312,7 @@ const mainCheckpointLabel = (checkpoint) => {
 };
 
 const FEMOEditor = forwardRef(function FEMOEditor({ plugin = false, onRun, onPause, initialScript, initialCheckpoint, initialRunning = false, onExport, onImport, onListFemoFiles, onPickFemoFile, onForgetFemoFile, savedPath, onBackToShell, onRestoreError, onPersistScript, getRecordScript, sessionId = '', enginePending = false, initialJobId, jobIds, initialWaitingHuman, initialLastError } = {}, ref) {
-// 插件模式：由 dsh-femo 注入（plugin=true）——运行/暂停走插件回调，
+// 插件模式：由 femo-plugin 注入（plugin=true）——运行/暂停走插件回调，
 // SSE 连插件广播路由；独立模式保留原后端调用（getBackendBaseUrl）。
 // initialScript/initialCheckpoint/initialRunning：会话恢复（刷新/重启/运行中打开）。
 // initialJobId/jobIds：宿主会话记录的 currentJobId + 激活过的全部 Job（2026-09-06
@@ -327,7 +327,7 @@ const FEMOEditor = forwardRef(function FEMOEditor({ plugin = false, onRun, onPau
 // savedPath：会话剧本文件地址（导出/导入产生）——空=未保存（提示+绝对寻址）。
 // onExport(femo, name)：导出（三态行为在 host 侧 editor-page 实现，返回 undefined=用户选了返回画布）；
 // onImport()：导入=host 弹系统文件选择器→{path, content}（引用原始位置，2026-08-30），null=用户取消。
-// onBackToShell：插件模式手机端返回键回调（dsh-femo 传 ctx.layout.toggleSidebar）。
+// onBackToShell：插件模式手机端返回键回调（femo-plugin 传 ctx.layout.toggleSidebar）。
 // sessionId：本编辑器所属会话（Job 模型 §11.1：SSE 信封按 sid 过滤）。
 // enginePending：引擎冷启动（bridge 未就绪）——按钮禁用+「引擎启动中」。
 //console.log('✅ FEMOEditor 已进入渲染');
@@ -481,7 +481,7 @@ const FEMOEditor = forwardRef(function FEMOEditor({ plugin = false, onRun, onPau
   // ── 调试窗口『编译器』页（2026-09-11 用户点名）──────────────────────────
   // 后端编译器/引擎运行时 print 的原文。数据源：宿主 bridge 把引擎 stdout 的
   // 非 JSON 行逐行 pushDiag('engine', ...) 进 diag-feed → SSE femo_diag 实时
-  // 广播；开面板时另拉 /dsh-femo/diag-tail 补历史（页面刷新后也有内容）。
+  // 广播；开面板时另拉 /femo-plugin/diag-tail 补历史（页面刷新后也有内容）。
   // 与『剧本』页完全分账：那边是画布事件/干跑流水（level 三态），这边是原样
   // 打印文本（无级别，故不上色）。
   const [compilerLog, setCompilerLog] = useState([]);   // [{ id, ts, text }]，新在前
@@ -526,7 +526,7 @@ const FEMOEditor = forwardRef(function FEMOEditor({ plugin = false, onRun, onPau
     let cancelled = false;
     (async () => {
       try {
-        const resp = await fetch('/dsh-femo/diag-tail?n=400');
+        const resp = await fetch('/femo-plugin/diag-tail?n=400');
         const data = await resp.json().catch(() => null);
         if (cancelled || !data || data.ok !== true || !Array.isArray(data.lines)) return;
         const seed = (setList, seqRef, tag) => {
@@ -1712,7 +1712,7 @@ if (specialType === 'FOR') {
       try {
         const qs = new URLSearchParams({ sessionId });
         if (pluginJobId !== null && pluginJobId !== undefined) qs.set('jobId', String(pluginJobId));
-        const resp = await fetch(`/dsh-femo/session-state?${qs.toString()}`);
+        const resp = await fetch(`/femo-plugin/session-state?${qs.toString()}`);
         const st = await resp.json().catch(() => ({}));
         if (st?.state === 'running' || st?.running === true) {
           pushDebug('warn', '运行', '引擎侧该 Job 仍在运行——先暂停或等它挂起再跑');
@@ -1784,7 +1784,7 @@ if (specialType === 'FOR') {
 
     try {
       if (plugin) {
-        // 插件模式：交给 dsh-femo 运行（保存剧本 + 启动引擎，同一 run
+        // 插件模式：交给 femo-plugin 运行（保存剧本 + 启动引擎，同一 run
         // 也驱动聊天窗角色气泡）；SSE 连插件广播路由（相对路径，同源）。
         // 按钮恒定（2026-09-11 定型）：三枚键各钉死一个动作，调用不再随状态漂移——
         // 绿「▶ 运行」= reset:true（fresh_start 从头开演，未开跑/挂起态同一句调用）；
@@ -1903,7 +1903,7 @@ const handlePauseWorkflow = useCallback(async () => {
         } else {
           const qs = new URLSearchParams({ sessionId });
           if (pluginJobId !== null && pluginJobId !== undefined) qs.set('jobId', String(pluginJobId));
-          const resp = await fetch(`/dsh-femo/pause?${qs.toString()}`, { method: 'POST' });
+          const resp = await fetch(`/femo-plugin/pause?${qs.toString()}`, { method: 'POST' });
           data = await resp.json().catch(() => ({}));
           if (!resp.ok) throw new Error(data?.error ?? `pause HTTP ${resp.status}`);
         }
@@ -1972,7 +1972,7 @@ const handlePauseWorkflow = useCallback(async () => {
 
   // ── 零 token 调试干跑（2026-09-08）：「🐞 调试」按钮 ──
   // femo_debugger FakeHost 替 AI/human 发言，引擎真实链路干跑剧本；
-  // /dsh-femo/debug-run 以 NDJSON 流式回传 DebugLogBus 记录，这里逐行
+  // /femo-plugin/debug-run 以 NDJSON 流式回传 DebugLogBus 记录，这里逐行
   // 渲染进调试窗（Print 效果）。与正式运行状态机完全独立——任何 flowStatus
   // 下都可用，不碰 job/SSE 链路；仅插件模式提供（独立后端无此路由）。
   const debugRunAbortRef = useRef(null);
@@ -2005,7 +2005,7 @@ const handlePauseWorkflow = useCallback(async () => {
     const controller = new AbortController();
     debugRunAbortRef.current = controller;
     try {
-      const resp = await fetch('/dsh-femo/debug-run', {
+      const resp = await fetch('/femo-plugin/debug-run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         // scriptPath=savedPath：code: file:"xxx.py" 相对引用按原剧本目录解析
@@ -2062,11 +2062,11 @@ const handlePauseWorkflow = useCallback(async () => {
 
   // 【2026-08-30 状态实时化】只关 run-scoped 的独立模式流（/api/run/<id>/stream，
   // 运行结束=流终，不关会被 EventSource 当 404 反复重连）；插件模式
-  // /dsh-femo/events 是页面级常驻广播——连接必须保留才能收到后续场次事件
+  // /femo-plugin/events 是页面级常驻广播——连接必须保留才能收到后续场次事件
   // （flow_start/flow_paused 等），关了就退回「外部开演看不见」的老坑。
   const closeRunScopedSse = useCallback(() => {
     const es = eventSourceRef.current;
-    if (es && !String(es.url ?? '').includes('/dsh-femo/events')) {
+    if (es && !String(es.url ?? '').includes('/femo-plugin/events')) {
       es.close();
       eventSourceRef.current = null;
     }
@@ -2742,7 +2742,7 @@ case 'node_retry': {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
     }
-    const es = new EventSource('/dsh-femo/events');
+    const es = new EventSource('/femo-plugin/events');
     eventSourceRef.current = es;
     es.onopen = () => {
       // 【2026-09-06 多端状态统一】接通/重连即拉权威快照校准 flowStatus：
@@ -2757,7 +2757,7 @@ case 'node_retry': {
       if (Date.now() - lastActionAtRef.current < 8000) return; // 本地刚操作过：别闪回
       void (async () => {
         try {
-          const resp = await fetch(`/dsh-femo/session-state?sessionId=${encodeURIComponent(sessionId)}`);
+          const resp = await fetch(`/femo-plugin/session-state?sessionId=${encodeURIComponent(sessionId)}`);
           const data = await resp.json().catch(() => null);
           if (!data || data.ok !== true) return;
           const hasCkpt = data.checkpoint && Object.keys(data.checkpoint).length > 0;
@@ -2915,7 +2915,7 @@ const submitHumanInput = useCallback(
     console.log('[submitHumanInput] payload:', JSON.stringify(payload));
 
     try {
-      const resp = await fetch(plugin ? '/dsh-femo/human-input' : getBackendBaseUrl() + `/api/run/${runId}/human-input`, {
+      const resp = await fetch(plugin ? '/femo-plugin/human-input' : getBackendBaseUrl() + `/api/run/${runId}/human-input`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -3954,7 +3954,7 @@ nodes={nodes}
           open={soulModalOpen}
           onClose={() => setSoulModalOpen(false)}
           onCreated={() => setSoulModalOpen(false)}
-          createUrl={plugin ? '/dsh-femo/souls' : getBackendBaseUrl() + '/api/souls/create'}
+          createUrl={plugin ? '/femo-plugin/souls' : getBackendBaseUrl() + '/api/souls/create'}
         />
         {/* 导入清单（第一级，2026-09-11）：**特意不传 onBrowse**——手机端的
             系统文件对话框开在电脑屏幕上，按了也够不着，留着只会让人以为按坏了。
@@ -5421,7 +5421,7 @@ if (enrichedNode.type === 'par_out') {
         onCreated={(data) => {
           setSoulModalOpen(false);
         }}
-        createUrl={plugin ? '/dsh-femo/souls' : getBackendBaseUrl() + '/api/souls/create'}
+        createUrl={plugin ? '/femo-plugin/souls' : getBackendBaseUrl() + '/api/souls/create'}
       />
 
       {/* 导入清单（第一级，2026-09-11）：桌面端带右上角「浏览…」，按它走原来的

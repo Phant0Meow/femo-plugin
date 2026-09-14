@@ -5,14 +5,14 @@
 import React, { useState, useEffect } from 'react';
 import { Field, PR, inp, btnP, btnS, TYPES } from './common';
 
-/** 拉取 dsh 可用模型列表（宿主 /dsh-femo/models，聚合 ctx.llm）。
+/** 拉取 dsh 可用模型列表（宿主 /femo-plugin/models，聚合 ctx.llm）。
  * 返回 [models, err]：models = {defaultProvider, providers:[{id, models:[{id}]}]} 或 null。 */
 export function useModelList() {
   const [models, setModels] = useState(null);
   const [err, setErr] = useState('');
   useEffect(() => {
     let alive = true;
-    fetch('/dsh-femo/models')
+    fetch('/femo-plugin/models')
       .then((r) => r.json())
       .then((d) => {
         if (!alive) return;

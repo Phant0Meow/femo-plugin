@@ -256,29 +256,65 @@ def board_notice(roles):
 
 
 # ---------------------------------------------------------------- 公告文案
+# 【2026-09-14 猫猫局】每轮换一种"陈述方式"，免得一局玩成复读机（人人都是
+# "甜甜的、凉凉的"）。轮到后面越绕，卧底越难照抄平民的现成说法。
+ROUND_TASKS = [
+    "本轮陈述任务：一句话说说它【是什么样、什么味儿】，别用比喻，也别太具体。",
+    "本轮陈述任务：不许说用途，改说你【上一次跟它打交道】的场面。",
+    "本轮陈述任务：把它【比作另一样东西】（打个比方），那个比方别贴脸。",
+    "本轮陈述任务：只说它给你留下的【一种感觉或一个画面】，不许再提实物特征。",
+    "本轮陈述任务：先给一句怀疑的理由（觉得谁最不像话），再补一句你自己的牌面描述。",
+    "本轮陈述任务：用【反问句】描述它（「那玩意儿不就是……吗」），越含糊越好。",
+]
+
+
 def round_announcement(round_no, alive_players):
-    """回合开始播报。"""
+    """回合开始播报：存活名单 + 本轮指定的陈述方式（文案按轮次循环）。"""
     alive_str = "、".join(_as_name(a) for a in (alive_players or []))
-    return {"announce_text": f"—— 第 {round_no} 轮 · 陈述阶段 ——\n当前存活玩家：{alive_str}"}
+    try:
+        idx = (int(round_no) - 1) % len(ROUND_TASKS)
+    except (TypeError, ValueError):
+        idx = 0
+    task = ROUND_TASKS[idx]
+    return {
+        "announce_text": f"—— 第 {round_no} 轮 · 陈述阶段 ——\n当前存活玩家：{alive_str}",
+        "round_task": f"【第 {round_no} 轮】{task}",
+    }
 
 
 # ---------------------------------------------------------------- 投票
 def collect_vote(vote_results, voter_name, target):
-    """把一票写进共享票箱（就地修改，返回同一对象供 out 写回）。"""
-    vote_results = vote_results if isinstance(vote_results, dict) else {}
+    """把一票写进共享票箱（就地修改，返回同一对象供 out 写回）。
+
+    空票写成 "?" 而不是留空：下一轮（或 PK 重投）该玩家真投了票就能覆盖它，
+    但他若已经出局，票箱里这笔旧票会被 _clean_votes 按投票人白名单过滤掉，
+    不会在明细里留下「@A→？（弃权）」这种看不懂的残迹（2026-09-14 实跑修正：
+    平票当事人张较真、猫猫在 PK 明细里各显示一条弃权，其实是他们本轮已无权投票）。
+    """
     voter = _as_name(voter_name)
-    target = _as_name(target)
+    target = _as_name(target) if _as_name(target) else "?"
+    vote_results = vote_results if isinstance(vote_results, dict) else {}
     if voter:
         vote_results[voter] = target
     return vote_results
 
 
-def _clean_votes(vote_results, alive):
-    """只留有效票：投票者与目标都得在存活名单里，且不能投自己。"""
+def _clean_votes(vote_results, alive, voters=None):
+    """只留「该由本人投出」的有效票：投票者与目标都在存活名单里、不能投自己。
+
+    【2026-09-14 实跑修正】票箱是全局共享的，平票 PK 重投时如果照单全收，
+    本轮已平票出局的玩家（以及上一轮淘汰的人）留在票箱里的旧票会被重复计进
+    PK 结果——实跑第 3757 场就出了这个岔子：PK 公告写「由其余 4 位重投」，
+    计票却把两名当事人的旧票也算上，凑成 2:2 又触发随机送走。
+    voters 给了白名单就按白名单收票（pk_decide 传「存活且非候选人」）。
+    """
     alive_set = set(alive)
+    voters_set = set(voters) if voters is not None else None
     votes = {}
     for voter, target in (vote_results or {}).items():
         v, t = _as_name(voter), _as_name(target)
+        if voters_set is not None and v not in voters_set:
+            continue
         if v in alive_set and t in alive_set and t != v:
             votes[v] = t
     return votes
@@ -304,16 +340,20 @@ def vote_box(vote_results, alive_players, candidates=None):
 
     parts = []
     for voter in alive:
+        # PK 重投时当事人自己也在这份名单里，但他没有投票权——不列他的票，
+        # 免得明细里冒出一条「@A→？（弃权）」（2026-09-14 实跑修正）。
+        if cand_set and voter in cand_set:
+            continue
         raw = votes.get(voter)
         target = _as_name(raw) if raw is not None else ""
-        if not target:
+        if not target or target == "?":
             parts.append(f"{voter}→？（弃权）")
             continue
         if target == voter:
             parts.append(f"{voter}→{target}（自投，废票）")
             continue
         if cand_set:
-            if voter in cand_set or target not in cand_set:
+            if target not in cand_set:
                 parts.append(f"{voter}→{target}（无效票）")
             else:
                 parts.append(f"{voter}→{target}")
@@ -322,7 +362,7 @@ def vote_box(vote_results, alive_players, candidates=None):
                 parts.append(f"{voter}→{target}（无效票）")
             else:
                 parts.append(f"{voter}→{target}")
-    return "投票明细：" + "、".join(parts)
+    return "投票明细：" + "、".join(parts) if parts else "投票明细：（无人有资格投票）"
 
 
 def vote_recap(vote_results, all_players, candidates=None):
@@ -336,14 +376,34 @@ def vote_recap(vote_results, all_players, candidates=None):
     return vote_box(vote_results, names, candidates)
 
 
-def _counts_note(counts, votes, alive):
-    """计票明面文案：[@A 3 票、@B 1 票] + 弃权数。"""
+def _counts_note(counts, votes, alive, voters=None):
+    """计票明面文案：[@A 3 票、@B 1 票] + 弃权数。
+
+    弃权数按**有投票权的人数**算：PK 重投时当事人也在存活名单里但无权投票，
+    用 len(alive) 会凭空多出一条"弃权"（2026-09-14 实跑修正）。
+    """
     note = "计票：" + "、".join(f"{n} {c} 票" for n, c in
                              sorted(counts.items(), key=lambda kv: -kv[1]))
-    abstain = len(alive) - len(votes)
-    if abstain:
+    eligible = len(alive) if voters is None else len(voters)
+    abstain = eligible - len(votes)
+    if abstain > 0:
         note += f"（{abstain} 人弃权）"
     return note
+
+
+def _pick_eliminated(top_names, alive, roles):
+    """无人投出有效票／再次平票时的送走规则：能点卧底就点卧底。
+
+    【2026-09-14 实跑修正】旧实现是纯随机：第 3757 场头一轮 3:3 打平、
+    PK 又 2:2，随机把平民送走了——玩家对此完全无从施加影响，观感很亏。
+    现在先看这几个平票的人里有没有卧底（身份只有引擎知道），有就送卧底走；
+    没有（都是好人、或白板）才随机。这样僵局仍必然收敛，但对玩家更讲理。
+    """
+    cands = [n for n in (top_names or []) if n in (alive or [])]
+    if not cands:
+        return "" if not alive else random.SystemRandom().choice(list(alive))
+    packed = [n for n in cands if (roles or {}).get(n) == "卧底"]
+    return random.SystemRandom().choice(packed or cands)
 
 
 def process_votes(vote_results, alive_players, roles, round_no):
@@ -371,11 +431,11 @@ def process_votes(vote_results, alive_players, roles, round_no):
     if not counts:
         # 【2026-09-13 兜底】整轮没人投出有效票（全员弃权／自投／投名单外的人）：
         # 旧文案"无人出局"会让这一轮原地打转——干跑实测第 5 轮起死循环，每轮真烧
-        # token 却永远不收敛。改为随机送走一人：僵局只有这一种出口。
-        if alive:
-            eliminated = random.SystemRandom().choice(alive)
+        # token 却永远不收敛。改为送走一人：僵局只有这一种出口。
+        eliminated = _pick_eliminated(alive, alive, roles)
+        if eliminated:
             reason = ("本轮没有人投出有效票——僵局不再空转，"
-                      f"随机送走一人：{eliminated} 出局。")
+                      f"送走一人：{eliminated} 出局。")
         else:
             reason = "本轮没有人投出有效票，无人出局。"
     else:
@@ -396,7 +456,6 @@ def process_votes(vote_results, alive_players, roles, round_no):
     announce = (f"—— 第 {round_no} 轮 · 投票结果 ——\n"
                 f"{vote_box(vote_results, alive)}\n"
                 f"{note}\n{reason}")
-
     game_over, winner = _judge(new_alive, roles)
     return {
         "eliminated": eliminated,
@@ -436,7 +495,7 @@ def pk_prompt(pk_candidates, alive_players, round_no):
         f"平票的是：{cand_str}。本轮无人出局。\n"
         f"现在进入 PK 环节：{cand_str} 每人再说一句话为自己申辩；"
         f"然后由其余 {len(voters)} 位（{'、'.join(voters)}）在平票的人里重投，"
-        f"得票多者出局；若再次平票，则由平票的几人中随机送走一人（僵局不再空转）。"
+        f"得票多者出局；若再次平票，则这几位里如果要有人顶缸，优先送走拿着怪词的那个（僵局不再空转）。"
     )
     return {"announce_text": announce, "$pk_voters": voters}
 
@@ -447,7 +506,8 @@ def pk_decide(vote_results, pk_candidates, alive_players, roles, round_no):
     有效票三条件：投票者**存活**、投票者不是 PK 选手、目标在 PK 名单里。
     （只判"不是 PK 选手"会把已出局的人也算成投票者——干跑流水里抓到过这个漏洞。）
     得票多者出局；再次平票、或一条有效票都没有（含"所有存活者都是候选人"这种
-    结构性无票可投），一律**随机送走一人**（2026-09-13 平票兜底：僵局必须有出口）。
+    结构性无票可投），一律送走一人（2026-09-13 平票兜底：僵局必须有出口；
+    2026-09-14 起改为优先送走卧底，见 _pick_eliminated）。
     """
     alive = [_as_name(a) for a in (alive_players or [])]
     cands = [_as_name(c) for c in (pk_candidates or []) if _as_name(c)]
@@ -455,6 +515,7 @@ def pk_decide(vote_results, pk_candidates, alive_players, roles, round_no):
     cand_set = set(cands)
     voters_ok = [a for a in alive if a not in cand_set]   # 存活且非 PK 选手
 
+    # 票箱是共享的，PK 重投只认「存活且非候选人」投出的、且投给候选人的票。
     votes = {}
     for voter, target in (vote_results or {}).items():
         v, t = _as_name(voter), _as_name(target)
@@ -475,11 +536,11 @@ def pk_decide(vote_results, pk_candidates, alive_players, roles, round_no):
         if len(top_names) > 1:
             # 【2026-09-13 平票兜底】旧规则"再次平票 = 本轮无人出局"会让
             # "票型天生 2:2"的局无限空转（2026-09-12 实测连平四轮、每轮都真烧
-            # token，谁都出不去）。现在改为随机送走一人：僵局只有这一种出口。
-            eliminated = random.SystemRandom().choice(top_names)
+            # token，谁都出不去）。现在改为送走一人：僵局只有这一种出口。
+            eliminated = _pick_eliminated(top_names, alive, roles)
             reason = ("、".join(top_names)
                       + f" 再次平票（各 {top} 票）——僵局不再空转，"
-                      + f"随机送走一人：{eliminated} 出局。")
+                      + f"送走一人：{eliminated} 出局。")
         else:
             eliminated = top_names[0]
             reason = f"{eliminated} 在 PK 重投中得票最多（{top} 票），被淘汰出局。"
@@ -488,9 +549,9 @@ def pk_decide(vote_results, pk_candidates, alive_players, roles, round_no):
         # ①全员弃权/自投；②**所有存活者都是 PK 候选人**（3 人局三人平票时必然发生，
         # 此时 $pk_voters 为空，谁都没资格投）——后者是结构性的，不兜底就永远出不去。
         if cands:
-            eliminated = random.SystemRandom().choice(cands)
+            eliminated = _pick_eliminated(cands, alive, roles)
             reason = ("PK 重投无人投出有效票——僵局不再空转，"
-                      f"随机送走一人：{eliminated} 出局。")
+                      f"送走一人：{eliminated} 出局。")
         else:
             reason = "PK 重投无人投出有效票，本轮无人出局。"
 
@@ -571,6 +632,12 @@ def verdict(eliminated, roles, words, alive_players, winner, deck_word=None,
         lines.append(f"{elim} 被投出局，他的身份是【{role}】，词是「{_word_display(elim, words)}」。")
     else:
         lines.append("场上再无人被投出局。")
+    # 【2026-09-14】卧底赢的局，旧文案只说「场上再无人被投出局」+「卧底隐藏到了
+    # 最后」，却没点出卧底是谁——明明身份表就在下面几行，第一次看还是懵。补一句。
+    if winner == "卧底阵营":
+        alive_uc = [a for a in alive if roles.get(a) == "卧底"]
+        if alive_uc:
+            lines.append("活到最后、把大家骗过去的是：" + "、".join(alive_uc) + "。")
 
     lines.append(f"本局卧底 {n_uc} 人。所有人的身份与词：")
     # 先点卧底，再把其余人按原顺序列出——复盘时一眼看到重点

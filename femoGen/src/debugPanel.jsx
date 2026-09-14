@@ -36,7 +36,7 @@
 //    『编译器』= 后端编译器/引擎运行时的 stdout print 原文 + stderr（[stderr]
 //    前缀）——宿主 src/bridge.ts / src/debug-run.ts 逐行转发进 diag-feed
 //    （tag 'engine'），前端经 SSE femo_diag 实时收 + 开面板时 GET
-//    /dsh-femo/diag-tail 拉历史；
+//    /femo-plugin/diag-tail 拉历史；
 //    『FEMOGen』= 前端 femoGen 自己的 console 输出（femoLog.js 钩 console 镜像）；
 //    『Host』= 宿主（投影窗这边）本插件代码的 console 输出（src/host-log.ts 钩
 //    console + 调用栈过滤，只认自己人，tag 'host'）。

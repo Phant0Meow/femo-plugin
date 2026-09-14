@@ -1,0 +1,8 @@
+# femo-plugin bundle patch: inserts this plugin into a profile's layer stack.
+# Applied when a profile lists this bundle (or copied by hand for manual
+# installs).
+- insert:
+    - id: femo-plugin
+      name: 'femo-plugin'
+      config:
+        enabled: true

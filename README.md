@@ -97,9 +97,13 @@ femo有网页端零代码生成工作流。比如你想要好几个AI群聊，�
 
 前置要求：**dsh（DeepSeek Harness）0.1.5 及以上**——零改动直接接入；更低版本 dsh 需自行改动（见 `dshPatch/` 目录）。
 
-1. 一条命令装插件（安装时自动编译，装完重启 dsh web 生效）：
+1. 一条命令装插件（装完重启 dsh web 生效）。二选一：npm 装（快，免编译，开箱即用）或 GitHub 装（克隆源码，安装时自动编译）：
 
 ```sh
+# npm 安装（推荐）：整包自包含，装完即用
+dsh plugin --profile web add femo-plugin
+
+# 或从 GitHub 安装：安装时自动编译
 dsh plugin --profile web add github:Phant0Meow/femo-plugin
 ```
 
@@ -497,9 +501,13 @@ So, are these steps brainless enough? ↓↓↓
 
 Prerequisite: **dsh (DeepSeek Harness) 0.1.5 or newer** — zero-config integration; older dsh versions need manual modifications (see the `dshPatch/` directory).
 
-1. Install the plugin (auto-compiles on install; takes effect after restarting dsh web):
+1. Install the plugin with one command (takes effect after restarting dsh web). Two options: npm (fast, prebuilt, no compile step) or GitHub (clones the source, auto-compiles on install):
 
 ```sh
+# Install from npm (recommended): self-contained package, works out of the box
+dsh plugin --profile web add femo-plugin
+
+# Or install from GitHub: auto-compiles on install
 dsh plugin --profile web add github:Phant0Meow/femo-plugin
 ```
 

@@ -1,0 +1,40 @@
+{
+  "name": "femo-plugin",
+  "version": "1.0.0",
+  "description": "femo (Flow Emerges Mag Opus) — 用写剧本的方式编排多智能体世界。dsh 插件版：引擎、桥接器、可视化编辑器全在一个文件夹里，自包含，整个文件夹搬走即用。",
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "femo",
+    "multi-agent",
+    "orchestration",
+    "script"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Phant0Meow/femo-plugin.git"
+  },
+  "main": "./hostAdapter/dshAdapter/lib/index.js",
+  "exports": {
+    ".": "./hostAdapter/dshAdapter/lib/index.js",
+    "./client": "./hostAdapter/dshAdapter/lib/client.js",
+    "./cordis.patch.yml": "./hostAdapter/dshAdapter/cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-primitives"
+      ]
+    },
+    "bundle": {
+      "patch": "./hostAdapter/dshAdapter/cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "build": "cd hostAdapter/dshAdapter && node build.mjs"
+  }
+}

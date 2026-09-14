@@ -1,0 +1,13 @@
+# npm 发布排除清单（与 sync-github.ps1 的排除项对齐）
+*.bak-*
+*.log
+*.pyc
+.env
+*.wor
+node_modules/
+__pycache__/
+dist/
+.dsh-meow/
+user_data/
+.wrangler/
+.git/

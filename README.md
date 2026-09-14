@@ -1,4 +1,4 @@
-中文 README 可往后翻。
+<img width="309" height="352" alt="diagram" src="https://github.com/user-attachments/assets/0db0df27-e3f2-405d-9e79-38919564c795" />中文 README 可往后翻。
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-lightgrey?style=flat-square)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/Python-3.6%2B-blue?style=flat-square&logo=python)](https://www.python.org/)
@@ -47,7 +47,8 @@ Perspective isolation needs just one line: `scope: [@God] + wolfpack`. Concurren
 ---
 
 # FEMO  
-<?xml version="1.0" standalone="no"?>
+
+![Uploading<?xml version="1.0" standalone="no"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="27.169998168945312 30 345.6600341796875 364" width="309.12" height="352">
 
   <!-- ============ 蒙版定义 ============ -->
@@ -101,7 +102,8 @@ Perspective isolation needs just one line: `scope: [@God] + wolfpack`. Concurren
   <!-- ============ 圆（最上层，保持完整） ============ -->
   <circle cx="200" cy="200" r="30" fill="none" stroke="#6FBF3A" stroke-width="32"/>
 
-</svg>
+</svg> diagram.svg…]()
+
 ## - This is a language for orchestrating multi-agent scripts + a compiler.
 
 ---

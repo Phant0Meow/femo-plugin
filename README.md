@@ -2,9 +2,9 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-lightgrey?style=flat-square)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/Python-3.6%2B-blue?style=flat-square&logo=python)](https://www.python.org/)
-[![dsh plugin](https://img.shields.io/badge/dsh-plugin-blue?style=flat-square)](https://github.com/Phant0Meow/femo-plugin)
-[![femo-Script Generator](https://img.shields.io/badge/femo-Script%20Generator-green?style=flat-square&logo=github)](https://github.com/Phant0Meow/femo-plugin/tree/main/femoGen)
-[![femo-Syntax Docs](https://img.shields.io/badge/femo-Syntax%20Docs-79b8d4?style=flat-square&logo=readthedocs)](https://github.com/Phant0Meow/femo-plugin/blob/main/%E8%AF%AD%E6%B3%95%E6%96%87%E6%A1%A3.md)
+[![dsh plugin](https://img.shields.io/badge/dsh-plugin-blue?style=flat-square)](https://github.com/Phant0Meow/dsh-femo)
+[![femo-Script Generator](https://img.shields.io/badge/femo-Script%20Generator-green?style=flat-square&logo=github)](https://github.com/Phant0Meow/dsh-femo/tree/main/femoGen)
+[![femo-Syntax Docs](https://img.shields.io/badge/femo-Syntax%20Docs-79b8d4?style=flat-square&logo=readthedocs)](https://github.com/Phant0Meow/dsh-femo/blob/main/%E8%AF%AD%E6%B3%95%E6%96%87%E6%A1%A3.md)
 
 # femo (Flow Emerges Mag Opus) — Orchestrating a Multi-Agent World, Scriptwriting Style
 
@@ -46,7 +46,9 @@ Perspective isolation needs just one line: `scope: [@God] + wolfpack`. Concurren
 
 ---
 
-# This is a language for orchestrating multi-agent scripts + a compiler.
+# FEMO  <img width="31" height="35" alt="femo-logo" src="https://github.com/user-attachments/assets/942b2fe4-a96c-43d5-be76-67f4f8a6a72e" />
+
+## - This is a language for orchestrating multi-agent scripts + a compiler.
 
 ---
 
@@ -113,7 +115,7 @@ Prerequisite: **dsh (DeepSeek Harness) 0.1.5 or newer** — zero-config integrat
 1. Install the plugin (auto-compiles on install; takes effect after restarting dsh web):
 
 ```sh
-dsh plugin --profile web add github:Phant0Meow/femo-plugin
+dsh plugin --profile web add github:Phant0Meow/dsh-femo
 ```
 
 2. Restart dsh web. Done.
@@ -171,7 +173,7 @@ A dsh session = your main-model session + the multi-agent script engine:
 - **Chat window = stage monitor**: character lines render as colored bubbles, node notices as announcement banners, flow state as centered gray text.
 - The system prompt and context sent to the LLM each round are assembled per-character by the femo engine (soul card + memory + scope isolation). AI nodes can run through dsh subagents (native tool calls + thinking chains) or through the engine's built-in LLM bridge.
 - The script language is `.femo`: scope isolation, `par` parallelism, fork/join gateways, checkpoint resume, `@mind` runtime dispatch, per-actor `source` model selection — with compile-time validation, so mistakes are caught immediately (see `语法文档.md`).
-- Config lives in the profile's `cordis.patch.yml` and is all optional: `provider` / `model` / `apiUrl` (LLM routing for engine AI nodes), `hostAiBackend`, `python`, `femoRoot`, etc. Out of the box it just works. Prefer manual assembly? Drop the whole folder into the profile's `node_modules`, `pip install requests`, register `femo-plugin` in `cordis.patch.yml`, restart dsh web. Note: the plugin root to register is the `hostAdapter/dshAdapter` folder — it searches upward two levels automatically.
+- Config lives in the profile's `cordis.patch.yml` and is all optional: `provider` / `model` / `apiUrl` (LLM routing for engine AI nodes), `hostAiBackend`, `python`, `femoRoot`, etc. Out of the box it just works. Prefer manual assembly? Drop the whole folder into the profile's `node_modules`, `pip install requests`, register `dsh-femo` in `cordis.patch.yml`, restart dsh web. Note: the plugin root to register is the `hostAdapter/dshAdapter` folder — it searches upward two levels automatically.
 
 Early days — plenty of bugs. Developers, come take a look. It's genuinely a lot of fun.
 
@@ -243,9 +245,9 @@ Early days — plenty of bugs. Developers, come take a look. It's genuinely a lo
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-lightgrey?style=flat-square)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/Python-3.6%2B-blue?style=flat-square&logo=python)](https://www.python.org/)
-[![dsh插件](https://img.shields.io/badge/dsh-插件-blue?style=flat-square)](https://github.com/Phant0Meow/femo-plugin)
-[![剧本生成器](https://img.shields.io/badge/femo-剧本生成器-green?style=flat-square&logo=github)](https://github.com/Phant0Meow/femo-plugin/tree/main/femoGen)
-[![语法文档](https://img.shields.io/badge/femo-语法文档-79b8d4?style=flat-square&logo=readthedocs)](https://github.com/Phant0Meow/femo-plugin/blob/main/%E8%AF%AD%E6%B3%95%E6%96%87%E6%A1%A3.md)
+[![dsh插件](https://img.shields.io/badge/dsh-插件-blue?style=flat-square)](https://github.com/Phant0Meow/dsh-femo)
+[![剧本生成器](https://img.shields.io/badge/femo-剧本生成器-green?style=flat-square&logo=github)](https://github.com/Phant0Meow/dsh-femo/tree/main/femoGen)
+[![语法文档](https://img.shields.io/badge/femo-语法文档-79b8d4?style=flat-square&logo=readthedocs)](https://github.com/Phant0Meow/dsh-femo/blob/main/%E8%AF%AD%E6%B3%95%E6%96%87%E6%A1%A3.md)
 
 # femo（Flow Emerges Mag Opus） —— 用写剧本的方式编排多智能体世界
 
@@ -333,7 +335,7 @@ femo有网页端零代码生成工作流。比如你想要好几个AI群聊，�
 1. 一条命令装插件（安装时自动编译，装完重启 dsh web 生效）：
 
 ```sh
-dsh plugin --profile web add github:Phant0Meow/femo-plugin
+dsh plugin --profile web add github:Phant0Meow/dsh-femo
 ```
 
 2. 重启 dsh web。完事。
@@ -389,28 +391,23 @@ femo 现在以自包含插件的形式接入 dsh（DeepSeek Harness）——引�
 - **聊天窗口 = 舞台监视器**：角色发言渲染为彩色气泡，节点提示渲染为公告条，流程状态居中灰字。
 - 每轮发给 LLM 的 system prompt 与上下文由 femo 引擎按角色组装（soul 卡片 + 记忆 + scope 视角隔离）；AI 节点可走 dsh 子代理（原生工具调用 + 思考链），也可走引擎内置 LLM 桥。
 - 剧本语言升级为 `.femo`：scope 视角隔离、par 并行、fork/join 网关、断点续跑、`@mind` 运行时分发、AI 角色可用 `source` 指定模型；编译期校验，写错立即报错（详见`语法文档.md`）。
-- 配置都在 profile 的 `cordis.patch.yml` 里，全部可省略：`provider` / `model` / `apiUrl`（引擎 AI 节点的 LLM 路由）、`hostAiBackend`、`python`、`femoRoot` 等，不配置也能开箱即用。不想一键安装？把整个文件夹放进 profile 的 `node_modules`（或 junction 过去），`pip install requests`，在 `cordis.patch.yml` 注册 `femo-plugin`，重启 dsh web 即可。注意：插件根目录应注册在 `hostAdapter/dshAdapter` 文件夹下，它会自动往上找两层文件夹。
+- 配置都在 profile 的 `cordis.patch.yml` 里，全部可省略：`provider` / `model` / `apiUrl`（引擎 AI 节点的 LLM 路由）、`hostAiBackend`、`python`、`femoRoot` 等，不配置也能开箱即用。不想一键安装？把整个文件夹放进 profile 的 `node_modules`（或 junction 过去），`pip install requests`，在 `cordis.patch.yml` 注册 `dsh-femo`，重启 dsh web 即可。注意：插件根目录应注册在 `hostAdapter/dshAdapter` 文件夹下，它会自动往上找两层文件夹。
 
 目前还比较早期，bug 不少，欢迎开发者一起来品鉴——它真的非常好玩。
 
 ## 目录结构（自包含布局）
 
 ```
-femo-plugin/                  ← 整个文件夹就是插件
-├── hostAdapter/              宿主适配层（2026-09-13 重构归拢）：
-│   ├── dshAdapter/             dsh 接口侧（host/ 宿主进程 TS + client/ 聊天窗 bundle + python/ 桥进程，见其 README.md）
-│   └── zcodeAdapter/           zcode 接口侧（mcp 网关 / hooks / skills / commands）
-├── femo2host/                引擎→宿主边界层（2026-09-13 重构归拢）：
-│   ├── femo_api.py             引擎门面（宿主唯一 import 入口）
-│   ├── femo_gen_api.jsx        编辑器门面（宿主 client bundle 唯一 import 入口）
-│   └── femoToolcall/           AI 工具箱：femo_debugger / chronica / femo-chat
+dsh-femo/                  ← 整个文件夹就是插件
+├── dshAdapter/               dsh 接口侧（host/ 宿主进程 TS + client/ 聊天窗 bundle + python/ 桥进程，见 dshAdapter/README.md）
 ├── femoGen/                可视化剧本编辑器（React/Vite）
+├── femoToolcall/           AI 工具箱：femo_debugger / chronica / femo-chat
 ├── femoCompiler/            femo 引擎：parser / runtime / 并发 / SQLite 记忆
 ├── femoBridges/             LLM 桥 + getDir（用户目录解析）
 ├── femoExamples/           示例与测试剧本（.femo）+ 伴生 @func 模块
 ├── user_data/              ★ 运行时数据：projects（你的剧本）/ memory（台账）/ host-history（会话显示：projections 投影窗 + drafts 草稿）/ jobs（后端 Job 状态）
 ├── host.manifest.json      宿主能力清单（thinking 档位/默认用户——接别的 harness 换这份文件）
-├── （dsh 插件根 = hostAdapter/dshAdapter/：package.json / lib / build.mjs / cordis.patch.yml / host.manifest.json / tsconfig 都在那里）
+├── build.mjs / package.json / cordis.patch.yml
 ```
 
 **用户数据自包含**：数据库、剧本、checkpoint 都落在本文件夹的 `user_data/` 下——整个文件夹打包/拷贝，数据跟着走。
@@ -430,26 +427,26 @@ femo-plugin/                  ← 整个文件夹就是插件
 
 ```yaml
 - insert:
-    - id: femo-plugin
-      name: 'femo-plugin'
+    - id: dsh-femo
+      name: 'dsh-femo'
       config:
         enabled: true
 ```
 
 ## dsh 版本要求
 
-插件往会话日志写入自定义事件类型 `femo-plugin/chat`。历史加载需要 dsh 的**事件注册面**（`registerSessionEventType`，dsh 官方注释预留的特性）：
+插件往会话日志写入自定义事件类型 `dsh-femo/chat`。历史加载需要 dsh 的**事件注册面**（`registerSessionEventType`，dsh 官方注释预留的特性）：
 
 - **0.1.3+ 官方构建**：插件启动时自动做**运行时白名单注册**（进程内存级，幂等，升级 dsh 后无需任何手工操作）——无需打任何补丁。
 - **含注册面的 dsh**（本特性上游化后的官方版）：完整功能，历史正常加载。
-- **旧版官方原版**（既无注册面、注册又不可用的极端情况）：插件照常工作、live 会话完全正常；**唯一限制**——重启后，含 `femo-plugin/chat` 事件的旧会话历史无法加载（dsh 拒绝未知事件类型是设计行为）。新会话不受影响。
+- **旧版官方原版**（既无注册面、注册又不可用的极端情况）：插件照常工作、live 会话完全正常；**唯一限制**——重启后，含 `dsh-femo/chat` 事件的旧会话历史无法加载（dsh 拒绝未知事件类型是设计行为）。新会话不受影响。
 
 <details>
 <summary>历史方案：给官方 dsh 打白名单补丁（已被运行时注册取代，留档）</summary>
 
 ### 给官方 dsh 打补丁（10 分钟）
 
-让官方版也支持历史加载，只需把 `femo-plugin/chat` 加进 dsh 的**已知事件类型白名单**。改动极小（一个文件一行），下面给出精确到行的操作步骤。
+让官方版也支持历史加载，只需把 `dsh-femo/chat` 加进 dsh 的**已知事件类型白名单**。改动极小（一个文件一行），下面给出精确到行的操作步骤。
 
 **目标文件**：`@deepseek-ai/dsh-session` 包内的 `KNOWN_SESSION_EVENT_TYPES` 定义处。
 
@@ -484,7 +481,7 @@ export const KNOWN_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([
 ```ts
   'command/done',
   'command/run',
-  'femo-plugin/chat',
+  'dsh-femo/chat',
   'compaction/end',
 ```
 
@@ -492,7 +489,7 @@ export const KNOWN_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([
 
 1. 定位包：`node -e "console.log(require.resolve('@deepseek-ai/dsh-session'))"`（或在 `node_modules/@deepseek-ai/dsh-session/lib/` 下找）
 2. 在产物文件里**全文搜索** `command/run`（白名单数组就在它附近），找到形如 `"command/run", "compaction/end"`（或换行写法）的数组
-3. 在 `"command/run"` 之后插入 `"femo-plugin/chat"`（保持数组语法一致）
+3. 在 `"command/run"` 之后插入 `"dsh-femo/chat"`（保持数组语法一致）
 
 **注意事项**：
 
@@ -557,7 +554,7 @@ export const KNOWN_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([
 npm install
 powershell -ExecutionPolicy Bypass -File scripts/link-workspace.ps1   # 建 @deepseek-ai 构建镜像（Windows junction）
 npm run build                 # lib/index.js（host）+ lib/client.js（browser）
-python hostAdapter/dshAdapter/python/dev-bridge-test.py   # 桥接器协议冒烟
+python dshAdapter/python/dev-bridge-test.py   # 桥接器协议冒烟
 ```
 
 ## 许可证

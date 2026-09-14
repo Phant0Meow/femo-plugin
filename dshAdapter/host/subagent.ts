@@ -192,14 +192,19 @@ export async function readSoulPersona(bridge: FemoBridge, soulId: string): Promi
  * 文本键；soul 不进 prompt（走 per-child persona，见下方 readSoulPersona）；
  * _actor_info 是引擎私有 dict（身份元数据），不得当文本拼。契约外键 = 剧本
  * 自定义 context 方法的产出（引擎 block_collector 收集），当前拼装器不识别
- * ——忽略并告警让它可见（静默丢弃会让宿主模式演员缺料且无人知晓）。 */
+ * ——忽略并告警让它可见（静默丢弃会让宿主模式演员缺料且无人知晓）。
+ * 2026-09-13 上下文 JSON 化：context 值为发言条目 JSON 串（soul_id/soul_name/
+ * steps 逐轮轨迹…）；incremental 拍引擎省 system 层四键（basic_safety/
+ * basic_output/soul/user_info）——缺键按 str() 兜底，首轮已喂过不复读。 */
 export const KNOWN_BLOCK_KEYS: ReadonlySet<string> = new Set([
-  'basic_safety', 'basic_output', 'user_info', 'context', 'prompt', 'memory', 'soul', '_actor_info',
+  'basic_safety', 'basic_output', 'user_info', 'context', 'prompt', 'memory', 'showprompt', 'soul', '_actor_info',
 ])
 
 /** Assemble the subagent's initial prompt from the engine's blocks. soul 不在
  * 此列（走 per-child persona，见上方 soul persona 段注释）；引擎侧仍生产
  * blocks['soul']（_exec_ai 的 ai_name 三级兜底依赖它），宿主只不再拼接。
+ * showprompt（2026-09-13 起引擎独立成块、不再折进 prompt）：宿主拼装时折回
+ * [提醒] 前缀，端到端 prompt 与旧引擎逐字节一致。
  * 导出供 subagent-native.ts 共用。 */
 export function buildSubagentPrompt(blocks: Record<string, unknown>): string {
   const str = (key: string): string => (typeof blocks[key] === 'string' ? String(blocks[key]) : '')
@@ -208,10 +213,13 @@ export function buildSubagentPrompt(blocks: Record<string, unknown>): string {
     str('basic_output'),
     str('user_info'),
   ].filter(Boolean).join('\n\n')
-  const parts = [str('context'), str('prompt')]
+  const promptRaw = str('prompt')
+  const showprompt = str('showprompt')
+  const prompt = showprompt ? `[提醒]\n${showprompt}\n\n${promptRaw}` : promptRaw
+  const parts = [str('context'), prompt]
   const memory = str('memory')
   if (memory.length > 0) {
-    parts.push('---\n[回忆]\n根据以上情况，你偶然回忆起了以下记忆，可能有用也可能无用：', memory, str('prompt'))
+    parts.push('---\n[回忆]\n根据以上情况，你偶然回忆起了以下记忆，可能有用也可能无用：', memory, prompt)
   }
   const user = parts.filter(Boolean).join('\n\n')
   return [system, user].filter(Boolean).join('\n\n')

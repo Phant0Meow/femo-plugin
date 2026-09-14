@@ -53,7 +53,7 @@ export class FemoBridge {
     if (attempt > 0) console.log(`[dsh-femo] subprocess service ready after ${attempt}s wait; starting bridge`)
     // Bridge lives inside the Femo project itself (self-contained plugin):
     // <femoRoot>/python/femo_bridge.py
-    const bridgePath = join(config.femoRoot, 'hostAdapter', 'python', 'femo_bridge.py')
+    const bridgePath = join(config.femoRoot, 'dshAdapter', 'python', 'femo_bridge.py')
     // 宿主能力清单（A2.1 解耦）：harness 的词汇与环境（thinking 档位/默认用户）
     // 由接口侧这份文件提供，引擎启动时读取——换 harness 换文件，引擎零改动。
     // 文件缺失时引擎用内置缺省（standalone 自圆满）。

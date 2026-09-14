@@ -1,11 +1,11 @@
-# hostAdapter — dsh 接口侧
+# dshAdapter — dsh 接口侧
 
 Femo 引擎与 dsh 宿主之间的全部胶水代码。与 `femoCompiler/`（引擎本体）、`femoGen/`（编辑器）、`femoBridges/`（引擎 LLM 出口）平级。
 
 分两半，**两半零共享文件**（2026-08-23 重构定的线）：
 
 ```
-hostAdapter/
+dshAdapter/
 ├── host/     Node 侧：跑在 dsh 宿主进程，入口 index.ts  → lib/index.js
 ├── client/   浏览器侧：打进聊天窗 bundle，入口 client.tsx → lib/client.js
 └── python/   桥进程 femo_bridge.py（stdio JSON-RPC，host/ 的 bridge.ts 拉起）
@@ -35,13 +35,27 @@ hostAdapter/
 - `client-ui/`：聊天窗 React 组件——`composer.tsx`（输入）、`chat-node.tsx` /
   `turn-nodes.tsx`（回合渲染）、`femo-stream-live.tsx`（SSE 活帧）、
   `stream-store.ts` / `view-state.ts`（状态）、`editor-page.tsx` / `editor-view.tsx`
-  （编辑器标签页，直接 `import` `femoGen/src/FemoWorAuto` 内嵌整个编辑器应用）、
-  `proj2/`（转写层）
+  （编辑器标签页，经 `femoGen/femo_gen_api.jsx` 门面 import 编辑器应用——
+  宿主不深入 femoGen/src 内部）、`proj2/`（转写层）
 - 散件：`lineage-fork.jsx` / `lineage-fork-native.jsx`（谱系分叉 UI）、
   `fa-icons.tsx`、`femo-reasoning-row.tsx`
 
+## python/ — 桥进程
+
+`femo_bridge.py`（stdio NDJSON JSON-RPC，`host/bridge.ts` 拉起）。引擎面唯一
+入口 = `femoCompiler/femo_api.py`（2026-09-13 API 化改造）：桥只准 import 这个
+门面，不直接 import 引擎内部模块（parse_script / FEMORunner / JobManager /
+db_utils / host_manifest）——引擎内部重构保住门面签名即可，桥与宿主零改动。
+私有属性注入（`_human_input_event` / `_host_ai_backend` / `_context_mode`）
+已在门面 `create_runner` 收口为显式参数。
+
+零 token 干跑也已收进门面（`femo_api.debug_dry_run`，与 CLI run 子命令同一
+实现面），但本宿主仍走一次性子进程 CLI（`debug-run.ts` spawn
+`femoToolcall/femo_debugger.py`）：干跑要能被 terminate 不留僵尸、不与运行桥
+同进程（门面函数在桥进程内禁用——print 会污染 NDJSON 流）。
+
 ## 注意
 
-- `host.manifest.json` 留在**仓库根**——dsh 按插件根目录约定找它，挪进 hostAdapter 会失联。
+- `host.manifest.json` 留在**仓库根**——dsh 按插件根目录约定找它，挪进 dshAdapter 会失联。
 - `tests/` 里三个 mjs 单测（safe-steer / pre-step-gate / main-delivery-queue）
-  用 esbuild 直接打包 `hostAdapter/host/` 的源文件跑，改路径记得同步。
+  用 esbuild 直接打包 `dshAdapter/host/` 的源文件跑，改路径记得同步。

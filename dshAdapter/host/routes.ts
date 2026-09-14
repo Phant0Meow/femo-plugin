@@ -23,7 +23,7 @@ import {
   readSessionScriptText, readSessionCurrentJob, readSessionJobIds, readActorUsageFile,
 } from './state-files'
 import { handleCreateSession, handleRunOnSession, handleSaveScript, handleReadScript, collectLlmModels, ensureSessionLive } from './run-control'
-import { listFemoFiles, readLedgerFemoFile, rememberFemoFile } from './femo-files'
+import { forgetFemoFile, listFemoFiles, readLedgerFemoFile, rememberFemoFile } from './femo-files'
 import { handleProjectionInput } from './projection-input'
 import { isNativeMode } from './windowing-native'
 import { handleDebugRun } from './debug-run'
@@ -940,6 +940,27 @@ export function registerRoutes(ctx: Context, deps: RoutesDeps): void {
           // 打开成功也算一次使用，把它顶到清单最前
           await rememberFemoFile(resolved.femoRoot, path, 'import')
           writeJson(res, 200, { ok: true, path, content })
+        })().catch((error: unknown) => {
+          writeJson(res, 500, { ok: false, error: String(error) })
+        })
+      },
+    })
+    webServer.register({
+      kind: 'exact',
+      path: '/dsh-femo/forget-femo-file',
+      handler: (req: IncomingMessage, res: ServerResponse): void => {
+        void (async () => {
+          // 从清单移除一条（2026-09-13）：只划账本，**源文件零接触**——
+          // 移除键的语义边界在 host 侧守住，前端文案只是转述这里的行为。
+          // 路径不在账本里也返回 ok（幂等，见 forgetFemoFile 注释）。
+          const raw = await readBody(req) as unknown as Record<string, unknown>
+          const path = typeof raw.path === 'string' ? raw.path.trim() : ''
+          if (path.length === 0) {
+            writeJson(res, 400, { ok: false, error: 'path is required' })
+            return
+          }
+          const removed = await forgetFemoFile(resolved.femoRoot, path)
+          writeJson(res, 200, { ok: true, removed })
         })().catch((error: unknown) => {
           writeJson(res, 500, { ok: false, error: String(error) })
         })

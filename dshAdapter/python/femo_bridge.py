@@ -2,8 +2,10 @@
 """
 femo_bridge.py — stdio NDJSON JSON-RPC bridge for the Femo compiler.
 
-Runs the Femo engine (FEMO_parser + FEMO_runtime) as a headless subprocess and
-speaks newline-delimited JSON over stdin/stdout:
+Runs the Femo engine as a headless subprocess and speaks newline-delimited
+JSON over stdin/stdout. 引擎面唯一入口 = femoCompiler/femo_api.py（门面）：
+本桥不直接 import 引擎内部模块——引擎内部重构保住门面签名即可，宿主与桥
+零改动（2026-09-13 API 化改造）:
 
   host -> bridge:  {"id": 1, "cmd": "job_start", "args": {...}}
   bridge -> host:  {"type": "response", "id": 1, "ok": true, "result": {...}}
@@ -34,6 +36,10 @@ Retired: run / pause / resume / get_checkpoint (zero live consumers; host
 switched in the same commit — no shims §八.6).
 
 Protocol notes:
+  - 引擎面唯一入口：femoCompiler/femo_api.py 门面——本桥的全部引擎消费
+    （parse_script / FEMORunner / JobManager / db_utils / host_manifest /
+    BLOCK_KEYS）都经它；私有属性注入（_human_input_event/_host_ai_backend/
+    _context_mode）已在门面 create_runner 收口为显式参数。
   - One JSON object per line, UTF-8. Every outbound line goes through a lock
     (event callbacks fire from LLM stream threads).
   - ai_request.blocks 料包键词汇契约见 femoCompiler/protocol.py BLOCK_KEYS
@@ -63,11 +69,6 @@ import argparse
 import time
 import traceback
 
-# fork 循环回流每轮嵌套一层 asyncio 任务（见 FEMO_runtime._run_fork），
-# 深层任务链的 Task.cancel() 是同步递归，默认 1000 栈深会在 stop 时
-# RecursionError（maximum recursion depth exceeded）。提高递归限制兜底。
-sys.setrecursionlimit(200_000)
-
 # ── resolve the Femo project root ────────────────────────────────────────
 def resolve_femo_root():
     root = os.environ.get("FEMO_ROOT", "")
@@ -77,11 +78,9 @@ def resolve_femo_root():
 
 def ensure_default_data():
     """Insert Femo's default souls/users (idempotent) so ai_name resolution
-    (get_soul_by_id) finds the built-in characters (Eve, littlecat, ...)."""
+    (get_soul) finds the built-in characters (Eve, littlecat, ...)."""
     try:
-        from femoCompiler.db_utils import init_database, ensure_default_data as _seed
-        init_database()
-        _seed()
+        femo_api.seed_default_data()
     except Exception as exc:
         sys.stderr.write(f"femo_bridge: ensure_default_data failed: {exc}\n")
 
@@ -109,27 +108,18 @@ def main():
         sys.stderr.write("femo_bridge: FEMO_ROOT/--fe4m must point at the Femo project\n")
         sys.exit(2)
     sys.path.insert(0, femo_root)
+
+    # 引擎面唯一入口（2026-09-13 API 化）：全部经 femoCompiler/femo_api.py，
+    # 本桥不再直接 import 引擎内部模块。门面 import 时自带递归上限兜底
+    # （fork 循环深层 Task.cancel() 的同步递归会破默认 1000 栈深）。
+    # ⚠️ 必须先于 --db 处理：set_db_path 要经门面调用（曾在 import 前调用，
+    # Python 作用域把 femo_api 判为局部变量 → 带 --db 启动即 UnboundLocalError）。
+    from femoCompiler import femo_api
+
     if args.db:
         # 账本指向独立库（测试沙盒等用）；生产默认不受影响
-        from femoCompiler.FEMO_config import set_db_path
-        set_db_path(os.path.abspath(args.db))
+        femo_api.set_db_path(os.path.abspath(args.db))
     os.chdir(femo_root)  # keep parse_script's debug file out of the harness cwd
-
-    from femoCompiler import host_manifest
-    from femoCompiler.FEMO_parser import parse_script
-    from femoCompiler.FEMO_runtime import FEMORunner
-    from femoCompiler.job_manager import JobManager, JobError, JobBusyError, fingerprint_script
-
-    def make_soul_checker():
-        """构造 soul 存在性检查器：parse_script 编译期校验 actors 的 soul 用。
-        携带 _soul_ids 可用列表，报错文案末尾附上（db_utils 无列表函数时省略）。"""
-        from femoCompiler.db_utils import check_soul_id_exists, list_all_soul_ids
-
-        def checker(sid: str) -> bool:
-            return check_soul_id_exists(sid)
-
-        checker._soul_ids = list_all_soul_ids()
-        return checker
 
     out_lock = threading.Lock()
 
@@ -156,17 +146,16 @@ def main():
     # 绝不因清单问题炸启动。
     manifest_path = args.host_manifest or os.environ.get("FEMO_HOST_MANIFEST", "")
     if manifest_path:
-        manifest_data, manifest_err = host_manifest.load_manifest_file(manifest_path)
+        notes, manifest_err = femo_api.apply_host_manifest_file(manifest_path)
         if manifest_err is not None:
             print(f"[bridge] 宿主清单未应用：{manifest_err}（用引擎内置缺省词汇）")
         else:
-            notes = host_manifest.apply_manifest(manifest_data)
             print("[bridge] 宿主清单已应用：" + ("；".join(notes) if notes else "（空清单，保持现状）"))
     else:
         print("[bridge] 未提供宿主清单（--host-manifest），引擎用内置缺省词汇")
 
     # ── Job 状态机（引擎侧唯一权威）────────────────────────────────────────
-    jm = JobManager()
+    jm = femo_api.get_job_manager()
     # 【2026-09-07 214 事故改造】启动扫全目录的 reconcile() 退役——它按
     # "不在我内存里=主人死了"把所有 running 档案判 crash，判定依据是本进程
     # 的 _bound，而 runs/ 目录是多进程共享资源（测试 bridge/第二个宿主都会
@@ -208,7 +197,7 @@ def main():
                 if resume_state:
                     # resume：裁决已过、构造即将开始——先确认 running（见上注）。
                     jm.mark_running(job_id)
-                runner = FEMORunner(
+                runner = femo_api.create_runner(
                     script,
                     base_dir=base_dir,
                     verbose=False,
@@ -228,21 +217,13 @@ def main():
                     },
                     # wait_key 世代前缀（§5.6）：跨 Job 键永不重合的机制性免疫
                     run_tag=f'j{job_id}:',
+                    # host_ai_backend=True 时 wait_key 信箱 + 「首轮全量、之后
+                    # 增量」上下文模式由门面装配（_host_ai_backend/
+                    # _context_mode 私有面已收口进 create_runner）。
+                    host_ai_backend=host_ai_backend,
                 )
                 if resume_state:
                     print(f"[bridge] resume state keys: {sorted(resume_state.keys())}")
-                runner._human_input_event = threading.Event()
-                runner._human_input_data = None
-                if host_ai_backend:
-                    # AI 节点走宿主子代理后端：_exec_ai 上行 ai_request 事件，
-                    # 等待 host 回传（human_input 命令，wait_key 形如 j<N>:ai_*）。
-                    runner._host_ai_backend = True
-                    # DSH harness 接口钉死的上下文拼接模式：子代理窗口 durable
-                    # 复用（同 Job 同角色同窗口），首轮喂全量、之后只喂增量——
-                    # 这是 harness 的窗口记忆契约，剧本无感。其他 harness 接口
-                    # 自行决定钉哪种模式；不钉（直连等）吃默认 full。
-                    from femoBridges.ContextExample import MODE_FIRST_FULL_THEN_INCREMENTAL
-                    runner._context_mode = MODE_FIRST_FULL_THEN_INCREMENTAL
                 jm.attach(job_id, runner)
                 runner.run()
                 emit({'type': 'event', 'event': 'bridge_run_ended',
@@ -275,43 +256,24 @@ def main():
         合法语义（引擎对相对路径报错），不能用 femo_root 回退。
         models = 宿主注入的模型白名单（validate_actor_sources 编译期校验
         source 用；None 跳过校验）。
-        编译成功时顺带取出 script.warnings（2026-09-07 warning 桶：编译不
-        阻断的提示），随三个回执上浮宿主；warnings 取不到按空列表（旧
-        Script 无此字段时防 AttributeError）。"""
-        script = parse_script(
+        编译成功时顺带取出 script.warnings（2026-09-07 warning 桶），随回执
+        上浮宿主。实现在门面 femo_api.compile_script（soul 检查器由门面自备），
+        这里只剩宿主侧的 base_dir 兜底策略；返回 CompileResult
+        （script=不透明句柄，只许传回 create_runner）。"""
+        return femo_api.compile_script(
             femo_text,
             base_dir=base_dir if base_dir is not None else femo_root,
-            soul_checker=make_soul_checker(),
             models=models,
         )
-        return script, list(getattr(script, 'warnings', None) or [])
 
     # ── command dispatch ───────────────────────────────────────────────────
     def dispatch_inner(req_id, cmd, args_obj):
         if cmd == "ping":
             send_response(req_id, True, {"pong": True})
         elif cmd == "list_scripts":
-            # Scan both the Femo project's bundled projects dir and the
-            # user-data projects dir (get_user_dir may resolve elsewhere).
-            from femoBridges.getDir.get_dir import get_user_dir
-            candidates = []
-            local_projects = os.path.join(femo_root, "user_data", "projects")
-            if os.path.isdir(local_projects):
-                candidates.append(local_projects)
-            home_projects = os.path.join(get_user_dir(), "user_data", "projects")
-            if os.path.isdir(home_projects) and home_projects not in candidates:
-                candidates.append(home_projects)
-            scripts = []
-            for projects in candidates:
-                for name in sorted(os.listdir(projects)):
-                    sub = os.path.join(projects, name)
-                    if os.path.isdir(sub):
-                        for f in sorted(os.listdir(sub)):
-                            if f.endswith(".femo"):
-                                scripts.append(os.path.join(sub, f))
-                    elif name.endswith(".femo"):
-                        scripts.append(sub)
-            send_response(req_id, True, {"scripts": scripts})
+            # 扫引擎自带 projects 目录 + 宿主用户目录（get_user_dir 可解析到
+            # 别处）；扫描与去重实现在门面 femo_api.list_scripts。
+            send_response(req_id, True, {"scripts": femo_api.list_scripts(femo_root)})
         elif cmd == "check":
             # 同步编译校验（femo-run 工具路径）：编译错误作为工具返回结果，
             # 带细节指导主模型改剧本；不启动运行、不产生状态。
@@ -320,11 +282,11 @@ def main():
                 send_response(req_id, False, error="femo is empty")
                 return
             try:
-                script, warnings = run_compile(femo_text, args_obj.get("base_dir"), args_obj.get("models"))
+                res = run_compile(femo_text, args_obj.get("base_dir"), args_obj.get("models"))
                 # warnings 随回执上浮（2026-09-07 warning 桶）：编译放行的提示
                 # 交宿主转告作者/主模型——编译没被阻断，但应当知情。
-                send_response(req_id, True, {"ok": True, "actions": len(script.actions),
-                                             "warnings": warnings})
+                send_response(req_id, True, {"ok": True, "actions": res.action_count,
+                                             "warnings": res.warnings})
             except Exception as exc:
                 traceback.print_exc(file=sys.stderr)
                 send_response(req_id, False, error=str(exc))
@@ -335,9 +297,9 @@ def main():
                 return
             ensure_default_data()
             # 同步编译先行：编译失败的剧本连 Job 文件都不产生（脏 Job 号零残留）
-            script, warnings = run_compile(femo_text, args_obj.get("base_dir"), args_obj.get("models"))
+            res = run_compile(femo_text, args_obj.get("base_dir"), args_obj.get("models"))
             rec = jm.create_job(
-                fingerprint_script(femo_text),
+                femo_api.fingerprint_script(femo_text),
                 # host_ref 旧协议名 owner_tag 兼容（旧宿主不断）
                 host_ref=str(args_obj.get("host_ref", args_obj.get("owner_tag", "")) or ""),
                 script_name=str(args_obj.get("script_name", "") or ""),
@@ -347,7 +309,7 @@ def main():
                 script_text=femo_text,
             )
             spawn_job_worker(
-                rec.job_id, script,
+                rec.job_id, res.script,
                 # base_dir：有剧本地址=剧本目录；未保存=空串（引擎对相对路径报错）。
                 args_obj.get("base_dir") if args_obj.get("base_dir") is not None else femo_root,
                 args_obj.get("user_api_key"),
@@ -358,7 +320,7 @@ def main():
                 resume_state=None,
             )
             send_response(req_id, True, {"job_id": rec.job_id, "state": rec.state,
-                                         "warnings": warnings})
+                                         "warnings": res.warnings})
         elif cmd == "job_resume":
             femo_text = args_obj.get("femo", "")
             job_id = args_obj.get("job_id")
@@ -375,16 +337,16 @@ def main():
             jm.reconcile_stale(job_id)
             ensure_default_data()
             # 同步编译先行（同 job_start）
-            script, warnings = run_compile(femo_text, args_obj.get("base_dir"), args_obj.get("models"))
+            res = run_compile(femo_text, args_obj.get("base_dir"), args_obj.get("models"))
             # 六关裁决（JobManager.resume_job，JobError 带原话上浮宿主——B2/C2）
-            rec = jm.resume_job(job_id, fingerprint_script(femo_text),
+            rec = jm.resume_job(job_id, femo_api.fingerprint_script(femo_text),
                                 host_ref=str(args_obj.get("host_ref", args_obj.get("owner_tag", "")) or ""),
                                 new_text=femo_text)
             # resume_state 由引擎档案提供（build_resume_state），宿主不再传——
             # 断点权威在 runs/<job_id>.json，指纹/场次/断点六关已裁决。
             resume_state = jm.build_resume_state(rec)
             spawn_job_worker(
-                job_id, script,
+                job_id, res.script,
                 args_obj.get("base_dir") if args_obj.get("base_dir") is not None else femo_root,
                 args_obj.get("user_api_key"),
                 args_obj.get("user_api_provider"),
@@ -395,7 +357,7 @@ def main():
             )
             send_response(req_id, True, {"resumed": True, "job_id": job_id,
                                          "femo_session_id": rec.femo_session_id,
-                                         "warnings": warnings})
+                                         "warnings": res.warnings})
         elif cmd == "job_pause":
             job_id = args_obj.get("job_id")
             if not isinstance(job_id, int):
@@ -490,8 +452,7 @@ def main():
             if not soul_id:
                 send_response(req_id, False, error="soul_id is required")
                 return
-            from femoCompiler.db_utils import get_soul_by_id as _get_soul_by_id
-            soul = _get_soul_by_id(soul_id)
+            soul = femo_api.get_soul(soul_id)
             if soul:
                 send_response(req_id, True, {"found": True, **soul})
             else:
@@ -499,12 +460,9 @@ def main():
                               {"found": False, "soul_id": soul_id, "description": ""})
         elif cmd == "list_souls":
             # femo-soul list：返回全部角色（精简 id+名字，主模型写剧本选角用）。
-            from femoCompiler.db_utils import list_souls as _list_souls
-            send_response(req_id, True, {"souls": _list_souls()})
+            send_response(req_id, True, {"souls": femo_api.list_souls()})
         elif cmd == "create_soul":
             # 插件模式 soul 创建：user_id/created_by 固定为默认用户 u001（前端不再输入）。
-            from femoCompiler.db_utils import create_soul as _create_soul
-            from femoCompiler.db_utils import check_soul_id_exists
             soul_id = str(args_obj.get("soul_id", "")).strip()
             soul_name = str(args_obj.get("soul_name", "")).strip()
             description = str(args_obj.get("description", ""))
@@ -512,18 +470,20 @@ def main():
             if not soul_id:
                 send_response(req_id, False, error="soul_id is required")
                 return
-            if check_soul_id_exists(soul_id):
-                send_response(req_id, False,
-                              error=f'soul_id "{soul_id}" 已存在（角色库中已有同名角色，请换一个 soul_id）')
+            # 重号 ValueError（人话文案）由门面 create_soul 抛出——本地捕获，
+            # 错误形态与旧 check-then-create 两段式逐字节一致，stderr 不留 traceback。
+            try:
+                femo_api.create_soul(soul_id, soul_name, description, user_id)
+            except ValueError as exc:
+                send_response(req_id, False, error=str(exc))
                 return
-            _create_soul(soul_id, soul_name, description, user_id)
             send_response(req_id, True, {"soul_id": soul_id})
         elif cmd == "shutdown":
             # 全场停止：对每个挂靠 Runner stop（取消链启动 → 取消路径
             # on_state_change 落 suspended——关机也诚实落挂起），然后 join 全部
             # worker（timeout=5）再回执+exit——旧实现 stop 后 0.2s os._exit，
             # 取消传播+落盘是异步的，可能没写盘就死（§7.2 shutdown 修正）。
-            for job_id in list(jm._bound):
+            for job_id in femo_api.bound_job_ids():
                 runner = jm.runner_of(job_id)
                 if runner is not None:
                     try:
@@ -543,11 +503,11 @@ def main():
         每个命令必须给明确答复 {ok:false, error:<code>, detail:<人话>}。"""
         try:
             dispatch_inner(req_id, cmd, args_obj)
-        except JobBusyError as exc:
+        except femo_api.JobBusyError as exc:
             send_response(req_id, False, error=exc.code, detail=exc.detail,
                           extra={"active_job_id": exc.active_job_id,
                                  "active_host_ref": exc.active_host_ref})
-        except JobError as exc:
+        except femo_api.JobError as exc:
             send_response(req_id, False, error=exc.code, detail=exc.detail)
 
     # ── stdin loop ─────────────────────────────────────────────────────────

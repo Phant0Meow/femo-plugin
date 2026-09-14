@@ -101,11 +101,16 @@ BLOCK_KEYS = {
     'basic_output': '输出风格/格式要求 → system 层',
     'soul': '演员 soul 卡描述（souls.description）。宿主模式不进 prompt——走子代理 persona；直连模式进 system',
     'user_info': '演员对应用户（human 身份）的资料 → system 层',
-    'context': '场上可见发言流水（scope 视角过滤后）→ user 层前部',
+    'context': '场上可见发言流水（scope 视角过滤后）→ user 层前部。2026-09-13 起 JSON 形态：发言条目列表，每条 {"soul_id","soul_name","steps":[...]}——steps 逐轮轨迹（dialog 行单轮；AI 行按 react 轮展开，每轮 cot/tool_call/tool_result/response 按键存在性表达 VISIBILITY），消费口径：台词=最后一个非空 response',
     'prompt': '本节点指令 → user 层；有 memory 时 user 末尾再重复一次（提醒当前任务）',
     'memory': '该演员的记忆检索结果 → user 层中段（垫「[回忆]」提示）',
+    'showprompt': '节点提醒文案（2026-09-13 起独立成块，已变量替换；不再折进 prompt——执行后端自定渲染位置，dsh 宿主折回 [提醒] 前缀）。incremental 拍与 system 层同在，随包不省',
     '_actor_info': '引擎私有（dict 非文本，身份元数据）——随包透传，不得当文本拼',
 }
+# 模式分集（2026-09-13 上下文 JSON 化）：full 拍（含 FFTI 首次）= 全键；
+# incremental 拍 = {context, memory, showprompt, prompt, _actor_info}——
+# 省 system 层四键（basic_safety/basic_output/soul/user_info），首轮已喂过，
+# 窗口不复读。消费方按缺键容错（宿主拼装器 str() 兜底，llmBridge .get 兜底）。
 # 契约外键：剧本可挂自定义 context 方法，其产出会以自定义键写入 blocks
 # （block_collector 收集）。宿主拼装器当前不识别 → 忽略 + 告警（可见性），
 # 即自定义 context 料仅在直连模式生效——这是已知边界，不是事故。

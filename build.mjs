@@ -15,7 +15,7 @@ const watch = process.argv.includes('--watch');
 const nodePaths = [fileURLToPath(new URL('./node_modules', import.meta.url))];
 
 const clientOptions = {
-  entryPoints: ['hostAdapter/client/client.tsx'],
+  entryPoints: ['dshAdapter/client/client.tsx'],
   bundle: true,
   platform: 'browser',
   format: 'cjs',
@@ -46,7 +46,7 @@ const clientOptions = {
 };
 
 const hostOptions = {
-  entryPoints: ['hostAdapter/host/index.ts'],
+  entryPoints: ['dshAdapter/host/index.ts'],
   bundle: true,
   platform: 'node',
   format: 'esm',
@@ -65,7 +65,7 @@ const hostOptions = {
 if (watch) {
   await (await context(clientOptions)).watch();
   await (await context(hostOptions)).watch();
-  console.log('[build] watching hostAdapter/ for changes...');
+  console.log('[build] watching dshAdapter/ for changes...');
 } else {
   await Promise.all([build(clientOptions), build(hostOptions)]);
 }

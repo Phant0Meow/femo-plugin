@@ -311,7 +311,7 @@ const mainCheckpointLabel = (checkpoint) => {
   return typeof first === 'string' && first.length > 0 ? first : null;
 };
 
-const FEMOEditor = forwardRef(function FEMOEditor({ plugin = false, onRun, onPause, initialScript, initialCheckpoint, initialRunning = false, onExport, onImport, onListFemoFiles, onPickFemoFile, savedPath, onBackToShell, onRestoreError, onPersistScript, getRecordScript, sessionId = '', enginePending = false, initialJobId, jobIds, initialWaitingHuman, initialLastError } = {}, ref) {
+const FEMOEditor = forwardRef(function FEMOEditor({ plugin = false, onRun, onPause, initialScript, initialCheckpoint, initialRunning = false, onExport, onImport, onListFemoFiles, onPickFemoFile, onForgetFemoFile, savedPath, onBackToShell, onRestoreError, onPersistScript, getRecordScript, sessionId = '', enginePending = false, initialJobId, jobIds, initialWaitingHuman, initialLastError } = {}, ref) {
 // 插件模式：由 dsh-femo 注入（plugin=true）——运行/暂停走插件回调，
 // SSE 连插件广播路由；独立模式保留原后端调用（getBackendBaseUrl）。
 // initialScript/initialCheckpoint/initialRunning：会话恢复（刷新/重启/运行中打开）。
@@ -725,6 +725,8 @@ const [userApiModel, setUserApiModel] = useState(() => {
   const [femoFileError, setFemoFileError] = useState('');
   /** 正在打开的那条路径（行内「打开中…」+ 全表禁用防连点）。 */
   const [femoFileBusyPath, setFemoFileBusyPath] = useState(null);
+  /** 正在移出清单（2026-09-13）：移除请求在途时全表 ⊖ 键防连点。 */
+  const [femoFileForgetBusy, setFemoFileForgetBusy] = useState(false);
 
   const cvRef = useRef(null);
   // 编辑器根容器（桌面分支外层 div）：内嵌 dsh tab 时「编辑器以为的屏幕」
@@ -3310,6 +3312,27 @@ const submitHumanInput = useCallback(
       .finally(() => { setFemoFileBusyPath(null); });
   }
 
+  // ── 移出清单（2026-09-13）──
+  // 只把这条记录从清单里划掉，**源文件零接触**（host forget-femo-file 只删
+  // 账本条目）。成功后本地同步剔除，不等重拉——清单是纯账本，本地删了 host
+  // 必然也删了；失败则亮错误条并重拉对账。
+  function handleForgetFromList(path) {
+    if (typeof onForgetFemoFile !== 'function' || femoFileForgetBusy) return;
+    setFemoFileForgetBusy(true);
+    Promise.resolve()
+      .then(() => onForgetFemoFile(path))
+      .then(() => {
+        setFemoFileError('');
+        setFemoFileList((list) => list.filter((f) => f.path !== path));
+      })
+      .catch((err) => {
+        console.warn('[导入清单] 移除失败:', err);
+        setFemoFileError(String(err?.message ?? err));
+        loadFemoFileList();
+      })
+      .finally(() => { setFemoFileForgetBusy(false); });
+  }
+
   async function handleToolbarExport() {
     if (exportBusy) return;
     console.log('[导出 .femo] 开始即时生成');
@@ -3944,6 +3967,7 @@ nodes={nodes}
           error={femoFileError}
           busyPath={femoFileBusyPath}
           onPick={handlePickFromList}
+          onForget={typeof onForgetFemoFile === 'function' ? handleForgetFromList : undefined}
           onClose={() => setFemoFileOpen(false)}
         />
       </ErrorBoundary>
@@ -5409,6 +5433,7 @@ if (enrichedNode.type === 'par_out') {
         error={femoFileError}
         busyPath={femoFileBusyPath}
         onPick={handlePickFromList}
+        onForget={typeof onForgetFemoFile === 'function' ? handleForgetFromList : undefined}
         onBrowse={handleBrowseImport}
         onClose={() => setFemoFileOpen(false)}
       />

@@ -23,7 +23,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import { femoStreamAcquire, subscribeControlEvents } from './stream-store'
-import FEMOEditor from '../../../femoGen/src/FemoWorAuto'
+import FEMOEditor from '../../../femoGen/femo_gen_api'
 
 /** 编辑器页需要的注入能力（原 ScriptViewInjected 语义——宿主注入给页面）。 */
 export interface EditorPageInjected {
@@ -603,6 +603,18 @@ function FemoEditorPage({ sessionId, injected }: { sessionId: string; injected: 
     return await recordAndLoad(pickedPath, pickedContent)
   }
 
+  /** 导入·从清单移除一条（2026-09-13）：只划 host 侧账本（femo-files.ts），
+   *  源文件零接触。路径不在账本里也 ok（幂等）。 */
+  const onForgetFemoFile = async (path: string): Promise<void> => {
+    const resp = await fetch('/dsh-femo/forget-femo-file', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path }),
+    })
+    const data = await readJsonOrThrow<{ ok?: boolean; error?: string }>(resp, '从清单移除')
+    if (data.ok !== true) throw new Error(data.error ?? '从清单移除失败')
+  }
+
   return (
     <div style={{ width: '100%', height: '100%' }}>
       <FEMOEditor
@@ -617,6 +629,7 @@ function FemoEditorPage({ sessionId, injected }: { sessionId: string; injected: 
         onImport={onImport}
         onListFemoFiles={onListFemoFiles}
         onPickFemoFile={onPickFemoFile}
+        onForgetFemoFile={onForgetFemoFile}
         onBackToShell={injected.toggleSidebar}
         savedPath={state?.scriptPath}
         initialScript={state?.script}

@@ -17,5 +17,5 @@
       "D:/myFiles/dsh/dsh-meow0.1.1-rc.2/node_modules/.pnpm/@types+node@22.20.0/node_modules/@types"
     ]
   },
-  "include": ["hostAdapter"]
+  "include": ["dshAdapter"]
 }

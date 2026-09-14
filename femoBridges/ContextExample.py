@@ -16,6 +16,7 @@ harness 接口决定 mode（DSH 宿主后端钉 first_full_then_incremental）�
 剧本无感；直连模式等不钉的调用方吃默认 full。
 """
 
+import json
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -237,15 +238,28 @@ def _last_speech_turn(session_id: int, soul_id: str) -> Optional[int]:
 
 
 def _render_context(records: List[Dict[str, Any]], soul_ids: List[str],
-                    actors_def: Optional[dict] = None) -> str:
-    """把可见记录行渲染成上下文文本（原 get_session_context 后半段）。
+                    actors_def: Optional[dict] = None,
+                    as_json: bool = False) -> str:
+    """把可见记录行渲染成上下文（原 get_session_context 后半段）。
 
     scope 过滤已由 _get_records_visible_to 完成；这里负责名字解析、react 行
-    按 (turn_id, soul_id) 分组、VISIBILITY 拼装（cot/tool 剥离在此）、排序、
-    [名字]：\n内容 拼接。名字走双名制「@戏中名（Soul name）」（不去重），
-    actors_def 缺席时退回单名（原行为）。"""
+    按 (turn_id, soul_id) 分组、VISIBILITY 拼装（cot/tool 剥离在此）、排序。
+
+    as_json=False（缺省）：文本形态——「[名字]：\\n内容」按序拼接（原行为）。
+    名字走双名制「@戏中名（Soul name）」（不去重），actors_def 缺席时退回
+    单名（原行为）。
+
+    as_json=True：结构化形态——发言条目列表的 JSON 串（ensure_ascii=False）。
+    每条 {"soul_id", "soul_name", "steps": [...]}；steps = 该发言的逐轮轨迹：
+      - dialog 行（旁白/提醒/人类输入）天然单轮 → steps 只有一个
+        {"response": 内容}；
+      - AI 发言按 react 轮逐轮展开，每轮 {"cot"?, "tool_call"?, "tool_result"?,
+        "response"?}——键是否存在 = VISIBILITY 常量裁决（别人的轮次根本不
+        带 cot/tool 键），键在 = 允许显示且非空。
+    消费口径：台词 = 最后一个非空 response；要全轨迹展示直接遍历 steps。
+    节点提醒行（femoshow-*）另带条目级 "showprompt": true。"""
     if not records:
-        return ""
+        return "[]" if as_json else ""
 
     # 排序主键（2026-08-29 换 turn 主序）：turn_id 在 _alloc_turn 后=节点因果
     # 序，par 慢分支的发言按自己节拍归位（910 实证），不再被墙钟完成时间打乱；
@@ -324,9 +338,11 @@ def _render_context(records: List[Dict[str, Any]], soul_ids: List[str],
         return bool(soul_ids) and row_soul in {str(s) for s in soul_ids}
 
     # react 行按 (turn_id, soul_id) 分组成一个发言块；dialog 行（旁白/提醒/
-    # 人类输入）保持逐行。blocks 元素=(turn_id, timestamp, idx, seq, name, content)。
+    # 人类输入）保持逐行。items 元素=(turn_id, timestamp, idx, seq, entry, rounds)：
+    # entry 是结构化发言条目（soul_id/soul_name/response[+cot/tool_results]），
+    # rounds 仅 AI 发言块带（每轮一条拼好的文本，文本形态用）。
     ai_groups = {}
-    blocks = []
+    items = []
     seq = 0
     for r in records:
         name = get_name(r)
@@ -340,46 +356,87 @@ def _render_context(records: List[Dict[str, Any]], soul_ids: List[str],
             g["rows"].append(r)
             g["ts"] = min(g["ts"], ts)
         else:
-            content = r.get("content", "")
-            blocks.append((turn, ts, r.get("oratio_idx", 0) or 0, seq, name, content))
+            entry = {
+                "soul_id": str(r.get("soul_id") or ""),
+                "soul_name": name,
+                # 统一条目形状（2026-09-13 v2）：一切发言都是 steps——dialog 行
+                # （旁白/提醒/人类输入）天然单轮，AI 行见下方逐 react 轮展开。
+                "steps": [{"response": r.get("content", "")}],
+            }
+            # femoshow-* 行 = 节点提醒（showprompt 的落库形态）——文本形态渲染成
+            # [节点提醒] 前缀（get_name 已返回），JSON 形态加标记位供消费方识别。
+            if str(r.get("user_id") or "").startswith("femoshow-"):
+                entry["showprompt"] = True
+            items.append((turn, ts, r.get("oratio_idx", 0) or 0, seq, entry, None))
             seq += 1
     for key in sorted(ai_groups.keys()):
         g = ai_groups[key]
         vis = VISIBILITY.get("self" if g["self"] else "other", VISIBILITY["other"])
         rounds = []
+        steps = []
         for row in sorted(g["rows"], key=lambda x: (x.get("step_idx", 0) or 0)):
             parts = []
-            if vis.get("cot") and str(row.get("cot") or "").strip():
-                parts.append(f"[思考] {str(row['cot']).strip()}")
-            if vis.get("tool"):
-                tool_result = str(row.get("tool_result") or "").strip()
-                tool_call = str(row.get("tool_call") or "").strip()
-                if tool_result:
-                    parts.append(tool_result)
-                elif tool_call:
-                    parts.append(f"[工具调用] {tool_call}")
+            step = {}
+            cot_s = str(row.get("cot") or "").strip()
+            tool_result = str(row.get("tool_result") or "").strip()
+            tool_call = str(row.get("tool_call") or "").strip()
             # 注意：SELECT 里 response AS content——ai 行的发言在 content 键，
             # 读 response 键会永远拿到空（915 场实测：Eve 谜面整块消失）。
             resp_text = str(row.get("content") or row.get("response") or "").strip()
+            # 可见性语义（2026-09-13 v2）：VISIBILITY 决定「键是否存在」——
+            # 别人的轮次根本不带 cot/tool 键；键在 = 允许显示且非空。
+            # 每行一个 step（react 轮），逐轮全量保留，消费方自行取舍
+            # （现状：台词 = 最后一个非空 response；将来要全轨迹展示直接遍历）。
+            if vis.get("cot") and cot_s:
+                parts.append(f"[思考] {cot_s}")
+                step["cot"] = cot_s
+            if vis.get("tool"):
+                if tool_result:
+                    parts.append(tool_result)
+                    step["tool_result"] = tool_result
+                elif tool_call:
+                    parts.append(f"[工具调用] {tool_call}")
+                if tool_call:
+                    # 轨迹完整性（2026-09-13 v2）：call 与 result 都独立留键——
+                    # 文本形态保持 result 优先的旧排版，JSON 不丢调用原文。
+                    step.setdefault("tool_call", tool_call)
             if vis.get("response") and resp_text:
                 parts.append(resp_text)
+                step["response"] = resp_text
             if parts:
                 rounds.append("\n".join(parts))
+            if step:
+                steps.append(step)
         if not rounds:
             continue
+        entry = {"soul_id": key[1], "soul_name": g["name"], "steps": steps}
         # idx 取大数：同一 turn 内 react 块永远排在 prompt/show/人类输入之后
-        blocks.append((key[0], g["ts"], 10 ** 9, seq, g["name"], "\n\n".join(rounds)))
+        items.append((key[0], g["ts"], 10 ** 9, seq, entry, rounds))
         seq += 1
-    blocks.sort(key=lambda b: (b[0], b[1], b[2], b[3]))
-    lines = [f"[{name}]：\n{content}" for _, _, _, _, name, content in blocks]
+    items.sort(key=lambda it: (it[0], it[1], it[2], it[3]))
+    if as_json:
+        return json.dumps([it[4] for it in items], ensure_ascii=False)
+    lines = []
+    for _, _, _, _, entry, rounds in items:
+        if rounds is None:
+            lines.append(f"[{entry['soul_name']}]：\n{entry['steps'][0]['response']}")
+        else:
+            lines.append(f"[{entry['soul_name']}]：\n" + "\n\n".join(rounds))
     return "\n\n".join(lines)
 
 
 # ═══ 三种拼接模式（只写拼接过程，工具全走上面的公共函数）════════════════
 
-def full(session_id: int, actor_info: dict, actors_def: dict = None) -> str:
-    """全量：本条之前所有可见内容（原有行为）。"""
+def _fetch_visible(session_id: int, actor_info: dict, mode: str):
+    """按模式取本演员可见记录（full/incremental/JSON 形态共用的取数口）。
+
+    full=从头全量；incremental/FFTI=上次本人发言之后（查库定起点，无既往
+    发言=从头）。返回 (records, soul_ids)。"""
     user_ids, soul_ids = _actor_scope_ids(actor_info)
+    after_turn = None
+    if mode in (MODE_INCREMENTAL, MODE_FIRST_FULL_THEN_INCREMENTAL):
+        ask_soul = soul_ids[0] if soul_ids else ''
+        after_turn = _last_speech_turn(session_id, ask_soul)
     records = _get_records_visible_to(
         user_ids=user_ids if user_ids else None,
         soul_ids=soul_ids if soul_ids else None,
@@ -387,8 +444,14 @@ def full(session_id: int, actor_info: dict, actors_def: dict = None) -> str:
         include_ai=True,
         max_turns=999999,  # 足够大的数，取所有记录
     )
+    return records, soul_ids
+
+
+def full(session_id: int, actor_info: dict, actors_def: dict = None) -> str:
+    """全量：本条之前所有可见内容（原有行为）。"""
+    records, soul_ids = _fetch_visible(session_id, actor_info, MODE_FULL)
     print(f"[ctx-dbg] session={session_id} full 模式检索到 {len(records)} 条可见记录 "
-          f"(ask_u={user_ids}, ask_s={soul_ids})")
+          f"(ask_u={actor_info.get('user') if actor_info else None}, ask_s={soul_ids})")
     return _render_context(records, soul_ids, actors_def)
 
 
@@ -397,24 +460,13 @@ def incremental(session_id: int, actor_info: dict, actors_def: dict = None) -> s
 
     起点查库定（react_steps 按 soul_id 取 MAX(turn_id)）；无既往发言时
     「之间」= 开场到现在 = 等价全量。AI 发言不带 cot/tool（VISIBILITY）。"""
-    user_ids, soul_ids = _actor_scope_ids(actor_info)
+    records, soul_ids = _fetch_visible(session_id, actor_info, MODE_INCREMENTAL)
     ask_soul = soul_ids[0] if soul_ids else ''
-    last_turn = _last_speech_turn(session_id, ask_soul)
-    if last_turn is None:
-        print(f"[ctx-dbg] session={session_id} incremental 无既往发言（soul={ask_soul!r}）→ 等价全量")
-        return full(session_id, actor_info, actors_def)
-    records = _get_records_visible_to(
-        user_ids=user_ids if user_ids else None,
-        soul_ids=soul_ids if soul_ids else None,
-        session_id=session_id,
-        include_ai=True,
-        max_turns=999999,
-        after_turn=last_turn,
-    )
-    print(f"[ctx-dbg] session={session_id} incremental 增量窗口 turn>{last_turn}，"
-          f"检索到 {len(records)} 条可见记录 (soul={ask_soul!r})")
     if not records:
+        print(f"[ctx-dbg] session={session_id} incremental（soul={ask_soul!r}）无可见记录 → 空串")
         return ""
+    print(f"[ctx-dbg] session={session_id} incremental（soul={ask_soul!r}）"
+          f"检索到 {len(records)} 条可见记录")
     return _render_context(records, soul_ids, actors_def)
 
 
@@ -443,6 +495,33 @@ def build_session_context(session_id: int, actor_info: dict,
         return first_full_then_incremental(session_id, actor_info, actors_def)
     raise ValueError(
         f"未知 context mode: {mode!r}（可用：{', '.join(_KNOWN_MODES)}）")
+
+
+def resolve_context_mode(session_id: int, actor_info: dict, mode: str) -> str:
+    """FFTI 落地裁决：该演员查库无既往发言 = 本拍按 full（首次），否则
+    incremental。其余 mode 原样返回。block_collector 用它决定 system 层
+    blocks（basic_safety/basic_output/soul/user_info）是否随包——首次全量
+    带 system 层，之后增量只带增量面（2026-09-13 上下文 JSON 化配套）。"""
+    if mode != MODE_FIRST_FULL_THEN_INCREMENTAL:
+        return mode
+    _, soul_ids = _actor_scope_ids(actor_info or {})
+    ask_soul = soul_ids[0] if soul_ids else ''
+    return MODE_FULL if _last_speech_turn(session_id, ask_soul) is None else MODE_INCREMENTAL
+
+
+def build_session_context_json(session_id: int, actor_info: dict,
+                               mode: str = MODE_FULL,
+                               actors_def: dict = None) -> str:
+    """build_session_context 的 JSON 形态（2026-09-13 上下文 JSON 化）：
+    返回发言条目列表的 JSON 串，每条 {"soul_id", "soul_name", "steps": [...]}
+    ——steps 为逐轮轨迹（dialog 行单轮；AI 行按 react 轮展开，每轮 cot /
+    tool_call / tool_result / response 按键存在性表达 VISIBILITY）。
+    mode 语义与 build_session_context 完全一致；未知 mode 同样硬报错。"""
+    if mode not in _KNOWN_MODES:
+        raise ValueError(
+            f"未知 context mode: {mode!r}（可用：{', '.join(_KNOWN_MODES)}）")
+    records, soul_ids = _fetch_visible(session_id, actor_info, mode)
+    return _render_context(records, soul_ids, actors_def, as_json=True)
 
 
 # ═══ 兼容薄壳（老调用方零感知）══════════════════════════════════════════

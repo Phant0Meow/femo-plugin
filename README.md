@@ -397,7 +397,7 @@ femo 现在以自包含插件的形式接入 dsh（DeepSeek Harness）——引�
 
 ```
 dsh-femo/                  ← 整个文件夹就是插件
-├── hostAdapter/               dsh 接口侧（host/ 宿主进程 TS + client/ 聊天窗 bundle + python/ 桥进程，见 hostAdapter/README.md）
+├── dshAdapter/               dsh 接口侧（host/ 宿主进程 TS + client/ 聊天窗 bundle + python/ 桥进程，见 dshAdapter/README.md）
 ├── femoGen/                可视化剧本编辑器（React/Vite）
 ├── femoToolcall/           AI 工具箱：femo_debugger / chronica / femo-chat
 ├── femoCompiler/            femo 引擎：parser / runtime / 并发 / SQLite 记忆
@@ -552,7 +552,7 @@ export const KNOWN_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([
 npm install
 powershell -ExecutionPolicy Bypass -File scripts/link-workspace.ps1   # 建 @deepseek-ai 构建镜像（Windows junction）
 npm run build                 # lib/index.js（host）+ lib/client.js（browser）
-python hostAdapter/python/dev-bridge-test.py   # 桥接器协议冒烟
+python dshAdapter/python/dev-bridge-test.py   # 桥接器协议冒烟
 ```
 
 ## 许可证

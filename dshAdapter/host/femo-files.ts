@@ -172,6 +172,26 @@ export async function listFemoFiles(femoRoot: string): Promise<FemoFileEntry[]> 
 }
 
 /**
+ * 从账本里划掉一条（2026-09-13 用户点名）：清单条目本身会碍眼——测试残留、
+ * 已废弃的剧本——但「清理清单」绝不能被理解成「删文件」。本函数只删账目，
+ * 对源文件零接触（连 stat 都不做）：这是清单 UI 上移除键的安全下限。
+ * 路径不在账本里时按成功返回（幂等：目标状态「清单里没有它」已达成），
+ * 让前端不必为连点/竞态区分错误。
+ */
+export async function forgetFemoFile(femoRoot: string, path: string): Promise<boolean> {
+  const trimmed = path.trim()
+  if (trimmed.length === 0) throw new Error('path is required')
+  return await withLedgerLock(femoRoot, async () => {
+    const ledger = await readLedger(femoRoot)
+    const key = normKey(trimmed)
+    if (ledger.files[key] === undefined) return false
+    delete ledger.files[key]
+    await writeLedger(femoRoot, ledger)
+    return true
+  })
+}
+
+/**
  * 按路径读正文（清单里选中的那条）。
  * 只允许打开账本里记过的文件：这个端点因此不会退化成「任意文件读取器」。
  * 账本外的路径一律拒绝——反正前端能选到的只有清单里的条目。

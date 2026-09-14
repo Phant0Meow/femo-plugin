@@ -20,8 +20,14 @@
 //
 // 桌面 / 手机共用本组件（手机端由 FemoWorAuto 的移动分支挂载），行高按触摸
 // 尺寸给足，两侧都不会「点不准」。
+//
+// 移出清单键（2026-09-13）：每行右侧一枚 ⊖，只把这条记录从清单里划掉，
+// 源文件零接触（host 侧 forget-femo-file 只划账本）。图标刻意用 circle-minus
+// 而不是垃圾桶——⊖ 读作「从集合里拿掉」，与「删文件」拉开距离；悬停提示
+// 再把话说死。onForget 传了才渲染（独立模式没有账本，不给这个键）。
 
 import React, { useEffect } from 'react';
+import { FaCircleMinus } from './faIcons.jsx';
 
 /** 相对时间（清单右列）。超过 30 天退回绝对日期。 */
 function relTime(ts) {
@@ -49,6 +55,10 @@ const ROW_CSS = `
 .femo-file-row:not(:disabled):hover { background: color-mix(in srgb, var(--femo-primary) 6%, transparent); }
 .femo-file-row:not(:disabled):active { background: color-mix(in srgb, var(--femo-primary) 12%, transparent); }
 .femo-file-row:disabled { cursor: not-allowed; }
+.femo-forget-btn { transition: background 0.12s ease, color 0.12s ease; color: var(--femo-text-4); }
+.femo-forget-btn:not(:disabled):hover { background: color-mix(in srgb, var(--femo-text-4) 14%, transparent); color: var(--femo-text-2); }
+.femo-forget-btn:not(:disabled):active { background: color-mix(in srgb, var(--femo-text-4) 22%, transparent); }
+.femo-forget-btn:disabled { cursor: not-allowed; opacity: 0.4; }
 `;
 
 /** 右列两格（大小 / 时间）共用的对齐口径：定宽右对齐 + 等宽数字，
@@ -71,6 +81,9 @@ export function FemoFileList({
   onPick,
   /** 电脑端专属：给了才渲染右上角「浏览…」（走系统文件对话框的旧路径）。 */
   onBrowse,
+  /** 从清单移除一条（2026-09-13）：给了才渲染每行右侧的 ⊖ 键。
+   *  语义红线：只从清单划掉，**绝不动源文件**——文案与图标都按这个写。 */
+  onForget,
   onClose,
 }) {
   // Esc 关闭：键盘党顺手（移动端无键盘，不影响）
@@ -85,6 +98,7 @@ export function FemoFileList({
 
   const busy = busyPath !== null;
   const canBrowse = typeof onBrowse === 'function';
+  const canForget = typeof onForget === 'function';
   const missingCount = files.filter((f) => f.exists === false).length;
 
   return (
@@ -215,69 +229,108 @@ export function FemoFileList({
             const isBusy = busyPath === f.path;
             const size = fmtSize(f.size);
             return (
-              <button
+              // 行本体现在只是布局层：可点的拆成两枚真按钮——「打开」（占满）
+              // 和「移出清单」（右侧定宽）。此前整行一枚 button，HTML 不允许
+              // 按钮嵌按钮，加移除键就必须拆。
+              <div
                 key={f.path}
-                onClick={() => { if (!missing && !busy) onPick?.(f.path); }}
-                disabled={missing || busy}
                 className="femo-file-row"
-                title={missing ? `${f.path}\n（文件已不在原位置）` : f.path}
                 style={{
-                  display: 'block',
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: '9px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '9px 10px 9px 16px',
                   minHeight: 50, // 触摸尺寸：手机上这一行要按得准
-                  background: 'none',
-                  border: 'none',
                   // 最后一行不画分隔线：贴着底栏那条会形成双线
                   borderBottom: i === files.length - 1
                     ? 'none'
                     : 'var(--femo-border-w) solid var(--femo-border)',
-                  cursor: missing ? 'not-allowed' : (busy ? 'wait' : 'pointer'),
-                  opacity: missing ? 0.5 : 1,
-                  fontFamily: 'var(--femo-font-sans)',
                 }}
               >
-                {/* 上行：文件名 ···· 大小 时间（右侧两列定宽对齐） */}
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                  <span
+                {/* 打开：原整行按钮的代言人，两点内容（上行文件名+大小时间，下行路径） */}
+                <button
+                  onClick={() => { if (!missing && !busy) onPick?.(f.path); }}
+                  disabled={missing || busy}
+                  title={missing ? `${f.path}\n（文件已不在原位置）` : f.path}
+                  style={{
+                    display: 'block',
+                    flex: 1,
+                    minWidth: 0,
+                    textAlign: 'left',
+                    padding: 0,
+                    background: 'none',
+                    border: 'none',
+                    cursor: missing ? 'not-allowed' : (busy ? 'wait' : 'pointer'),
+                    opacity: missing ? 0.5 : 1,
+                    fontFamily: 'var(--femo-font-sans)',
+                  }}
+                >
+                  {/* 上行：文件名 ···· 大小 时间（右侧两列定宽对齐） */}
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                    <span
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: 'var(--femo-text-1)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        flex: 1,
+                        minWidth: 0,
+                      }}
+                    >
+                      {f.name}
+                    </span>
+                    {missing && (
+                      <span style={{ ...colStyle, color: 'var(--femo-danger)', fontWeight: 700 }}>
+                        文件不在原位置
+                      </span>
+                    )}
+                    <span style={{ ...colStyle, minWidth: 52 }}>{missing ? '—' : size}</span>
+                    <span style={{ ...colStyle, minWidth: 62, color: 'var(--femo-text-3)' }}>
+                      {isBusy ? '打开中…' : relTime(f.lastUsedAt)}
+                    </span>
+                  </div>
+                  {/* 下行：完整路径（截尾；文件名已在上行，这里的信息量在目录） */}
+                  <div
                     style={{
-                      fontSize: 13,
-                      fontWeight: 700,
-                      color: 'var(--femo-text-1)',
+                      fontSize: 10.5,
+                      color: 'var(--femo-text-4)',
+                      marginTop: 3,
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
-                      flex: 1,
-                      minWidth: 0,
                     }}
                   >
-                    {f.name}
-                  </span>
-                  {missing && (
-                    <span style={{ ...colStyle, color: 'var(--femo-danger)', fontWeight: 700 }}>
-                      文件不在原位置
-                    </span>
-                  )}
-                  <span style={{ ...colStyle, minWidth: 52 }}>{missing ? '—' : size}</span>
-                  <span style={{ ...colStyle, minWidth: 62, color: 'var(--femo-text-3)' }}>
-                    {isBusy ? '打开中…' : relTime(f.lastUsedAt)}
-                  </span>
-                </div>
-                {/* 下行：完整路径（截尾；文件名已在上行，这里的信息量在目录） */}
-                <div
-                  style={{
-                    fontSize: 10.5,
-                    color: 'var(--femo-text-4)',
-                    marginTop: 3,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {f.path}
-                </div>
-              </button>
+                    {f.path}
+                  </div>
+                </button>
+                {/* 移出清单：⊖ 只划记录不删文件；缺失条目也能移（清死记录是主用例） */}
+                {canForget && (
+                  <button
+                    className="femo-forget-btn"
+                    onClick={() => { if (!busy) onForget?.(f.path); }}
+                    disabled={busy}
+                    title="从清单移除（只划掉这条记录，文件保留在原位置）"
+                    aria-label={`从清单移除 ${f.name}`}
+                    style={{
+                      flexShrink: 0,
+                      width: 30,
+                      height: 30,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: 0,
+                      background: 'none',
+                      border: 'none',
+                      borderRadius: 'var(--femo-radius-md)',
+                      cursor: busy ? 'wait' : 'pointer',
+                    }}
+                  >
+                    <FaCircleMinus size={15} />
+                  </button>
+                )}
+              </div>
             );
           })}
         </div>

@@ -4,20 +4,33 @@ block_collector.py — Block 收集器
 根据当前 Action、Meta、Actor 等信息，收集所有 prompt block，
 返回一个标准的 blocks 字典，供外部框架的 prompt 组装器使用。
 
-Block 清单：
-  basic_safety  — 安全须知
-  basic_output  — 输出质量要求
-  soul          — 角色描述（system prompt 片段）
-  user_info     — 用户信息
-  memory        — 记忆检索结果
-  context       — 对话历史上下文
-  prompt    — 当前 Action 的 prompt（已变量替换）
+Block 清单（2026-09-13 上下文 JSON 化后按模式分集）：
+  full（首次）全集：
+    basic_safety  — 安全须知
+    basic_output  — 输出质量要求
+    soul          — 角色描述（system prompt 片段）
+    user_info     — 用户信息
+    memory        — 记忆检索结果
+    context       — 对话历史上下文（JSON：发言条目列表，每条
+                    soul_id / soul_name / steps[]；steps 为逐轮轨迹——
+                    dialog 行单轮 {"response"}，AI 行按 react 轮展开每轮
+                    {cot?, tool_call?, tool_result?, response?}，键存在性 =
+                    VISIBILITY 常量裁决；节点提醒行带 showprompt:true）
+    showprompt    — 节点提醒文案（独立成块，已变量替换）
+    prompt        — 当前 Action 的 prompt（已变量替换）
+    _actor_info   — 引擎私有身份元数据（dict，随包透传）
+  incremental（之后）增量面（省 system 层——首轮已喂过，窗口不复读）：
+    context（增量窗口 JSON）/ memory / showprompt / prompt / _actor_info
 """
 
 import os
 from typing import Dict, Any, Optional, List, Tuple
 
-from femoBridges.ContextExample import build_session_context, MODE_FULL
+from femoBridges.ContextExample import (
+    build_session_context_json,
+    resolve_context_mode,
+    MODE_FULL,
+)
 
 
 def _load_file_or_text(value: str, base_dir: str = "") -> str:
@@ -88,51 +101,11 @@ def _parse_method_ref(method_str: str) -> Tuple[Optional[str], Optional[str], di
     return None, method_str, {}
 
 
-def collect_blocks(
-    action,
-    meta: dict,
-    actors_def: dict,
-    var_manager,
-    code_modules: dict,
-    memory_defs: dict = None,
-    context_defs: dict = None,
-    session_id: int = 1,
-    turn_id: int = 0,
-    actor_info: dict = None,
-    runner=None,
-    base_dir: str = ".",
-    evaluator=None,
-    context_mode: str = MODE_FULL,
-) -> Dict[str, str]:
-    """
-    收集所有 prompt block，返回字典。
-
-    参数：
-        action: 当前 Action 定义对象
-        meta: 剧本 meta 字典
-        actors_def: 剧本 actors 字典
-        var_manager: VarFacade 实例（R2 起：get/set 同名接口，VarManager 退役）
-        evaluator: Evaluator 实例（R2 接线：prompt/showprompt 的 {var} 替换统一
-                   走 evaluator.interpolate_prompt——修复旧 hasattr 恒 False 导致
-                   blocks 侧 showprompt 从不替换变量的 bug）
-        code_modules: 已加载的 Python 模块字典 {alias: module}
-        registered_methods: 已注册的方法字典 {method_name: (module_alias, func_name)}
-        session_id: 当前 session ID
-        base_dir: 剧本文件所在目录
-        context_mode: 默认上下文拼接模式（full/incremental/first_full_then_
-                      incremental）。由调用方传入——DSH 宿主后端在 femo_bridge
-                      钉 first_full_then_incremental，直连等老调用方吃默认 full。
-                      只作用于默认 context 路径；剧本显式声明的自定义 context
-                      方法优先级更高，不受此参数影响。
-
-    返回：
-        blocks 字典，包含 basic_safety, basic_output, soul, user_info,
-                      memory, context, prompt
-    """
-    blocks = {}
-    
-    print(f"[DEBUG collect_blocks] actor_info = {actor_info!r}")
-
+def _collect_system_blocks(blocks: Dict[str, Any], meta: dict, base_dir: str,
+                           actor_info: Optional[dict]) -> None:
+    """system 层四块（basic_safety / basic_output / soul / user_info）——
+    仅 full 模式（含 FFTI 首次）随包；incremental 省略（宿主首轮已喂，
+    窗口复读纯属浪费）。原地写入 blocks。"""
     # ── 1. basic_safety ──
     safety = meta.get('system_safety', '')
     blocks['basic_safety'] = _load_file_or_text(safety, base_dir)
@@ -175,6 +148,68 @@ def collect_blocks(
                 blocks['user_info'] = "\n\n".join(profiles)
         except ImportError:
             print("[block_collector] ⚠️ 无法导入 db_utils，跳过 user_info 加载")
+
+
+def collect_blocks(
+    action,
+    meta: dict,
+    actors_def: dict,
+    var_manager,
+    code_modules: dict,
+    memory_defs: dict = None,
+    context_defs: dict = None,
+    session_id: int = 1,
+    turn_id: int = 0,
+    actor_info: dict = None,
+    runner=None,
+    base_dir: str = ".",
+    evaluator=None,
+    context_mode: str = MODE_FULL,
+) -> Dict[str, str]:
+    """
+    收集所有 prompt block，返回字典。
+
+    参数：
+        action: 当前 Action 定义对象
+        meta: 剧本 meta 字典
+        actors_def: 剧本 actors 字典
+        var_manager: VarFacade 实例（R2 起：get/set 同名接口，VarManager 退役）
+        evaluator: Evaluator 实例（R2 接线：prompt/showprompt 的 {var} 替换统一
+                   走 evaluator.interpolate_prompt——修复旧 hasattr 恒 False 导致
+                   blocks 侧 showprompt 从不替换变量的 bug）
+        code_modules: 已加载的 Python 模块字典 {alias: module}
+        registered_methods: 已注册的方法字典 {method_name: (module_alias, func_name)}
+        session_id: 当前 session ID
+        base_dir: 剧本文件所在目录
+        context_mode: 默认上下文拼接模式（full/incremental/first_full_then_
+                      incremental）。由调用方传入——DSH 宿主后端在 femo_bridge
+                      钉 first_full_then_incremental，直连等老调用方吃默认 full。
+                      只作用于默认 context 路径；剧本显式声明的自定义 context
+                      方法优先级更高，不受此参数影响。
+
+    返回：
+        blocks 字典，按模式分集（2026-09-13 上下文 JSON 化）——
+        full（FFTI 首次）：basic_safety, basic_output, soul, user_info,
+                      memory, context(JSON), showprompt, prompt, _actor_info
+        incremental（FFTI 之后）：memory, context(增量窗口 JSON), showprompt,
+                      prompt, _actor_info（省 system 层）
+        context 的 JSON 形态：发言条目列表，每条 {"soul_id", "soul_name",
+        "steps": [...]}——steps 逐轮轨迹，每轮 {cot?, tool_call?,
+        tool_result?, response?}（键存在性 = VISIBILITY 常量）。
+    """
+    blocks = {}
+
+    print(f"[DEBUG collect_blocks] actor_info = {actor_info!r}")
+
+    # ── 模式落地（2026-09-13 上下文 JSON 化）：FFTI 按本人发言史裁决本拍实际
+    # 生效的模式——首次=full 带 system 层；之后=incremental 只带增量面。
+    effective_mode = resolve_context_mode(session_id, actor_info or {}, context_mode)
+    include_system = effective_mode == MODE_FULL
+    print(f"[block_collector] 🧭 context 路由: 请求={context_mode} 生效={effective_mode}"
+          f"（{'含' if include_system else '省'} system 层）")
+
+    if include_system:
+        _collect_system_blocks(blocks, meta, base_dir, actor_info)
 
     # ── 5. memory ──
     blocks['memory'] = ""
@@ -223,8 +258,9 @@ def collect_blocks(
         )
     elif context_ref:
         print(f"[block_collector] ⚠️ 未找到 context 定义: '{context_ref}'，走默认 context 路由: mode={context_mode}")
-        # actors_def 穿线（2026-09-11 双名制）：上下文发言行显示「戏中名（Soul name）」
-        blocks['context'] = build_session_context(session_id, actor_info or {}, context_mode, actors_def)
+        # actors_def 穿线（2026-09-11 双名制）；JSON 形态（2026-09-13）：条目
+        # 结构化 soul_id/soul_name/response[+cot/tool_results]
+        blocks['context'] = build_session_context_json(session_id, actor_info or {}, context_mode, actors_def)
     elif context_defs:
         # 没有指定 context 但剧本定义过：用第一个定义的（原行为保留）
         first_key = list(context_defs.keys())[0]
@@ -238,8 +274,9 @@ def collect_blocks(
         # 默认：走上下文路由入口（full / incremental / first_full_then_incremental，
         # 由调用方经 context_mode 决定；缺省 full = 原默认行为）
         print(f"[block_collector] 📖 默认 context 路由: mode={context_mode}")
-        # actors_def 穿线（2026-09-11 双名制）：上下文发言行显示「戏中名（Soul name）」
-        blocks['context'] = build_session_context(session_id, actor_info or {}, context_mode, actors_def)
+        # actors_def 穿线（2026-09-11 双名制）；JSON 形态（2026-09-13）：条目
+        # 结构化 soul_id/soul_name/response[+cot/tool_results]
+        blocks['context'] = build_session_context_json(session_id, actor_info or {}, context_mode, actors_def)
 
     # ── 7. prompt ──
     raw_prompt = action.prompt or ""
@@ -259,16 +296,18 @@ def collect_blocks(
                 return m.group(0)
         prompt_text = re.sub(r'\{([^}]+)\}', replacer, raw_prompt)
 
-    # 如果有 showprompt，拼接到 prompt 前面作为提醒
-    # （R2 修复：旧 hasattr(var_manager,'_replace_prompt_vars') 恒 False——
-    #   blocks 侧 showprompt 从不替换变量；现与 prompt 同走 Evaluator）
+    # showprompt 独立成块（2026-09-13 拍板）：不再折进 prompt 的 [提醒] 前缀，
+    # 执行后端按块自行决定渲染位置（dsh 宿主拼装器折回 [提醒]，端到端不变）。
+    # 变量替换与 prompt 同走 Evaluator（R2 修复沿用：不走 hasattr 宽松分支的
+    # 旧 bug 已修）。
     showprompt_raw = getattr(action, 'showprompt', '') or ''
     if showprompt_raw:
         if evaluator is not None and var_manager is not None:
-            showprompt_text = evaluator.interpolate_prompt(showprompt_raw, var_manager)
+            blocks['showprompt'] = evaluator.interpolate_prompt(showprompt_raw, var_manager)
         else:
-            showprompt_text = showprompt_raw
-        prompt_text = f"[提醒]\n{showprompt_text}\n\n{prompt_text}"
+            blocks['showprompt'] = showprompt_raw
+    else:
+        blocks['showprompt'] = ""
 
     # 为 prompt 加上用户标签（与 context 中的格式一致）
     user_name = None

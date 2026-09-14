@@ -1,4 +1,4 @@
-<img width="309" height="352" alt="diagram" src="https://github.com/user-attachments/assets/0db0df27-e3f2-405d-9e79-38919564c795" />中文 README 可往后翻。
+中文 README 可往后翻。
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-lightgrey?style=flat-square)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/Python-3.6%2B-blue?style=flat-square&logo=python)](https://www.python.org/)
@@ -46,7 +46,7 @@ Perspective isolation needs just one line: `scope: [@God] + wolfpack`. Concurren
 
 ---
 
-# FEMO  <img width="309" height="352" alt="femo-logo" src="https://github.com/user-attachments/assets/942b2fe4-a96c-43d5-be76-67f4f8a6a72e" />
+# FEMO  <img width="31" height="35" alt="femo-logo" src="https://github.com/user-attachments/assets/942b2fe4-a96c-43d5-be76-67f4f8a6a72e" />
 
 ## - This is a language for orchestrating multi-agent scripts + a compiler.
 

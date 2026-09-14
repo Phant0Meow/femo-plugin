@@ -48,7 +48,7 @@ Perspective isolation needs just one line: `scope: [@God] + wolfpack`. Concurren
 
 # FEMO - This is a language for orchestrating multi-agent scripts + a compiler.
 
-<img width="400" height="480" alt="femo-logo" src="https://github.com/user-attachments/assets/8bdf7dbb-d4ea-4fd2-b679-bb8d4bc04ef5" />
+<img width="40" height="48" alt="femo-logo" src="https://github.com/user-attachments/assets/8bdf7dbb-d4ea-4fd2-b679-bb8d4bc04ef5" />
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 480" width="400" height="480">
 
   <!-- ============ 蒙版定义 ============ -->

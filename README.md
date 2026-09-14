@@ -46,63 +46,7 @@ Perspective isolation needs just one line: `scope: [@God] + wolfpack`. Concurren
 
 ---
 
-# FEMO  
-
-![Uploading<?xml version="1.0" standalone="no"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="27.169998168945312 30 345.6600341796875 364" width="309.12" height="352">
-
-  <!-- ============ 蒙版定义 ============ -->
-  <defs>
-    <mask id="cut">
-      <rect x="0" y="0" width="400" height="480" fill="#ffffff"/>
-
-      <!-- 身体部分轮廓：五边形 -->
-      <path d="M 187.5 200 L 212.5 200 L 262.5 359 L 200 384 L 137.5 359 Z" fill="none" stroke="#000000" stroke-width="16" stroke-linejoin="round" stroke-linecap="round"/>
-
-      <!-- 圆内部：半径 15 -->
-      <circle cx="200" cy="200" r="15" fill="#000000"/>
-
-      <!-- 透明 a线 -->
-      <line x1="35" y1="100" x2="200" y2="75" stroke="#000000" stroke-width="16" stroke-linecap="round"/>
-
-      <!-- 透明 a'线 -->
-      <line x1="200" y1="75" x2="365" y2="100" stroke="#000000" stroke-width="16" stroke-linecap="round"/>
-
-      <!-- 透明 b线 -->
-      <line x1="30.92" y1="107.11" x2="91.75" y2="262.5" stroke="#000000" stroke-width="16" stroke-linecap="round"/>
-
-      <!-- 透明 c线 -->
-      <line x1="369.08" y1="107.11" x2="308.25" y2="262.5" stroke="#000000" stroke-width="16" stroke-linecap="round"/>
-    </mask>
-  </defs>
-
-  <!-- ============ 图形主体 + 箭头填充 ============ -->
-  <g mask="url(#cut)">
-
-    <!-- 六边形边框 -->
-    <polygon points="200,40 338.56,120 338.56,280 200,360 61.44,280 61.44,120" fill="none" stroke="#6FBF3A" stroke-width="32" stroke-linejoin="round" stroke-linecap="round"/>
-
-    <!-- 左上斜边 -->
-    <line x1="200" y1="200" x2="61.44" y2="120" stroke="#6FBF3A" stroke-width="32" stroke-linecap="round"/>
-
-    <!-- 右上斜边 -->
-    <line x1="200" y1="200" x2="338.56" y2="120" stroke="#6FBF3A" stroke-width="32" stroke-linecap="round"/>
-
-    <!-- 身体部分：五边形 -->
-    <path d="M 187.5 200 L 212.5 200 L 262.5 359 L 200 384 L 137.5 359 Z" fill="#6FBF3A"/>
-
-    <!-- 箭头填充（左） -->
-    <path d="M 75.78 197.79&#10;             L 37.17 105.58&#10;             L 135.99 93.53&#10;             L 68.63 132.43&#10;             L 75.78 120&#10;             Z" fill="#6FBF3A"/>
-
-    <!-- 箭头填充（右） -->
-    <path d="M 324.22 197.79&#10;             L 362.83 105.58&#10;             L 264.01 93.53&#10;             L 331.37 132.43&#10;             L 324.22 120&#10;             Z" fill="#6FBF3A"/>
-
-  </g>
-
-  <!-- ============ 圆（最上层，保持完整） ============ -->
-  <circle cx="200" cy="200" r="30" fill="none" stroke="#6FBF3A" stroke-width="32"/>
-
-</svg> diagram.svg…]()
+# FEMO  <img width="309" height="352" alt="femo-logo" src="https://github.com/user-attachments/assets/942b2fe4-a96c-43d5-be76-67f4f8a6a72e" />
 
 ## - This is a language for orchestrating multi-agent scripts + a compiler.
 

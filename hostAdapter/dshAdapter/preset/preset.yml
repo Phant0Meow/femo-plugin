@@ -1,0 +1,3 @@
+﻿name: FEMO模式
+description: FEMO 多智能体剧本舞台。主模型可对话、写剧本、运行剧本；剧本运行期间由引擎按角色组装 system prompt 驱动。
+order: 10

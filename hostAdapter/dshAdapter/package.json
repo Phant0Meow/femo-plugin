@@ -1,6 +1,6 @@
 {
   "name": "femo-plugin",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Femo (FlowEngineforMinds) 多智能体剧本引擎的 dsh 插件版 — 无主模型 Femo 会话、聊天窗口角色气泡、剧本控制（含完整引擎，自包含，整个文件夹搬走即用）",
   "keywords": [
     "deepseek-harness",
@@ -19,10 +19,6 @@
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
-  "files": [
-    "lib",
-    "cordis.patch.yml"
-  ],
   "license": "Apache-2.0",
   "dsh": {
     "client": {

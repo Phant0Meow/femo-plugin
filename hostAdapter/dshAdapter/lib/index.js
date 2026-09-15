@@ -4816,7 +4816,7 @@ function projectionStateOf(runState, mainSid) {
   const running = job !== void 0 && job.state === "running" && runState.activeJobId === job.jobId;
   const waiting = running && job.waitingHuman !== void 0;
   const waitScope = waiting ? job.waitingHuman?.waitScope ?? (job.waitingHuman?.nodeName !== void 0 ? job.nodeScopes.get(job.waitingHuman.nodeName) ?? [] : []) : [];
-  return { running, waiting, waitScope, ...waiting ? { prompt: job.waitingHuman?.prompt } : {} };
+  return { running, waiting, waitScope, outVars: waiting ? job.waitingHuman?.outVars ?? [] : [], ...waiting ? { prompt: job.waitingHuman?.prompt } : {} };
 }
 function broadcastProjectionState(runState, mainSid) {
   broadcastSse("projection_state", { sid: mainSid, ...projectionStateOf(runState, mainSid) });
@@ -5594,8 +5594,8 @@ function assertRunAllowed(runState, sessionId) {
 }
 async function readScriptText(femo, scriptPath) {
   if (femo !== void 0) return femo;
-  const { readFileSync } = await import("node:fs");
-  return readFileSync(scriptPath, "utf8");
+  const { readFileSync: readFileSync2 } = await import("node:fs");
+  return readFileSync2(scriptPath, "utf8");
 }
 async function handleSaveScript(req, res, resolved) {
   if (req.method !== "POST") {
@@ -5628,7 +5628,7 @@ async function handleSaveScript(req, res, resolved) {
     broadcastSse("script_changed", { sessionId });
     console.log(`[femo-plugin] session record updated: ${sessionId} <- ${savedPath} (rev ${result.ok ? String(result.rev) : "conflict"})`);
   };
-  const { mkdirSync: mkdirSync3, writeFileSync } = await import("node:fs");
+  const { mkdirSync: mkdirSync4, writeFileSync } = await import("node:fs");
   if (rawPath.length > 0) {
     const path2 = rawPath.toLowerCase().endsWith(".femo") ? rawPath : `${rawPath}.femo`;
     writeFileSync(path2, content, "utf8");
@@ -5640,7 +5640,7 @@ async function handleSaveScript(req, res, resolved) {
   }
   const safe = name2.replace(/[\\/:*?"<>|]/g, "_").replace(/\.femo$/i, "");
   const projectsDir = `${resolved.femoRoot}\\user_data\\projects`;
-  mkdirSync3(projectsDir, { recursive: true });
+  mkdirSync4(projectsDir, { recursive: true });
   const path = `${projectsDir}\\${safe}.femo`;
   writeFileSync(path, content, "utf8");
   console.log(`[femo-plugin] saved script to ${path}`);
@@ -5655,9 +5655,9 @@ async function handleReadScript(req, res) {
     writeJson(res, 400, { ok: false, error: "path is required" });
     return;
   }
-  const { readFileSync } = await import("node:fs");
+  const { readFileSync: readFileSync2 } = await import("node:fs");
   try {
-    const content = readFileSync(path, "utf8");
+    const content = readFileSync2(path, "utf8");
     writeJson(res, 200, { ok: true, content });
   } catch (error) {
     writeJson(res, 404, { ok: false, error: `cannot read ${path}: ${String(error)}` });
@@ -5849,9 +5849,14 @@ async function handleProjectionInput(ctx, deps, req, res) {
   const raw = await readBody(req);
   const sessionId = typeof raw.sessionId === "string" && raw.sessionId.trim().length > 0 ? raw.sessionId : "";
   const text = typeof raw.text === "string" && raw.text.trim().length > 0 ? raw.text.trim() : "";
-  debugLog(`payload: sessionId=${sessionId} textLen=${text.length}`);
-  if (sessionId.length === 0 || text.length === 0) {
-    writeJson(res, 400, { ok: false, error: "sessionId and text are required" });
+  const rawVars = typeof raw.variables === "object" && raw.variables !== null ? raw.variables : {};
+  const variables = {};
+  for (const [key, value] of Object.entries(rawVars)) {
+    if (typeof value === "string" && value.trim().length > 0) variables[key] = value.trim();
+  }
+  debugLog(`payload: sessionId=${sessionId} textLen=${text.length} variables=${JSON.stringify(variables)}`);
+  if (sessionId.length === 0 || text.length === 0 && Object.keys(variables).length === 0) {
+    writeJson(res, 400, { ok: false, error: "sessionId and text (or variables) are required" });
     return;
   }
   const sessions = ctx.get("sessions");
@@ -5921,7 +5926,7 @@ async function handleProjectionInput(ctx, deps, req, res) {
     return;
   }
   if (waiting) {
-    await feedHumanNode(ctx, deps, mainSid, job, text, debugLog);
+    await feedHumanNode(ctx, deps, mainSid, job, text, variables, debugLog);
     writeJson(res, 200, { ok: true, routed: "human-node" });
     return;
   }
@@ -5933,14 +5938,14 @@ async function handleProjectionInput(ctx, deps, req, res) {
   console.log(`[femo-plugin] projection input kept local: len=${text.length}`);
   writeJson(res, 200, { ok: true, routed: "interjection-todo" });
 }
-async function feedHumanNode(ctx, deps, mainSid, job, text, debugLog) {
+async function feedHumanNode(ctx, deps, mainSid, job, text, variables, debugLog) {
   const { bridge, projections, sessionsStore } = deps;
   const waitKeyUsed = String(job.waitingHuman?.waitKey ?? "");
-  debugLog(`branch\u2461 feeding: job=${String(job.jobId)} wait_key=${waitKeyUsed} len=${text.length}`);
+  debugLog(`branch\u2461 feeding: job=${String(job.jobId)} wait_key=${waitKeyUsed} len=${text.length} vars=${JSON.stringify(variables)}`);
   const feedResult = await bridge.send("human_input", {
     job_id: job.jobId,
     wait_key: waitKeyUsed,
-    body: { chat_text: text, variables: {} }
+    body: { chat_text: text, variables }
   });
   debugLog(`branch\u2461 feed result: ${JSON.stringify(feedResult)}`);
   pushDiag("proj-input", `branch\u2461 human_input delivered job=${String(job.jobId)} wait_key=${waitKeyUsed} \u2192 ${JSON.stringify(feedResult)}`);
@@ -7299,10 +7304,10 @@ function registerRoutes(ctx, deps) {
           });
           const picked = out.trim();
           if (code === 0 && picked.length > 0) {
-            const { readFileSync } = await import("node:fs");
+            const { readFileSync: readFileSync2 } = await import("node:fs");
             let content;
             try {
-              content = readFileSync(picked, "utf8");
+              content = readFileSync2(picked, "utf8");
             } catch (error) {
               writeJson(res, 500, { ok: false, error: `cannot read ${picked}: ${String(error)}` });
               return;
@@ -7776,6 +7781,40 @@ ${value.script ?? ""}`;
   };
 }
 
+// host/preset-install.ts
+import { copyFileSync, existsSync, mkdirSync as mkdirSync3, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join as join12 } from "node:path";
+import { fileURLToPath as fileURLToPath3 } from "node:url";
+var PRESET_NAME = "femo-plugin";
+var PRESET_FILES = ["preset.yml", "agent.cordis.yml"];
+function dshHome() {
+  const fromEnv = process.env.DSH_HOME?.trim();
+  return fromEnv || join12(homedir(), ".dsh");
+}
+function installFemoPreset() {
+  const bundledDir = fileURLToPath3(new URL("../preset/", import.meta.url));
+  const targetDir = join12(dshHome(), ".agent-presets", PRESET_NAME);
+  let result = "up-to-date";
+  const errors = [];
+  const existed = existsSync(join12(targetDir, "preset.yml"));
+  for (const file of PRESET_FILES) {
+    try {
+      const source = join12(bundledDir, file);
+      const target = join12(targetDir, file);
+      const same = existsSync(target) && readFileSync(target, "utf8") === readFileSync(source, "utf8");
+      if (same) continue;
+      mkdirSync3(targetDir, { recursive: true });
+      copyFileSync(source, target);
+      if (result === "up-to-date") result = existed ? "updated" : "installed";
+    } catch (error) {
+      errors.push(`${file}: ${String(error)}`);
+    }
+  }
+  if (errors.length > 0) return `${result} with errors (${errors.join("; ")})`;
+  return result;
+}
+
 // host/index.ts
 var name = "femo-plugin";
 var inject = ["agents", "sessions", "agentDefaultModel", "tools", "webServer"];
@@ -7785,6 +7824,7 @@ async function apply(ctx, config) {
     console.log("[femo-plugin] disabled by config");
     return;
   }
+  console.log(`[femo-plugin] preset install: ${installFemoPreset()}`);
   const defaultModel = ctx.get("agentDefaultModel");
   const registerSessionEventType2 = sessionNS.registerSessionEventType;
   if (registerSessionEventType2 !== void 0) {
@@ -8136,7 +8176,7 @@ async function apply(ctx, config) {
         throw new Error("subprocess \u670D\u52A1\u4E0D\u53EF\u7528\uFF08\u65E0\u6CD5\u89E3\u6790 python \u53EF\u6267\u884C\u6587\u4EF6\uFF09");
       }
       const pythonPath = await subprocess.resolveExecutable(resolved.python);
-      const [{ execFile }, { promisify }, { join: join12 }] = await Promise.all([
+      const [{ execFile }, { promisify }, { join: join13 }] = await Promise.all([
         import("node:child_process"),
         import("node:util"),
         import("node:path")
@@ -8144,7 +8184,7 @@ async function apply(ctx, config) {
       try {
         const { stdout } = await promisify(execFile)(
           pythonPath,
-          [join12(resolved.femoRoot, "femo2host", "femoToolcall", "chronica.py"), ...args],
+          [join13(resolved.femoRoot, "femo2host", "femoToolcall", "chronica.py"), ...args],
           {
             timeout: 15e3,
             maxBuffer: 32 * 1024 * 1024,

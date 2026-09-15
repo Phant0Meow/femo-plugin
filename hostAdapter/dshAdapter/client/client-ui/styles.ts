@@ -133,6 +133,23 @@ const FEMO_COMPOSER_CSS = `
 .femo-comp-meter-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:2px 0}
 .femo-comp-meter-row dt{color:var(--dsw-alias-label-secondary)}
 .femo-comp-meter-row dd{margin:0;font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-primary)}
+/* 变量赋值浮层（2026-09-14）：等待人类节点且节点声明 out 时，输入框上方的
+    fa-code 小按钮 + 向上弹出的「变量名 = 输入框」列表；确认钮=FaCircleCheck。 */
+.femo-comp-var-bar{position:relative;display:flex;padding:0 8px;align-items:center}
+.femo-comp-var-trigger{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 8px;border:none;border-radius:12px;outline:none;background:transparent;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:16px;font-family:inherit;cursor:pointer}
+.femo-comp-var-trigger:hover{background:var(--dsw-alias-interactive-bg-hover)}
+.femo-comp-var-trigger:focus-visible{box-shadow:0 0 0 2px var(--dsw-alias-border-l3)}
+.femo-comp-var-trigger[data-open='true']{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}
+.femo-comp-var-panel{position:absolute;bottom:calc(100% + 6px);left:8px;z-index:100;box-sizing:border-box;min-width:260px;max-width:min(420px,calc(100% - 16px));padding:10px 12px 12px;border:1px solid var(--dsw-alias-border-inverted);border-radius:12px;background:var(--dsw-specific-menu);box-shadow:var(--dsw-shadow-lv3);font-size:13px;line-height:20px;color:var(--dsw-alias-label-secondary);cursor:default}
+.femo-comp-var-head{margin-bottom:8px;font-weight:500;color:var(--dsw-alias-label-primary)}
+.femo-comp-var-row{display:flex;align-items:center;gap:8px;padding:3px 0}
+.femo-comp-var-name{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--dsw-font-mono,ui-monospace,monospace);color:var(--dsw-alias-label-primary)}
+.femo-comp-var-eq{flex:none;color:var(--dsw-alias-label-tertiary)}
+.femo-comp-var-input{flex:1 1 auto;min-width:0;box-sizing:border-box;height:28px;padding:0 8px;border:1px solid var(--dsw-alias-border-l2-darkmode-thin);border-radius:8px;outline:none;background:var(--dsw-specific-input-major);color:var(--dsw-alias-label-primary);font-size:13px;line-height:20px;font-family:inherit}
+.femo-comp-var-input:focus{border-color:var(--dsw-alias-state-business-primary)}
+.femo-comp-var-confirm{display:inline-flex;align-items:center;gap:5px;margin-top:10px;height:28px;padding:0 12px;border:none;border-radius:999px;outline:none;background:var(--dsw-alias-button-info-fill,#3964FE);color:#fff;font-size:12px;line-height:16px;font-weight:500;font-family:inherit;cursor:pointer;transition:background-color 100ms ease}
+.femo-comp-var-confirm:hover{background:var(--dsw-alias-button-info-hover)}
+.femo-comp-var-confirm:disabled{opacity:.4;cursor:default}
 `
 
 export function ensureFemoStreamStyles(): void {

@@ -66,9 +66,16 @@ export async function handleProjectionInput(
   const raw = await readBody(req) as Record<string, unknown>
   const sessionId = typeof raw.sessionId === 'string' && raw.sessionId.trim().length > 0 ? raw.sessionId : ''
   const text = typeof raw.text === 'string' && raw.text.trim().length > 0 ? raw.text.trim() : ''
-  debugLog(`payload: sessionId=${sessionId} textLen=${text.length}`)
-  if (sessionId.length === 0 || text.length === 0) {
-    writeJson(res, 400, { ok: false, error: 'sessionId and text are required' })
+  // 变量赋值浮层（2026-09-14）：人类节点 out 的结构化赋值，绕过引擎侧
+  // chat_text 文本解析（人类指令跟随差的根治）。只收非空字符串值。
+  const rawVars = typeof raw.variables === 'object' && raw.variables !== null ? raw.variables as Record<string, unknown> : {}
+  const variables: Record<string, string> = {}
+  for (const [key, value] of Object.entries(rawVars)) {
+    if (typeof value === 'string' && value.trim().length > 0) variables[key] = value.trim()
+  }
+  debugLog(`payload: sessionId=${sessionId} textLen=${text.length} variables=${JSON.stringify(variables)}`)
+  if (sessionId.length === 0 || (text.length === 0 && Object.keys(variables).length === 0)) {
+    writeJson(res, 400, { ok: false, error: 'sessionId and text (or variables) are required' })
     return
   }
   const sessions = ctx.get('sessions') as { get(id: SessionId): Session | undefined } | undefined
@@ -191,7 +198,7 @@ export async function handleProjectionInput(
     // 【UI 同日拍板】本窗不再写 user/message 留痕——role 行（全窗广播、渲染
     // 为 dsh user 气泡样式）就是人类发言的唯一显示面，避免发言窗同一段话
     // 双份（user/message 气泡 + role 行）。
-    await feedHumanNode(ctx, deps, mainSid, job!, text, debugLog)
+    await feedHumanNode(ctx, deps, mainSid, job!, text, variables, debugLog)
     writeJson(res, 200, { ok: true, routed: 'human-node' })
     return
   }
@@ -218,15 +225,16 @@ async function feedHumanNode(
   mainSid: string,
   job: JobMirror,
   text: string,
+  variables: Record<string, string>,
   debugLog: (line: string) => void,
 ): Promise<boolean> {
   const { bridge, projections, sessionsStore } = deps
   const waitKeyUsed = String(job.waitingHuman?.waitKey ?? '')
-  debugLog(`branch② feeding: job=${String(job.jobId)} wait_key=${waitKeyUsed} len=${text.length}`)
+  debugLog(`branch② feeding: job=${String(job.jobId)} wait_key=${waitKeyUsed} len=${text.length} vars=${JSON.stringify(variables)}`)
   const feedResult = await bridge.send('human_input', {
     job_id: job.jobId,
     wait_key: waitKeyUsed,
-    body: { chat_text: text, variables: {} },
+    body: { chat_text: text, variables },
   }) as { delivered?: boolean } | undefined
   debugLog(`branch② feed result: ${JSON.stringify(feedResult)}`)
   pushDiag('proj-input', `branch② human_input delivered job=${String(job.jobId)} wait_key=${waitKeyUsed} → ${JSON.stringify(feedResult)}`)

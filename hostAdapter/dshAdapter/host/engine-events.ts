@@ -234,6 +234,9 @@ export interface ProjectionRunState {
   waitScope: string[]
   /** 轮到人类节点时的提示全文（composer 内嵌等待横幅的数据源；非等待缺省）。 */
   prompt?: string
+  /** 等待人类节点声明的 out 变量名列表（composer 变量赋值浮层的数据源；
+   *  dynamic out 为 `变量名.@actor` 完整形式，human_wait 事件自带；非等待为 []）。 */
+  outVars: string[]
 }
 
 export function projectionStateOf(runState: RunState, mainSid: string): ProjectionRunState {
@@ -247,7 +250,7 @@ export function projectionStateOf(runState: RunState, mainSid: string): Projecti
     ? job.waitingHuman?.waitScope
       ?? (job.waitingHuman?.nodeName !== undefined ? job.nodeScopes.get(job.waitingHuman.nodeName) ?? [] : [])
     : []
-  return { running, waiting, waitScope, ...(waiting ? { prompt: job.waitingHuman?.prompt } : {}) }
+  return { running, waiting, waitScope, outVars: waiting ? job.waitingHuman?.outVars ?? [] : [], ...(waiting ? { prompt: job.waitingHuman?.prompt } : {}) }
 }
 
 /** 快照广播（SSE projection_state，信封 sid=主会话）：waitingHuman 变化与

@@ -43,6 +43,7 @@ vars:
   @speaker = ""
   @VOTE = ""
   announce_text = ""
+  round_task = ""
   verdict_text = ""
 
 action 结束判定 @func(u.next_round_stage):
@@ -128,11 +129,11 @@ module 发言:
       round_no = round_no
       alive_players = $alive
     out:
-      announce_text
+      announce_text, round_task
 
   action 回合公告 @notice:
     prompt: |
-      "{announce_text}"
+      "{announce_text}\n{round_task}"
     scope: all
 
   action 陈述 @mind(@speaker):

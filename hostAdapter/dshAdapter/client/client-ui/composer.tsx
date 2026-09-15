@@ -39,7 +39,7 @@ import { IconChevronDownOutline14, Menu, RiskConfirmation, Tooltip } from '@deep
 import type { MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
 import { femoStreamAcquire, useActorUsage, subscribeControlEvents } from './stream-store'
 import { LeadingIconText } from './chat-node'
-import { FemoLogo } from '../fa-icons'
+import { FemoLogo, FaCode, FaCircleCheck } from '../fa-icons'
 
 /** 提交失败的提示条状态：seq 保证连续同文错误也会重开计时。 */
 interface ComposerError {
@@ -663,9 +663,11 @@ interface FemoRunState {
   waiting: boolean
   waitScope: string[]
   prompt?: string
+  /** 等待人类节点声明的 out 变量名（变量赋值浮层的数据源；非等待为 []）。 */
+  outVars: string[]
 }
 
-const IDLE_RUN_STATE: FemoRunState = { running: false, waiting: false, waitScope: [] }
+const IDLE_RUN_STATE: FemoRunState = { running: false, waiting: false, waitScope: [], outVars: [] }
 
 /**
  * 按钮状态机（各投影窗唯一的控制逻辑，2026-09-06 猫猫拍板的矩阵）：
@@ -765,13 +767,14 @@ export function ProjectionComposer({ useSession, useSessions, getSessionFace }: 
   // 单通道的实时性）。
   const [run, setRun] = useState<FemoRunState>(IDLE_RUN_STATE)
   const [winInfo, setWinInfo] = useState<{ winKind: 'god' | 'stage' | 'actor' | 'none'; actor?: string }>({ winKind: 'none' })
-  const applyState = useCallback((data: { ok?: boolean; winKind?: 'god' | 'stage' | 'actor' | 'none'; actor?: string; running?: boolean; waiting?: boolean; waitScope?: string[]; prompt?: string }) => {
+  const applyState = useCallback((data: { ok?: boolean; winKind?: 'god' | 'stage' | 'actor' | 'none'; actor?: string; running?: boolean; waiting?: boolean; waitScope?: string[]; prompt?: string; outVars?: string[] }) => {
     setWinInfo({ winKind: data.winKind ?? 'none', actor: data.actor })
     if (data.ok === true) {
       setRun({
         running: data.running === true,
         waiting: data.waiting === true,
         waitScope: Array.isArray(data.waitScope) ? data.waitScope : [],
+        outVars: Array.isArray(data.outVars) ? data.outVars : [],
         prompt: typeof data.prompt === 'string' ? data.prompt : undefined,
       })
     }
@@ -810,12 +813,13 @@ export function ProjectionComposer({ useSession, useSessions, getSessionFace }: 
     if (mainSid === undefined) return
     return subscribeControlEvents(msg => {
       if (msg.type !== 'projection_state') return
-      const data = msg.data as { sid?: string; running?: boolean; waiting?: boolean; waitScope?: string[]; prompt?: string } | undefined
+      const data = msg.data as { sid?: string; running?: boolean; waiting?: boolean; waitScope?: string[]; prompt?: string; outVars?: string[] } | undefined
       if (data === undefined || data.sid !== mainSid) return
       setRun({
         running: data.running === true,
         waiting: data.waiting === true,
         waitScope: Array.isArray(data.waitScope) ? data.waitScope : [],
+        outVars: Array.isArray(data.outVars) ? data.outVars : [],
         prompt: typeof data.prompt === 'string' ? data.prompt : undefined,
       })
     })
@@ -823,14 +827,65 @@ export function ProjectionComposer({ useSession, useSessions, getSessionFace }: 
 
   const buttonState = composerButtonState({ winKind: winInfo.winKind, actor: winInfo.actor, run, mainRunning })
 
-  const submit = (): void => {
+  // ── 变量赋值浮层（2026-09-14）──────────────────────────────────────────
+  // 轮到人类节点且节点声明了 out：输入框上方出现 fa-code 小按钮，点击向上弹
+  // 出「变量名 = 输入框」浮层；确认把非空行收成结构化 variables 与文本一起
+  // POST（引擎 _try_apply_human_variables 直取，绕过 chat_text 文本解析）。
+  const [varsOpen, setVarsOpen] = useState(false)
+  const [varValues, setVarValues] = useState<Record<string, string>>({})
+  const varsPanelRef = useRef<HTMLDivElement | null>(null)
+  // 等待回合切换（outVars 变化）即收起浮层并清空旧值，防止上一回合的赋值
+  // 残留误提交到下一回合。
+  const outVarsKey = run.outVars.join('\u0000')
+  useEffect(() => {
+    setVarsOpen(false)
+    setVarValues({})
+  }, [outVarsKey])
+  // 浮层开着时：外部点击 / Escape 关闭（ContextRing 同款单监听器模式）。
+  useEffect(() => {
+    if (!varsOpen) return
+    const onPointerDown = (e: PointerEvent): void => {
+      if (e.target instanceof Node && varsPanelRef.current?.contains(e.target) === true) return
+      setVarsOpen(false)
+    }
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setVarsOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [varsOpen])
+  const setVarValue = (name: string, value: string): void => {
+    setVarValues(prev => ({ ...prev, [name]: value }))
+  }
+  // 确认：只提交填了值的变量；全空=收起浮层不发（空输入会喂引擎空回合）。
+  const confirmVars = (): void => {
+    const filled: Record<string, string> = {}
+    for (const name of run.outVars) {
+      const value = varValues[name]?.trim()
+      if (value !== undefined && value.length > 0) filled[name] = value
+    }
+    if (Object.keys(filled).length === 0) {
+      setVarsOpen(false)
+      return
+    }
+    submit(filled)
+  }
+  // 显示条件与发送钮同源（buttonState==='send' 已含 waiting + 本窗在 scope）。
+  const showVarUi = buttonState === 'send' && run.outVars.length > 0
+
+  const submit = (variables: Record<string, string> = {}): void => {
     const value = text.trim()
-    if (value.length === 0 || busy || sessionId === undefined) return
+    const hasVars = Object.keys(variables).length > 0
+    if ((value.length === 0 && !hasVars) || busy || sessionId === undefined) return
     setBusy(true)
     const post = async (): Promise<Response> => fetch('/femo-plugin/projection-input', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ sessionId, text: value }),
+      body: JSON.stringify({ sessionId, text: value, ...(hasVars ? { variables } : {}) }),
     })
     void (async (): Promise<void> => {
       try {
@@ -854,6 +909,9 @@ export function ProjectionComposer({ useSession, useSessions, getSessionFace }: 
         if (data.ok === true) {
           // 官方同语义：提交成功清空草稿（state + 持久层一起）。
           changeText('')
+          // 变量浮层随之收起并清空已填值（下个等待回合重新开始）。
+          setVarsOpen(false)
+          setVarValues({})
           return
         }
         errorSeqRef.current += 1
@@ -926,6 +984,51 @@ export function ProjectionComposer({ useSession, useSessions, getSessionFace }: 
           手机触摸豁免/软键盘避让全部委托 [data-composer-card] 与
           [data-input-scroll] 识别——不挂钩子这些适配层对我们失效。 */}
       <div className="femo-comp-card" data-composer-card="">
+        {showVarUi && (
+          <div className="femo-comp-var-bar">
+            <button
+              type="button"
+              className="femo-comp-var-trigger"
+              aria-label="变量赋值"
+              aria-haspopup="dialog"
+              aria-expanded={varsOpen}
+              data-open={varsOpen}
+              onMouseDown={keepFocus}
+              onClick={() => { setVarsOpen(!varsOpen) }}
+            >
+              <FaCode size={12} />
+              <span>变量赋值</span>
+            </button>
+            {varsOpen && (
+              <div ref={varsPanelRef} className="femo-comp-var-panel" role="dialog" aria-label="变量赋值">
+                <div className="femo-comp-var-head">本节点变量赋值（可只填其中几项）</div>
+                {run.outVars.map(name => (
+                  <div key={name} className="femo-comp-var-row">
+                    <span className="femo-comp-var-name" title={name}>{name}</span>
+                    <span className="femo-comp-var-eq" aria-hidden>=</span>
+                    <input
+                      className="femo-comp-var-input"
+                      value={varValues[name] ?? ''}
+                      placeholder="留空=不赋值"
+                      spellCheck={false}
+                      onChange={(e) => { setVarValue(name, e.currentTarget.value) }}
+                    />
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="femo-comp-var-confirm"
+                  disabled={busy}
+                  onMouseDown={keepFocus}
+                  onClick={confirmVars}
+                >
+                  <FaCircleCheck size={13} />
+                  <span>{busy ? '发送中' : '确认赋值并发送'}</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         <div className="femo-comp-scroll" data-input-scroll="">
           <div className="femo-comp-grow">
             <div aria-hidden className="femo-comp-mirror" data-input-mirror="">{`${text}\n`}</div>
@@ -973,7 +1076,7 @@ export function ProjectionComposer({ useSession, useSessions, getSessionFace }: 
               onMouseDown={keepFocus}
               onClick={buttonState === 'stop'
                 ? () => { void mainFace?.cancel?.()?.catch(() => { /* 失败经主会话快照 promptError 呈现（官方 stop 同语义） */ }) }
-                : submit}
+                : () => { submit() }}
             >
               {/* 官方 InputBar 同款 glyph：stop=方块 Stop（primaryStops），
                   send/disabled=箭头 Send（箭头态由按钮 disabled 样式置灰）。 */}

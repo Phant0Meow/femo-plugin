@@ -1158,6 +1158,23 @@ var FEMO_COMPOSER_CSS = `
 .femo-comp-meter-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:2px 0}
 .femo-comp-meter-row dt{color:var(--dsw-alias-label-secondary)}
 .femo-comp-meter-row dd{margin:0;font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-primary)}
+/* \u53D8\u91CF\u8D4B\u503C\u6D6E\u5C42\uFF082026-09-14\uFF09\uFF1A\u7B49\u5F85\u4EBA\u7C7B\u8282\u70B9\u4E14\u8282\u70B9\u58F0\u660E out \u65F6\uFF0C\u8F93\u5165\u6846\u4E0A\u65B9\u7684
+    fa-code \u5C0F\u6309\u94AE + \u5411\u4E0A\u5F39\u51FA\u7684\u300C\u53D8\u91CF\u540D = \u8F93\u5165\u6846\u300D\u5217\u8868\uFF1B\u786E\u8BA4\u94AE=FaCircleCheck\u3002 */
+.femo-comp-var-bar{position:relative;display:flex;padding:0 8px;align-items:center}
+.femo-comp-var-trigger{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 8px;border:none;border-radius:12px;outline:none;background:transparent;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:16px;font-family:inherit;cursor:pointer}
+.femo-comp-var-trigger:hover{background:var(--dsw-alias-interactive-bg-hover)}
+.femo-comp-var-trigger:focus-visible{box-shadow:0 0 0 2px var(--dsw-alias-border-l3)}
+.femo-comp-var-trigger[data-open='true']{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}
+.femo-comp-var-panel{position:absolute;bottom:calc(100% + 6px);left:8px;z-index:100;box-sizing:border-box;min-width:260px;max-width:min(420px,calc(100% - 16px));padding:10px 12px 12px;border:1px solid var(--dsw-alias-border-inverted);border-radius:12px;background:var(--dsw-specific-menu);box-shadow:var(--dsw-shadow-lv3);font-size:13px;line-height:20px;color:var(--dsw-alias-label-secondary);cursor:default}
+.femo-comp-var-head{margin-bottom:8px;font-weight:500;color:var(--dsw-alias-label-primary)}
+.femo-comp-var-row{display:flex;align-items:center;gap:8px;padding:3px 0}
+.femo-comp-var-name{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--dsw-font-mono,ui-monospace,monospace);color:var(--dsw-alias-label-primary)}
+.femo-comp-var-eq{flex:none;color:var(--dsw-alias-label-tertiary)}
+.femo-comp-var-input{flex:1 1 auto;min-width:0;box-sizing:border-box;height:28px;padding:0 8px;border:1px solid var(--dsw-alias-border-l2-darkmode-thin);border-radius:8px;outline:none;background:var(--dsw-specific-input-major);color:var(--dsw-alias-label-primary);font-size:13px;line-height:20px;font-family:inherit}
+.femo-comp-var-input:focus{border-color:var(--dsw-alias-state-business-primary)}
+.femo-comp-var-confirm{display:inline-flex;align-items:center;gap:5px;margin-top:10px;height:28px;padding:0 12px;border:none;border-radius:999px;outline:none;background:var(--dsw-alias-button-info-fill,#3964FE);color:#fff;font-size:12px;line-height:16px;font-weight:500;font-family:inherit;cursor:pointer;transition:background-color 100ms ease}
+.femo-comp-var-confirm:hover{background:var(--dsw-alias-button-info-hover)}
+.femo-comp-var-confirm:disabled{opacity:.4;cursor:default}
 `;
 function ensureFemoStreamStyles() {
   if (document.getElementById("femo-stream-style") !== null) return;
@@ -1280,6 +1297,7 @@ var FaTriangleExclamation = make("0 0 512 512", "M256 32c14.2 0 27.3 7.5 34.5 19
 var FaMasksTheater = make("0 0 640 512", "M74.6 373.2c41.7 36.1 108 82.5 166.1 73.7c6.1-.9 12.1-2.5 18-4.5c-9.2-12.3-17.3-24.4-24.2-35.4c-21.9-35-28.8-75.2-25.9-113.6c-20.6 4.1-39.2 13-54.7 25.4c-6.5 5.2-16.3 1.3-14.8-7c6.4-33.5 33-60.9 68.2-66.3c2.6-.4 5.3-.7 7.9-.8l19.4-131.3c2-13.8 8-32.7 25-45.9C278.2 53.2 310.5 37 363.2 32.2c-.8-.7-1.6-1.4-2.4-2.1C340.6 14.5 288.4-11.5 175.7 5.6S20.5 63 5.7 83.9C0 91.9-.8 102 .6 111.8L24.8 276.1c5.5 37.3 21.5 72.6 49.8 97.2zm87.7-219.6c4.4-3.1 10.8-2 11.8 3.3c.1 .5 .2 1.1 .3 1.6c3.2 21.8-11.6 42-33.1 45.3s-41.5-11.8-44.7-33.5c-.1-.5-.1-1.1-.2-1.6c-.6-5.4 5.2-8.4 10.3-6.7c9 3 18.8 3.9 28.7 2.4s19.1-5.3 26.8-10.8zM261.6 390c29.4 46.9 79.5 110.9 137.6 119.7s124.5-37.5 166.1-73.7c28.3-24.5 44.3-59.8 49.8-97.2l24.2-164.3c1.4-9.8 .6-19.9-5.1-27.9c-14.8-20.9-57.3-61.2-170-78.3S299.4 77.2 279.2 92.8c-7.8 6-11.5 15.4-12.9 25.2L242.1 282.3c-5.5 37.3-.4 75.8 19.6 107.7zM404.5 235.3c-7.7-5.5-16.8-9.3-26.8-10.8s-19.8-.6-28.7 2.4c-5.1 1.7-10.9-1.3-10.3-6.7c.1-.5 .1-1.1 .2-1.6c3.2-21.8 23.2-36.8 44.7-33.5s36.3 23.5 33.1 45.3c-.1 .5-.2 1.1-.3 1.6c-1 5.3-7.4 6.4-11.8 3.3zm136.2 15.5c-1 5.3-7.4 6.4-11.8 3.3c-7.7-5.5-16.8-9.3-26.8-10.8s-19.8-.6-28.7 2.4c-5.1 1.7-10.9-1.3-10.3-6.7c.1-.5 .1-1.1 .2-1.6c3.2-21.8 23.2-36.8 44.7-33.5s36.3 23.5 33.1 45.3c-.1 .5-.2 1.1-.3 1.6zM530 350.2c-19.6 44.7-66.8 72.5-116.8 64.9s-87.1-48.2-93-96.7c-1-8.3 8.9-12.1 15.2-6.7c23.9 20.8 53.6 35.3 87 40.3s66.1 .1 94.9-12.8c7.6-3.4 16 3.2 12.6 10.9z");
 var FaBullhorn = make("0 0 512 512", "M480 32c0-12.9-7.8-24.6-19.8-29.6s-25.7-2.2-34.9 6.9L381.7 53c-48 48-113.1 75-181 75H192 160 64c-35.3 0-64 28.7-64 64v96c0 35.3 28.7 64 64 64l0 128c0 17.7 14.3 32 32 32h64c17.7 0 32-14.3 32-32V352l8.7 0c67.9 0 133 27 181 75l43.6 43.6c9.2 9.2 22.9 11.9 34.9 6.9s19.8-16.6 19.8-29.6V300.4c18.6-8.8 32-32.5 32-60.4s-13.4-51.6-32-60.4V32zm-64 76.7V240 371.3C357.2 317.8 280.5 288 200.7 288H192V192h8.7c79.8 0 156.5-29.8 215.3-83.3z");
 var FaWrench = make("0 0 512 512", "M352 320c88.4 0 160-71.6 160-160c0-15.3-2.2-30.1-6.2-44.2c-3.1-10.8-16.4-13.2-24.3-5.3l-76.8 76.8c-3 3-7.1 4.7-11.3 4.7H336c-8.8 0-16-7.2-16-16V118.6c0-4.2 1.7-8.3 4.7-11.3l76.8-76.8c7.9-7.9 5.4-21.2-5.3-24.3C382.1 2.2 367.3 0 352 0C263.6 0 192 71.6 192 160c0 19.1 3.4 37.5 9.5 54.5L19.9 396.1C7.2 408.8 0 426.1 0 444.1C0 481.6 30.4 512 67.9 512c18 0 35.3-7.2 48-19.9L297.5 310.5c17 6.2 35.4 9.5 54.5 9.5zM80 408a24 24 0 1 1 0 48 24 24 0 1 1 0-48z");
+var FaCode = make("0 0 640 512", "M392.8 1.2c-17-4.9-34.7 5-39.6 22l-128 448c-4.9 17 5 34.7 22 39.6s34.7-5 39.6-22l128-448c4.9-17-5-34.7-22-39.6zm80.6 120.1c-12.5 12.5-12.5 32.8 0 45.3L562.7 256l-89.4 89.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0l112-112c12.5-12.5 12.5-32.8 0-45.3l-112-112c-12.5-12.5-32.8-12.5-45.3 0zm-306.7 0c-12.5-12.5-32.8-12.5-45.3 0l-112 112c-12.5 12.5-12.5 32.8 0 45.3l112 112c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L77.3 256l89.4-89.4c12.5-12.5 12.5-32.8 0-45.3z");
 
 // client/client-ui/chat-node.tsx
 var import_jsx_runtime4 = require("react/jsx-runtime");
@@ -18563,7 +18581,7 @@ function PermissionMenu({ face, disabled }) {
     )
   ] });
 }
-var IDLE_RUN_STATE = { running: false, waiting: false, waitScope: [] };
+var IDLE_RUN_STATE = { running: false, waiting: false, waitScope: [], outVars: [] };
 function composerButtonState(args) {
   const { winKind, actor, run, mainRunning } = args;
   if (winKind === "god") {
@@ -18616,6 +18634,7 @@ function ProjectionComposer({ useSession, useSessions, getSessionFace }) {
         running: data.running === true,
         waiting: data.waiting === true,
         waitScope: Array.isArray(data.waitScope) ? data.waitScope : [],
+        outVars: Array.isArray(data.outVars) ? data.outVars : [],
         prompt: typeof data.prompt === "string" ? data.prompt : void 0
       });
     }
@@ -18660,19 +18679,61 @@ function ProjectionComposer({ useSession, useSessions, getSessionFace }) {
         running: data.running === true,
         waiting: data.waiting === true,
         waitScope: Array.isArray(data.waitScope) ? data.waitScope : [],
+        outVars: Array.isArray(data.outVars) ? data.outVars : [],
         prompt: typeof data.prompt === "string" ? data.prompt : void 0
       });
     });
   }, [mainSid]);
   const buttonState = composerButtonState({ winKind: winInfo.winKind, actor: winInfo.actor, run, mainRunning });
-  const submit = () => {
+  const [varsOpen, setVarsOpen] = (0, import_react25.useState)(false);
+  const [varValues, setVarValues] = (0, import_react25.useState)({});
+  const varsPanelRef = (0, import_react25.useRef)(null);
+  const outVarsKey = run.outVars.join("\0");
+  (0, import_react25.useEffect)(() => {
+    setVarsOpen(false);
+    setVarValues({});
+  }, [outVarsKey]);
+  (0, import_react25.useEffect)(() => {
+    if (!varsOpen) return;
+    const onPointerDown = (e) => {
+      if (e.target instanceof Node && varsPanelRef.current?.contains(e.target) === true) return;
+      setVarsOpen(false);
+    };
+    const onKeyDown2 = (e) => {
+      if (e.key === "Escape") setVarsOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown2);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown2);
+    };
+  }, [varsOpen]);
+  const setVarValue = (name, value) => {
+    setVarValues((prev) => ({ ...prev, [name]: value }));
+  };
+  const confirmVars = () => {
+    const filled = {};
+    for (const name of run.outVars) {
+      const value = varValues[name]?.trim();
+      if (value !== void 0 && value.length > 0) filled[name] = value;
+    }
+    if (Object.keys(filled).length === 0) {
+      setVarsOpen(false);
+      return;
+    }
+    submit(filled);
+  };
+  const showVarUi = buttonState === "send" && run.outVars.length > 0;
+  const submit = (variables = {}) => {
     const value = text.trim();
-    if (value.length === 0 || busy || sessionId === void 0) return;
+    const hasVars = Object.keys(variables).length > 0;
+    if (value.length === 0 && !hasVars || busy || sessionId === void 0) return;
     setBusy(true);
     const post = async () => fetch("/femo-plugin/projection-input", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ sessionId, text: value })
+      body: JSON.stringify({ sessionId, text: value, ...hasVars ? { variables } : {} })
     });
     void (async () => {
       try {
@@ -18688,6 +18749,8 @@ function ProjectionComposer({ useSession, useSessions, getSessionFace }) {
         }
         if (data.ok === true) {
           changeText("");
+          setVarsOpen(false);
+          setVarValues({});
           return;
         }
         errorSeqRef.current += 1;
@@ -18743,6 +18806,60 @@ function ProjectionComposer({ useSession, useSessions, getSessionFace }) {
     ] }) }),
     error !== null && /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "femo-comp-notice", role: "status", children: error.text }),
     /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "femo-comp-card", "data-composer-card": "", children: [
+      showVarUi && /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "femo-comp-var-bar", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)(
+          "button",
+          {
+            type: "button",
+            className: "femo-comp-var-trigger",
+            "aria-label": "\u53D8\u91CF\u8D4B\u503C",
+            "aria-haspopup": "dialog",
+            "aria-expanded": varsOpen,
+            "data-open": varsOpen,
+            onMouseDown: keepFocus,
+            onClick: () => {
+              setVarsOpen(!varsOpen);
+            },
+            children: [
+              /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(FaCode, { size: 12 }),
+              /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { children: "\u53D8\u91CF\u8D4B\u503C" })
+            ]
+          }
+        ),
+        varsOpen && /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { ref: varsPanelRef, className: "femo-comp-var-panel", role: "dialog", "aria-label": "\u53D8\u91CF\u8D4B\u503C", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "femo-comp-var-head", children: "\u672C\u8282\u70B9\u53D8\u91CF\u8D4B\u503C\uFF08\u53EF\u53EA\u586B\u5176\u4E2D\u51E0\u9879\uFF09" }),
+          run.outVars.map((name) => /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "femo-comp-var-row", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { className: "femo-comp-var-name", title: name, children: name }),
+            /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { className: "femo-comp-var-eq", "aria-hidden": true, children: "=" }),
+            /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(
+              "input",
+              {
+                className: "femo-comp-var-input",
+                value: varValues[name] ?? "",
+                placeholder: "\u7559\u7A7A=\u4E0D\u8D4B\u503C",
+                spellCheck: false,
+                onChange: (e) => {
+                  setVarValue(name, e.currentTarget.value);
+                }
+              }
+            )
+          ] }, name)),
+          /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)(
+            "button",
+            {
+              type: "button",
+              className: "femo-comp-var-confirm",
+              disabled: busy,
+              onMouseDown: keepFocus,
+              onClick: confirmVars,
+              children: [
+                /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(FaCircleCheck, { size: 13 }),
+                /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { children: busy ? "\u53D1\u9001\u4E2D" : "\u786E\u8BA4\u8D4B\u503C\u5E76\u53D1\u9001" })
+              ]
+            }
+          )
+        ] })
+      ] }),
       /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "femo-comp-scroll", "data-input-scroll": "", children: /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { className: "femo-comp-grow", children: [
         /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { "aria-hidden": true, className: "femo-comp-mirror", "data-input-mirror": "", children: `${text}
 ` }),
@@ -18792,7 +18909,9 @@ function ProjectionComposer({ useSession, useSessions, getSessionFace }) {
               onClick: buttonState === "stop" ? () => {
                 void mainFace?.cancel?.()?.catch(() => {
                 });
-              } : submit,
+              } : () => {
+                submit();
+              },
               children: buttonState === "stop" ? /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("svg", { viewBox: "0 0 16 16", width: "16", height: "16", "aria-hidden": true, children: /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("rect", { x: "3", y: "3", width: "10", height: "10", rx: "3", fill: "currentColor" }) }) : /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("svg", { viewBox: "0 0 16 16", width: "16", height: "16", "aria-hidden": true, children: /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("path", { d: "M8.3125 0.980183C8.66767 1.0531 8.97902 1.20418 9.2627 1.43233C9.48724 1.61297 9.73029 1.85793 9.97949 2.10714L14.707 6.83468L13.293 8.24874L9 3.95577V15.0417H7V3.95577L2.70703 8.24874L1.29297 6.83468L6.02051 2.10714C6.26971 1.85793 6.51277 1.61297 6.7373 1.43233C6.97662 1.23986 7.28445 1.04402 7.6875 0.980183C7.8973 0.947006 8.1031 0.95516 8.3125 0.980183Z", fill: "currentColor" }) })
             }
           )

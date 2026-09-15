@@ -76,6 +76,7 @@ import { apiRetry } from './api-retry'
 import { activeChildRuns, abortAllSubagents } from './subagent'
 import { disposeMainDeliveries, isMainAnswerPending, mainActorSceneActor, pendingNodeName } from './main-actor'
 import { broker } from './node-retry'
+import { installFemoPreset } from './preset-install'
 
 declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {
@@ -115,6 +116,10 @@ export async function apply(ctx: Context, config: unknown): Promise<void> {
     console.log('[femo-plugin] disabled by config')
     return
   }
+  // 先于一切会话加载：把随插件打包的 FEMO preset 镜像到 dsh home 的
+  // .agent-presets/femo-plugin/，模式菜单里才有「FEMO模式」可选
+  // （issue #1：preset 从前只活在开发者自己的 dsh-home，普通用户装完没有）。
+  console.log(`[femo-plugin] preset install: ${installFemoPreset()}`)
   // 全局默认模型选择（用户在模型选择 UI 保存的推理等级在这里）；
   // 子 agent 不走 apiproxy 的 selection 安装，需要手动注入。
   const defaultModel = ctx.get('agentDefaultModel') as

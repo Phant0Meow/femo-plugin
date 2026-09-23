@@ -362,7 +362,7 @@ Apache-2.0
 - 欢迎提交 Issue！有bug欢迎提～肯定有 bug 的，这才第一版。
 - 欢迎 Pull Request！多好玩啊来一起搞吧！
 - 欢迎提交你写的femo剧本！这个也是很好的贡献～
-  (我就把自用的debug剧本（femoExamples/debug神器/）放文件夹里当示例了哈哈哈。欢迎你们也试试～不过这个剧本建议只用来找复杂隐蔽的 bug 哦，不然我心疼你的 Token，两处并发和多轮讨论挺消耗TOKEN的。简单bug大概更适配别的剧本流程，欢迎你们分享！)
+  (我就把自用的debug剧本（femoExamples/debug神器/）放文件夹里当示例了哈哈哈。欢迎你们也试试～不过这个剧本建议只用来找复杂隐蔽的 bug 哦，日常开发可能更适配别的femo流程，欢迎你们分享！)
 
 ## one more thing...
 - 最后还有一个非常有想象力的特性，或许你们会觉得有意思：
@@ -568,8 +568,6 @@ A dsh session = your main-model session + the multi-agent script engine:
 - The script language is `.femo`: scope isolation, `par` parallelism, fork/join gateways, checkpoint resume, `@mind` runtime dispatch, per-actor `source` model selection — with compile-time validation, so mistakes are caught immediately (see `语法文档.md`).
 - Config lives in the profile's `cordis.patch.yml` and is all optional: `provider` / `model` / `apiUrl` (LLM routing for engine AI nodes), `hostAiBackend`, `python`, `femoRoot`, etc. Out of the box it just works. Prefer manual assembly? Drop the whole folder into the profile's `node_modules`, `pip install requests`, register `femo-plugin` in `cordis.patch.yml`, restart dsh web. Note: the plugin root to register is the `hostAdapter/dshAdapter` folder — it searches upward two levels automatically.
 
-Early days — plenty of bugs. Developers, come take a look. It's genuinely a lot of fun.
-
 > Operational details — folder layout, the full config table, `@func` / `file:` placement conventions, script error tolerance, zero-token dry-run debugging, pause & resume, and dsh version compatibility — are all documented in the Chinese half of this README.
 
 ---
@@ -607,7 +605,7 @@ Early days — plenty of bugs. Developers, come take a look. It's genuinely a lo
 - Issues are welcome! If you find a bug, please report it~ There are bound to be bugs — this is only the first version.
 - Pull Requests are welcome! It's so much fun, let's build it together!
 - Submitting femo scripts you've written is also a great contribution!
-  (I've put my personal debug script (`femoExamples/debug神器/`) in the folder as an example, haha. You're welcome to try it too~ But I suggest using this script only for complex, hidden bugs, otherwise I'll feel bad for your token usage — the dual concurrency and multi-round discussions consume quite a lot of tokens. Simple bugs probably fit other script flows better — feel free to share those!)
+  (I've put my personal debug script (`femoExamples/debug神器/`) in the folder as an example, haha. You're welcome to try it too~ But I suggest using this script only for complex, hidden bugs, daily coding probably fit other script flows better — feel free to share those!)
 
 ---
 

@@ -735,6 +735,14 @@ h1 .amp { color: var(--gold); }
   box-shadow: var(--topbtn-badge-shadow);
 }
 .topbtn.on .tb-badge { color: var(--teal); background: var(--teal-faint); }
+/* 纯图标钮的徽章（2026-10-04 顶栏图标化随刀）：钉在右下角、不占版面——
+   带徽章的钮与无徽章的兄弟钮尺寸完全一致（用户拍板「各个按钮样式大小都一致」）；
+   不钉右上是因为顶栏贴页顶（留白退役），往上戳会被视口裁掉。 */
+.topbtn.iconbtn { position: relative; }
+.topbtn.iconbtn .tb-badge {
+  position: absolute; bottom: -5px; right: -5px;
+  font-size: 9px; line-height: 12px; padding: 0 4px;
+}
 .dbg-wrap { position: static; display: flex; flex-direction: column; align-items: flex-end; }
 .dbg-panel {
   display: none; position: absolute; top: calc(100% + 6px); right: 0;

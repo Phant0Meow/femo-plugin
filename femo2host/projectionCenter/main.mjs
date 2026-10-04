@@ -128,13 +128,11 @@ function initTheme() {
   if (!t) { try { t = localStorage.getItem('pc-theme') || ''; } catch (e) {} }
   if (!THEMES.some(x => x[0] === t)) t = document.documentElement.dataset.theme || 'porcelain';
   applyTheme(t);
-  // toggle 按钮：显示「另一个主题」的名字（点下去就去那儿），青色=非缺省主题
+  // toggle 按钮：纯图标（2026-10-04 用户拍板「主题改成画板那个图标」顶栏全部
+  // 图标化）——主题名文字退场，按钮只留点亮语义：非缺省主题亮青。
   const elBtn = document.getElementById('themeToggle');
-  const elTxt = document.getElementById('themeToggleTxt');
   const sync = () => {
     const cur = document.documentElement.dataset.theme;
-    const i = Math.max(THEMES.findIndex(x => x[0] === cur), 0);
-    elTxt.textContent = THEMES[i][1];
     const lit = cur !== 'porcelain';   // 非缺省主题亮青（缺省=素瓷）
     elBtn.classList.toggle('on', lit);
     elBtn.setAttribute('aria-pressed', String(lit));

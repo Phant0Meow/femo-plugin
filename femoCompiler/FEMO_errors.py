@@ -2,8 +2,8 @@
 2026-09-07 增设 WARNING 桶）。
 
 统一错误处理入口：新代码遇到错误先 `classify_error` 归桶，再按桶处理——
-- FATAL：编译/语法/结构错、LLM 配置错（无 key/模型/URL）→ 剧本暂停/不启动，
-  错误信息回主模型与用户（host 转戏外视角）；
+- FATAL：编译/语法/结构错、LLM 配置错（无 key/模型/URL）→ FEMO脚本暂停/不启动，
+  错误信息回主模型与用户（host 转FEMO外视角）；
 - AGENT：执行者输出问题（赋值违规、格式错、LLM 临时失败限流/超时）→
   错误反馈给当前节点执行者，该轮输出不落库，重跑此节点；
 - WARNING：出现了值得作者知道的事，但没有任何东西被拒绝——编译不阻断
@@ -21,7 +21,7 @@ warning 了；分界看「有没有被拒绝的东西」。
 三桶分发入口（绑定 FEMORunner）。职责=宪法口径：拼装报错信息（compose_message）
 + 按桶下发信号（node_retry / notify_author，NDJSON 事件交宿主翻译成对应
 agent 框架的行为）+ 返回裁决（VERDICT_*）给 runtime 执行。重试循环留在
-runtime（裁决⑤：Error 只负责单次裁决与发信号，不驱动重试）；终止剧本的
+runtime（裁决⑤：Error 只负责单次裁决与发信号，不驱动重试）；终止FEMO脚本的
 执行权在 runtime（raise → worker → flow_error）。计数以 wait_key 为键
 （ai_<node>_<n> / human_<node>_<n>，par 并发各分支独立 key 天然隔离）。
 
@@ -41,7 +41,7 @@ class ErrorCategory(Enum):
 
 
 class FEMOConfigError(Exception):
-    """LLM 配置错误（无 key/模型/URL/供应商等）→ FATAL：剧本无法继续，直接报错。"""
+    """LLM 配置错误（无 key/模型/URL/供应商等）→ FATAL：FEMO脚本无法继续，直接报错。"""
 
 
 class FEMOTransientError(Exception):
@@ -52,6 +52,19 @@ class FEMOTransientError(Exception):
     （agent/request-error 瀑布：内置 llm-retry 快层 + 插件 api-retry 慢层），
     compiler 全程无感。本异常永不进 AGENT 反馈信号，仅直连 llmBridge 分支
     可达；重试用尽走 runtime 的暂停分支（现状语义保留）。"""
+
+
+class FEMORunPaused(Exception):
+    """运行期挂起信号（节点门口断点已拍 → run_async 走 suspended(node_pause)
+    可续跑；宿主 FSM 收 flow_paused 做暂停清场）。
+
+    【2026-10-01 用户拍板：一切 error 都挂起可续】fork/par 分支内 raise 时
+    **放行**——branch_main 对它原样上抛（不进 _fork_errors），fork/直启的
+    收场循环掐掉兄弟分支后原样再抛，由 run_async 的 except 统一落
+    suspended。旧法「分支内转 FEMOVariableError → failed 诚实收场」退役
+    （实案 job 2657：狼人杀选举 fork 里的网页席位冻结 → 整场 failed 不可
+    续，而通知文案还教用户「可点继续」——两处假话）。续不续、改不改剧本
+    都是用户的事：改稿对不上断点由续跑第④关（指纹）教重跑。"""
 
 
 class FEMOActorExecutionError(Exception):
@@ -110,7 +123,7 @@ class ErrorDispatcher:
     """错误四桶分发入口（绑定 FEMORunner；每 run 一个，run_async 里 reset）。
 
     职责=宪法口径：拼装报错信息 + 按桶下发信号 + 返回裁决。
-    重试循环留在 runtime（裁决⑤）；终止剧本的执行权在 runtime
+    重试循环留在 runtime（裁决⑤）；终止FEMO脚本的执行权在 runtime
     （raise → worker → flow_error）。本类只判定与发信号。
 
     计数以 wait_key 为键（wait_key 含自增 counter，par 并发各分支独立
@@ -128,9 +141,9 @@ class ErrorDispatcher:
         self._retry_counts = {}
 
     def compose_message(self, *, node_id, errors, bucket, attempt=None,
-                        max_attempts=None, ai_name='', target=FEEDBACK_TARGET_AI) -> str:
+                        max_attempts=None, actor_name='', target=FEEDBACK_TARGET_AI) -> str:
         """报错信息单点拼装（分 target 文案）：
-        target='ai'    : "剧本错误（{bucket}桶）@ 节点 {node}（{ai_name}）：{errors}（第 x/N 次反馈）"
+        target='ai'    : "脚本错误（{bucket}桶）@ 节点 {node}（{actor_name}）：{errors}（第 x/N 次反馈）"
         target='human' : "你的输入未被接受：{errors}。请修正后重新输入。"
         超限（attempt > max_attempts）时尾巴改为"按结束跳过/继续"——giveup 的
         notify_author 与重试的 node_retry 看到同一段话（单点拼装）。
@@ -144,17 +157,17 @@ class ErrorDispatcher:
                 return base + f"已重试 {max_attempts} 次仍未通过，本节点按结束继续。"
             return base + "请修正后重新输入。"
         bucket_name = bucket.value if bucket is not None else 'agent'
-        who = f"@ 节点 {node_id}" + (f"（{ai_name}）" if ai_name else "")
+        who = f"@ 节点 {node_id}" + (f"（{actor_name}）" if actor_name else "")
         if over_limit:
             tail = f"（重试 {max_attempts} 次仍未通过，本节点按结束跳过）"
         elif attempt is not None and max_attempts is not None:
             tail = f"（第 {attempt}/{max_attempts} 次反馈）"
         else:
             tail = ""
-        return f"剧本错误（{bucket_name}桶）{who}：{err_text}{tail}"
+        return f"脚本错误（{bucket_name}桶）{who}：{err_text}{tail}"
 
     def dispatch(self, error, node_id, *, errors=None, bucket=None, wait_key='',
-                 ai_name='', max_retries=2, attempt=None,
+                 actor_name='', max_retries=2, attempt=None,
                  target=FEEDBACK_TARGET_AI) -> str:
         """唯一分发入口。errors 优先（assign_errors/assign_err 列表），
         否则 [str(error)]。返回 VERDICT_* 常量。
@@ -164,9 +177,12 @@ class ErrorDispatcher:
                 紧随的 flow_error 三通道承担——宪法要求发信号 ✓，宿主防双份）
         AGENT：n = _retry_counts.get(wait_key or node_id, 0) + 1；写回
                n <= max_retries：
-                   target='ai' 时 emit ai_retry{node_name, attempt, errors}（既有显示行）
-                   emit node_retry{node_name, wait_key, ai_name, feedback=compose(...),
-                                   error, attempt, max_attempts, target}（行为信号）
+                   emit node_retry{node_name, wait_key, actor_name, feedback=compose(...),
+                                   error, attempt, max_attempts, target}（行为信号；
+                                   显示归桥 retry 槽）＋ emit notify_author
+                                   {severity:'agent_error'}（报错即通知作者，与重试
+                                   并行）——ai_retry 显示回声已拔管（2026-09-23
+                                   十连裁④：原先 target='ai' 时与其双发，作者收双信）
                    emit notify_author{severity:'agent_error', message=compose(...)}
                    （报错即通知作者——2026-09-05 猫猫实测修订：不再等重试用尽才通知。
                     原因=执行者看到报错后可能"聪明规避"（重试时干脆不写赋值语句），
@@ -189,15 +205,15 @@ class ErrorDispatcher:
         if bucket == ErrorCategory.FATAL:
             self._emit(NOTIFY_AUTHOR_EVENT, {
                 'node_name': node_id,
-                'ai_name': ai_name,
+                'actor_name': actor_name,
                 'severity': 'fatal',
                 'message': self.compose_message(
                     node_id=node_id, errors=errors_list, bucket=bucket,
-                    ai_name=ai_name, target=FEEDBACK_TARGET_AI),
+                    actor_name=actor_name, target=FEEDBACK_TARGET_AI),
             })
             return VERDICT_FATAL
         if bucket == ErrorCategory.WARNING:
-            self.warn('; '.join(errors_list), node_id=node_id, ai_name=ai_name)
+            self.warn('; '.join(errors_list), node_id=node_id, actor_name=actor_name)
             return VERDICT_WARN
         if bucket == ErrorCategory.TOLERANT:
             print(f"[errors]⚠️ TOLERANT 错误（忽略继续）: {'; '.join(errors_list)}")
@@ -208,20 +224,12 @@ class ErrorDispatcher:
         self._retry_counts[key] = n
         message = self.compose_message(
             node_id=node_id, errors=errors_list, bucket=bucket,
-            attempt=n, max_attempts=max_retries, ai_name=ai_name, target=target)
+            attempt=n, max_attempts=max_retries, actor_name=actor_name, target=target)
         if n <= max_retries:
-            if target == FEEDBACK_TARGET_AI:
-                # 既有显示行（投影窗 ⚠️）：ai 节点的重试显示由它承担，
-                # node_retry 是行为信号，宿主不重复投影（防双份）。
-                self._emit('ai_retry', {
-                    'node_name': node_id,
-                    'attempt': n,
-                    'errors': errors_list,
-                })
             self._emit(AGENT_RETRY_EVENT, {
                 'node_name': node_id,
                 'wait_key': wait_key,
-                'ai_name': ai_name,
+                'actor_name': actor_name,
                 'feedback': message,
                 'error': errors_list,
                 'attempt': n,
@@ -236,20 +244,20 @@ class ErrorDispatcher:
             # 状态尾巴）。
             self._emit(NOTIFY_AUTHOR_EVENT, {
                 'node_name': node_id,
-                'ai_name': ai_name,
+                'actor_name': actor_name,
                 'severity': 'agent_error',
                 'message': message,
             })
             return VERDICT_RETRY
         self._emit(NOTIFY_AUTHOR_EVENT, {
             'node_name': node_id,
-            'ai_name': ai_name,
+            'actor_name': actor_name,
             'severity': 'agent_giveup',
             'message': message,
         })
         return VERDICT_EXHAUSTED
 
-    def warn(self, message: str, node_id: str = '', ai_name: str = '') -> None:
+    def warn(self, message: str, node_id: str = '', actor_name: str = '') -> None:
         """WARNING 桶便捷入口（2026-09-07）：运行期「值得作者知道但不拒绝任何
         东西」的观察。与 dispatch 的差别——不需要 Exception/错误列表，没有
         重试计数，发完即返回（runtime 无需看裁决，照常走）。
@@ -257,16 +265,16 @@ class ErrorDispatcher:
         典型产生点：断点续跑变量补种/孤儿、流程在无出边处正常收尾、动作未
         定义跳过、for 迭代器不是列表空转——都是「能跑，但作者应当知情」。
         消息格式与 compose_message 分开：警告没有「第 x/N 次反馈」状态，
-        也不叫「错误」——`剧本警告 @ 节点 X：...`。"""
+        也不叫「错误」——`脚本警告 @ 节点 X：...`。"""
         text = str(message or '').strip()
         if not text:
             return
-        at = f" @ 节点 {node_id}" + (f"（{ai_name}）" if ai_name else "") if node_id else ""
+        at = f" @ 节点 {node_id}" + (f"（{actor_name}）" if actor_name else "") if node_id else ""
         self._emit(NOTIFY_AUTHOR_EVENT, {
             'node_name': node_id,
-            'ai_name': ai_name,
+            'actor_name': actor_name,
             'severity': 'warning',
-            'message': f"剧本警告{at}：{text}",
+            'message': f"脚本警告{at}：{text}",
         })
 
     def _emit(self, event_type: str, data: dict) -> None:

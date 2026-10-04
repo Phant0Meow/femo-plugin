@@ -22,8 +22,8 @@ from typing import Any, Dict, List, Optional, Tuple, Set
 from .femoAsync import AsyncEngine, CancelledError
 # （task_pause import 已随 C3 修复退役（§5.7）：TaskPauseManager/save_snapshot/
 #  restore_snapshot 不再被 runtime 引用；文件移 mytrashbin 留痕。）
-from femoBridges.getDir.get_dir import get_FEMOroot_dir
-from femoCompiler.FEMO_CLIrenderer import CLIRenderer, emit_step, emit_context_ready, emit_memory_ready
+# （get_FEMOroot_dir 已退役观察期（2026-09-26）：txt 寻址老机制，import 后从未调用。）
+from femoCompiler.FEMO_CLIrenderer import CLIRenderer, emit_step  # emit_context_ready/emit_memory_ready 已退役观察期（2026-09-26），随其注释摘除
 from femoCompiler.actor_resolver import resolve_actor_var, resolve_actor_attr
 
 # ============================================================
@@ -33,6 +33,7 @@ from femoCompiler.actor_resolver import resolve_actor_var, resolve_actor_attr
 from femoCompiler.vars.model import FEMOVariableError
 from femoCompiler.protocol import normalize_transcript_steps
 from femoCompiler.vars.checkpoint import dump_state, restore_state
+from femoCompiler.vars.env import VarFacade
 from femoCompiler.vars.evaluator import Evaluator
 from femoCompiler.task_world import (
     TaskContext, ModuleFrame, task_ctx, current_task_ctx, set_task_ctx,
@@ -48,7 +49,7 @@ from femoCompiler.FEMO_parser import (
     ActorDef, OutDef, InMapping, MethodDef, _split_module_ref,
 )
 from femoCompiler.FEMO_errors import (
-    ErrorCategory, FEMOActorExecutionError, FEMOConfigError, FEMOTransientError, classify_error,
+    ErrorCategory, FEMOActorExecutionError, FEMOConfigError, FEMOTransientError, FEMORunPaused, classify_error,
     build_dispatcher, VERDICT_FATAL, VERDICT_RETRY, VERDICT_EXHAUSTED, VERDICT_TOLERANT,
     FEEDBACK_TARGET_AI, FEEDBACK_TARGET_HUMAN, NODE_SETTLED_EVENT,
 )
@@ -60,21 +61,12 @@ class FEMOException(Exception):
         self.message = message
         super().__init__(f"[{code}] {message}")
 
-class FEMOConcurrencyError(FEMOException):
-    def __init__(self, message: str):
-        super().__init__("FEMO-101", message)
-
-
-class FEMORunPaused(Exception):
-    """直连模式 AI 失败挂起（C3 修复，施工清单 v3 §5.7）：节点门口断点已拍
-    （_record_checkpoint），raise 后由 run_async 的 except 分支走
-    on_state_change('suspended', 'node_pause')——替换旧 task_pause.pause()
-    的 `await event.wait()` 无超时挂死协程（C3：永挂无人 set）。
-    为什么是 suspended 不是 failed：提案 §六 C3 归宿表锚点"AI 失败走
-    on_state_change(suspended)"，且保留直连模式续跑能力。
-    fork/par 分支内 raise 时会被 branch_main 的 except Exception 收进
-    _fork_errors → 转 FEMOVariableError → failed（既有分支错误上报链，
-    诚实收场；主链直连 AI 失败=suspended）。"""
+# ━━━ 已退役·观察期（2026-09-26 起）━━━ FEMOConcurrencyError：定义后从未被 raise 也从未被接住
+# （双窗口交叉扫描+逐项复核），错误分类学遗留。无报错数日后整段删除（含本注）。
+# class FEMOConcurrencyError(FEMOException):
+#     def __init__(self, message: str):
+#         super().__init__("FEMO-101", message)
+# ━━━ 观察期退役段结束：FEMOConcurrencyError ━━━
 
 
 # 赋值通道统一变量名（三处共用：extract_ai_assignments / _parse_single_assignment /
@@ -96,17 +88,20 @@ def extract_ai_assignments(text: str) -> List[Tuple[str, str]]:
       SET VARIABLE: <<KILL += 1>>
       SET VARIABLE: <<KILL = add(@Alice)>>
       SET VARIABLE: <<$x = 1>>（shared 变量，拍板 8④）
+    赋值语句必须独占一行（行首可有缩进、行尾可有空白）才被识别；
+    夹在句子中间的出现只是台词/复述，不算赋值信号（2026-09-29 拍板）。
     """
     pattern = (
-        r'(?:SET\s+VARIABLE|设定变量|设置变量)'
-        r'\s*[:：]\s*'
+        r'^[ \t]*(?:SET[ \t]+VARIABLE|设定变量)'
+        r'[ \t]*[:：][ \t]*'
         r'(?:<<|《|〈|《《)'
-        r'\s*(' + VAR_NAME_RE + r')\s*'   # 变量名（VAR_NAME_RE：$ / @ / 中文）
-        r'([+\-]?=)\s*'                   # 操作符 = / += / -=
-        r'(.+?)'                          # 表达式
+        r'[ \t]*(' + VAR_NAME_RE + r')[ \t]*'   # 变量名（VAR_NAME_RE：$ / @ / 中文）
+        r'([+\-]?=)[ \t]*'                      # 操作符 = / += / -=
+        r'(.+?)'                                # 表达式
         r'(?:>>|》|〉|》》)'
+        r'[ \t]*\r?$'                           # 行尾：只许空白，语句必须独占一行
     )
-    matches = re.findall(pattern, text)
+    matches = re.findall(pattern, text, re.MULTILINE)
     result = []
     for m in matches:
         var_name = m[0].strip()
@@ -215,8 +210,8 @@ def call_python(bridge, path: str, kwargs: dict = None) -> Any:
     
 def _resolve_val(val, facade):
     """递归解析变量值，直到不是 @ 开头的变量引用（追链上限 10 层防环）。
-    静态演员引用（@Alice 在 actors 表）经 facade.get 原样返回名字本身——
-    out 变量存演员名语义不变；@变量 → 取当前值（可能再是 @引用 → 继续解）。"""
+    静态角色引用（@Alice 在 actors 表）经 facade.get 原样返回名字本身——
+    out 变量存角色名语义不变；@变量 → 取当前值（可能再是 @引用 → 继续解）。"""
     for _ in range(10):
         if isinstance(val, str) and val.startswith('@') and facade.has(val):
             val = facade.get(val)
@@ -329,8 +324,8 @@ class PythonBridge:
     """加载外部 Python 文件，调用其中函数"""
 
     def __init__(self, base_dir: str = ""):
-        # base_dir = 剧本文件所在目录（有剧本地址时由 host 传入）；
-        # 空 = 剧本未保存（纯文本运行），此时相对路径一律报错。
+        # base_dir = 脚本文件所在目录（有FEMO脚本地址时由 host 传入）；
+        # 空 = 脚本未保存（纯文本运行），此时相对路径一律报错。
         self.base_dir = base_dir
         self.modules: Dict[str, types.ModuleType] = {}
 
@@ -339,8 +334,8 @@ class PythonBridge:
         加载 .py 文件，注册为 alias。
         地址解析规则（todo #2）：
         - 绝对路径 → 直接使用（无脑支持）
-        - 相对路径 → 相对剧本文件所在目录（base_dir）解析
-        - base_dir 为空（剧本未保存）→ 相对路径报错
+        - 相对路径 → 相对脚本文件所在目录（base_dir）解析
+        - base_dir 为空（脚本未保存）→ 相对路径报错
         func_code 默认位置已取消（不再回退查找）。
         """
         if os.path.isabs(filepath):
@@ -349,8 +344,8 @@ class PythonBridge:
             full_path = os.path.join(self.base_dir, filepath)
         else:
             raise FileNotFoundError(
-                f"Python Bridge: 相对路径 '{filepath}' 需要剧本文件地址（剧本未保存）。"
-                f"请先「导出 .FEMO」保存剧本，或改用绝对路径。"
+                f"Python Bridge: 相对路径 '{filepath}' 需要脚本文件地址（脚本未保存）。"
+                f"请先「导出 .FEMO」保存FEMO脚本，或改用绝对路径。"
             )
 
         if not os.path.exists(full_path):
@@ -449,12 +444,12 @@ class FEMORunner:
         # ErrorDispatcher 只裁决与发信号；重试循环留在 runtime（裁决⑤）。
         self.errors = build_dispatcher(self)
         # ── 断点状态：位置 + per-task 变量世界整包，经 checkpoint 事件交宿主持久化 ──
-        # 记录的是"位置"（task_id→node id）：续跑/改剧本后从该节点重放（分支直启）。
+        # 记录的是"位置"（task_id→node id）：续跑/改脚本后从该节点重放（分支直启）。
         self.checkpoints: Dict[str, str] = {}    # task_id → node_id（宿主可见性/续跑位置）
         self._positions: Dict[str, Dict[str, Any]] = {}   # task_id → {node_id, mod_stack, loop_frames}
         self._last_vars_dump: str = ""   # state 去重基线：没变化不随事件上行（事件体积）
         # 外部注入的恢复态（断点续跑）：{checkpoints, session_id, state=整包}。
-        # session_id 优先级最高——续跑=回到同一个世界（同一场次房间）接着演。
+        # session_id 优先级最高——续跑=回到同一个世界（同一次次房间）接着演。
         # ⚠️ 数据源单一性约束（接线约定 5）：恢复唯一数据源=state（R4 起字段
         # 名 state，载荷暂名 vars 的过渡期已随宿主更名结束）；checkpoints 是
         # 宿主可见性信号，恢复侧不消费它。
@@ -485,7 +480,7 @@ class FEMORunner:
         from femoCompiler.db_utils import init_database, get_max_session_id, get_or_create_session, get_next_turn_id, session_exists
         init_database()
 
-        # ── 断点续跑：注入的场次身份优先级最高（宿主已校验剧本指纹未变）。
+        # ── 断点续跑：注入的场次身份优先级最高（宿主已校验脚本指纹未变）。
         # 场次不存在（台账被清）→ 拒绝失忆续跑：宁可 fresh_start，不演失忆剧。
         resume_sid = self.resume_state.get('session_id')
         resumed_session = False
@@ -496,10 +491,18 @@ class FEMORunner:
                 raise ValueError(f"断点的 session_id 无效: {resume_sid!r}")
             if not session_exists(sid):
                 raise ValueError(
-                    f"断点指向的场次 {sid} 不存在（运行台账可能已被清空），拒绝失忆续跑；请 fresh_start 重新开演。")
+                    f"断点指向的场次 {sid} 不存在（运行台账可能已被清空），拒绝失忆续跑；请 fresh_start 重新启动运行。")
             self._current_session_id = sid
             self._current_turn_id = get_next_turn_id(sid)
             resumed_session = True
+            # 交付游标随断点回填（2026-09-28 漏台词定案）：增量窗口从上次交付
+            # 处接续，不再回落「自己最近发言 turn」——收卷一拍后发言在收卷时刻
+            # 现取最大号落库，回落会吞掉自己发言期间别人的台词。
+            resume_cursors = self.resume_state.get('delivery_cursors') or {}
+            if resume_cursors:
+                from femoBridges.ContextExample import restore_delivery_cursors
+                restore_delivery_cursors(sid, resume_cursors)
+                print(f"[runtime]🔁 交付游标回填 {len(resume_cursors)} 格，增量窗口接续断点前")
             print(f"[runtime]🔁 断点续跑：复用场次 {sid}（turn {self._current_turn_id}），前情对话照常可见")
 
         session_meta = script.meta.get('session', None)
@@ -608,7 +611,7 @@ class FEMORunner:
                   f"{len(_positions)} 位置），task 序号续自 t{seq_next}")
             # 【2026-09-06 vars 增删容差（用户拍板）】整包恢复只认快照——新剧本
             # 新声明的变量不在恢复后的世界里，读到即"未声明"崩。按声明初值补种；
-            # 快照有而新剧本已删的成为孤儿值（无人读则无害）。都打 ⚠️——能跑，
+            # 快照有而新脚本已删的成为孤儿值（无人读则无害）。都打 ⚠️——能跑，
             # 但作者应当知情（⚠️ 补种值=声明初值，非断点时刻的中间态）。
             # 【2026-09-07 warning 桶】汇总发 WARNING（notify_author），作者在
             # 聊天窗/错误面板可见——原来只进 bridge 日志，作者蒙在鼓里。
@@ -621,9 +624,9 @@ class FEMORunner:
                     "（补种值=声明初值，非断点时刻的中间态）")
             if orphaned:
                 names = ', '.join(orphaned)
-                print(f"[runtime] ⚠️ 断点续跑：变量 {names} 在新剧本已删除，快照残留值成为孤儿数据（无人读则无害）")
+                print(f"[runtime] ⚠️ 断点续跑：变量 {names} 在新脚本已删除，快照残留值成为孤儿数据（无人读则无害）")
                 self.errors.warn(
-                    f"断点续跑：变量 {names} 在新剧本已删除，快照残留值成为孤儿数据（无人读则无害）")
+                    f"断点续跑：变量 {names} 在新脚本已删除，快照残留值成为孤儿数据（无人读则无害）")
         else:
             self.resume_positions = {}
 
@@ -659,23 +662,26 @@ class FEMORunner:
                 else:
                     return str(obj)
             data = _sanitize(data)
-        
+
+        # 执行者名字段 = actor_name（2026-09-19 由 ai_name 正名而来，用户原话
+        # 「明明应该叫 actorname」——它是**执行者**的名字，不只属于 AI，人类节点
+        # 等的也是同一个执行者）。全仓已改彻底，旧名不再发。
         # 调试：打印所有发往前端的事件
         #print(f"[EMIT] {event_type}: {json.dumps(data, ensure_ascii=False, default=str) if data else '{}'}")
-        
+
         if self._event_callback:
             self._event_callback(event_type, data or {})
 
     def _rc_call(self, name: str, *args) -> None:
         """窄回调安全调用（§4.2 依赖倒置契约）：回调是旁挂，环境故障不能带崩
-        演出本体——try/except 打 log。旁挂失效最坏=Job 停在 running → 重启
+        运行本体——try/except 打 log。旁挂失效最坏=Job 停在 running → 重启
         对账判 crash，不会伪 finished。未注入该回调（缺省 None）→ no-op。"""
         callback = self._rc.get(name)
         if callback is None:
             return
         try:
             callback(*args)
-        except Exception as exc:  # noqa: BLE001 ——旁挂绝不反向炸演出
+        except Exception as exc:  # noqa: BLE001 ——旁挂绝不反向炸运行
             print(f"[runtime]⚠️ runtime callback {name!r} failed: {exc}")
 
     def _record_checkpoint(self, ctx: TaskContext, node_id: str) -> None:
@@ -683,15 +689,16 @@ class FEMORunner:
         （进入节点前调用）。
 
         存的是"位置"（task_id→node id，分支直启的恢复点）；节点不存在于
-        新剧本时从头跑。[END]/[BREAK] 是终点/跳出点，永不作为续跑位置记录
+        新脚本时从头跑。[END]/[BREAK] 是终点/跳出点，永不作为续跑位置记录
         ——否则残留的 checkpoint 会让后续每次 run 都从终点"续跑"而整体跳过
-        剧本。
+        FEMO脚本。
 
-        载荷 {checkpoints, session_id, state?}：checkpoints=task_id→node_id
+        载荷 {checkpoints, session_id, state?, delivery_cursors}：checkpoints=task_id→node_id
         位置映射（宿主 canResume 判据，纯透传）；state=dump_state per-task
         世界整包（仅内容变化时携带去重省流量；R4 起字段名 state，与宿主
-        宿主侧事件/开演两模块同刻更名——引擎与宿主同插件
-        同次构建部署，无跨版本窗口）。
+        宿主侧事件/启动运行两模块同刻更名——引擎与宿主同插件
+        同次构建部署，无跨版本窗口）；delivery_cursors=交付游标
+        （{soul_id: turn}，续跑回填 ContextExample，2026-09-28）。
         ⚠️ 引擎恢复侧唯一数据源=state.positions（接线约定 5）。
         """
         if node_id in ('[END]', '[BREAK]'):
@@ -741,6 +748,14 @@ class FEMORunner:
                                    'checkpoint_labels': labels}
         if self._current_session_id:
             payload['session_id'] = self._current_session_id
+            # 交付游标随 checkpoint 落盘（2026-09-28 漏台词定案）：增量窗口的
+            # 基线只活在 ContextExample 内存，进程重启即丢，缺键回落「自己最近
+            # 发言 turn」（收卷一拍后=收卷号），续跑会吞掉「收到节点提醒→说完
+            # 落账」之间别人的发言。随断点存、续跑回填。游标在节点门口之后
+            # （拼料包时）才会推进，挂起时档案里可能落后一拍——只会有重发
+            # （窗口拨回去一点），不会有漏（窗口跳过去），方向安全。
+            from femoBridges.ContextExample import export_delivery_cursors
+            payload['delivery_cursors'] = export_delivery_cursors(self._current_session_id)
         if state_changed:
             payload['state'] = state
         self._emit_event('checkpoint', payload)
@@ -749,7 +764,7 @@ class FEMORunner:
         self._rc_call('on_checkpoint', payload)
 
     def _resume_start_for(self, task_id: str, fallback: str, flow) -> str:
-        """续跑起点：该 task 上次记录的节点若仍在新剧本中则用之，否则从头。"""
+        """续跑起点：该 task 上次记录的节点若仍在新脚本中则用之，否则从头。"""
         if not self.resume_checkpoints:
             return fallback
         resumed = self.resume_checkpoints.get(task_id)
@@ -757,7 +772,7 @@ class FEMORunner:
             print(f"[resume] 分支 {task_id} 从节点 {resumed} 继续")
             return resumed
         if resumed:
-            print(f"[resume] 分支 {task_id} 的记录节点 {resumed} 已不在新剧本，从头执行")
+            print(f"[resume] 分支 {task_id} 的记录节点 {resumed} 已不在新脚本，从头执行")
         return fallback
 
     def _resolve_module_def(self, mod_path: str):
@@ -790,7 +805,7 @@ class FEMORunner:
 
     def _flow_for_stack(self, mod_stack) -> Tuple[Any, Optional[dict]]:
         """直启/分支执行的目标 flow 与 extra_actions：模块栈顶决定
-        （栈顶剧本级 → mainflow；否则对应模块 flow，extra_actions 同源）。"""
+        （栈顶FEMO脚本级 → mainflow；否则对应模块 flow，extra_actions 同源）。"""
         if not mod_stack:
             return self.script.flow, None
         mod = self._resolve_module_def(mod_stack[-1])
@@ -802,7 +817,7 @@ class FEMORunner:
         分支直启按栈顶 flow（模块 flow）跑：到 [OUT]/[BREAK] 时 _execute_path
         返回——**正常场景**母协程（fork gather 收场后）继续母 flow 的剩余执行
         流；**直启场景**母协程不存在（root 已随 fork 终止且不直启），若不续传，
-        模块出口后 mainflow 的后续节点永远没人跑（flow_done 照发、剧本断头）。
+        模块出口后 mainflow 的后续节点永远没人跑（flow_done 照发、FEMO脚本断头）。
 
         本方法逐层弹栈：exit_module 清模块帧（宪法 1.2）→ 按快照调用链
         （ModuleFrame.caller_node_id，_run_module push 时记录）定位母 flow 中
@@ -820,7 +835,7 @@ class FEMORunner:
             flow, extra = self._flow_for_stack(parent_stack)
             caller = top.caller_node_id or ''
             if flow is None or not caller or caller not in flow.nodes:
-                print(f"[resume]⚠️ 模块 {mod_path} 的调用点 {caller!r} 不在新剧本"
+                print(f"[resume]⚠️ 模块 {mod_path} 的调用点 {caller!r} 不在新脚本"
                       f"母 flow 中，续跑止于模块出口")
                 return
             nxt = self._follow_next_edge(caller, flow)
@@ -869,52 +884,55 @@ class FEMORunner:
 
         # 【2026-09-07 warning 桶】流程在无出边处停止=按设计正常收尾的一种，
         # 不阻断（return None → 上层正常结束），但作者应当知情。
-        print(f"[runtime]⚠️ 节点 {node_id} 没有任何符合条件的出边，流程将在此停止。")
-        self.errors.warn(f"节点 {node_id} 没有任何符合条件的出边，流程将在此停止。")
+        print(f"[runtime]⚠️ 节点 {node_id} 没有任何符合条件的出边，该分支在此停止。")
+        self.errors.warn(f"节点 {node_id} 没有任何符合条件的出边，该分支在此停止。")
 
         return None
 
-    def _collect_loop_body(self, gateway_id: str, flow) -> Tuple[Set[str], Optional[str], Optional[str]]:
-        """
-        找出 for 循环体包含的节点，以及循环入口和出口。
-        返回 (body_node_ids, body_entry_id, exit_node_id)
-        """
-        body = set()
-        queue = []
-
-        # 从 gateway 出发，所有非自环边的目标是候选入口
-        for e in flow.edges:
-            if e.source == gateway_id and e.target != gateway_id:
-                queue.append(e.target)
-
-        # BFS 收集 body 节点（不穿过 gateway）
-        visited = set()
-        while queue:
-            nid = queue.pop(0)
-            if nid in visited or nid == gateway_id:
-                continue
-            visited.add(nid)
-            body.add(nid)
-
-            for e in flow.edges:
-                if e.source == nid and e.target != gateway_id and e.target not in visited:
-                    queue.append(e.target)
-
-        # body_entry: gateway 的第一条进入 body 的边
-        body_entry = None
-        for e in flow.edges:
-            if e.source == gateway_id and e.target in body:
-                body_entry = e.target
-                break
-
-        # exit_node: gateway 的边中，目标不在 body 里且不是 gateway 自身的
-        exit_node = None
-        for e in flow.edges:
-            if e.source == gateway_id and e.target != gateway_id and e.target not in body:
-                exit_node = e.target
-                break
-
-        return body, body_entry, exit_node
+    # ━━━ 已退役·观察期（2026-09-26 起）━━━ _collect_loop_body：全仓零调用（双窗口交叉扫描+逐项复核），
+    # for 循环体的现行实现不经过这个 BFS 收集器。无报错数日后整段删除（含本注）。
+    # def _collect_loop_body(self, gateway_id: str, flow) -> Tuple[Set[str], Optional[str], Optional[str]]:
+    #     """
+    #     找出 for 循环体包含的节点，以及循环入口和出口。
+    #     返回 (body_node_ids, body_entry_id, exit_node_id)
+    #     """
+    #     body = set()
+    #     queue = []
+    #
+    #     # 从 gateway 出发，所有非自环边的目标是候选入口
+    #     for e in flow.edges:
+    #         if e.source == gateway_id and e.target != gateway_id:
+    #             queue.append(e.target)
+    #
+    #     # BFS 收集 body 节点（不穿过 gateway）
+    #     visited = set()
+    #     while queue:
+    #         nid = queue.pop(0)
+    #         if nid in visited or nid == gateway_id:
+    #             continue
+    #         visited.add(nid)
+    #         body.add(nid)
+    #
+    #         for e in flow.edges:
+    #             if e.source == nid and e.target != gateway_id and e.target not in visited:
+    #                 queue.append(e.target)
+    #
+    #     # body_entry: gateway 的第一条进入 body 的边
+    #     body_entry = None
+    #     for e in flow.edges:
+    #         if e.source == gateway_id and e.target in body:
+    #             body_entry = e.target
+    #             break
+    #
+    #     # exit_node: gateway 的边中，目标不在 body 里且不是 gateway 自身的
+    #     exit_node = None
+    #     for e in flow.edges:
+    #         if e.source == gateway_id and e.target != gateway_id and e.target not in body:
+    #             exit_node = e.target
+    #             break
+    #
+    #     return body, body_entry, exit_node
+    # ━━━ 观察期退役段结束：_collect_loop_body ━━━
 
 
 
@@ -1229,7 +1247,10 @@ class FEMORunner:
         #   结束不是断链。此前在此处对网关收尾告警，一局误报 6 次（作者
         #   被吓退），且与真正的卡死（join 环上死等，完全无声）毫无关系，
         #   纯属误导，整段退役。
-        return None
+        # 【2026-09-28 停点外带（用户拍板「分支没到 OUT 别收幕」）】返回停点：
+        # None=死路走尽；'[OUT]'/'[BREAK]'=命中 stop_at（模块收幕据此区分
+        # 「真到出口」与「死路完结」——前者收幕掐兄弟，后者不算数）。
+        return current
 
 
         
@@ -1554,6 +1575,12 @@ class FEMORunner:
             # 避免独占并饿死其他并行分支（多地点常驻并行线场景）。
             await asyncio.sleep(0)
 
+        # 【2026-09-28 停点外带（用户拍板「分支没到 OUT 别收幕」）】返回停点：
+        # '[OUT]'/'[BREAK]'=真到出口（模块收幕据此掐兄弟）；None=死路走尽
+        # （不算收幕）。原隐式 return None 让收幕无法区分两者——群聊室实锤：
+        # 一个 AI 挂起退场即被当成模块演完，掐掉活着的兄弟分支无限重进。
+        return current
+
 
     # ══════════════════════════════════════════════════
     #  FORK 执行
@@ -1620,13 +1647,115 @@ class FEMORunner:
             # （循环变量各分支不同值，不制造 conflict 噪音）；gather 收场
             # 后移除（帧生命周期=分支存续期，与 for 循环帧 push/pop 对称）。
             self._skip_frames.add(gateway_id)
-        print(f"[FORK]   等待 {len(tasks)} 分支全部完成（纯收场，不连接 join）")
+        # 【2026-09-21 收幕语义】模块内普通 fork：任一分支收幕（跑到
+        # [OUT]/[BREAK]）= 模块收幕，剩余分支立即掐掉（join(N) 掐尾同款——
+        # branch_main 对 CancelledError 安静退场，不进 _fork_errors）。
+        # 实锤 j1948（狼人杀赛后聊天模块）：AI 分支 6 人说完到 [OUT]，人类席
+        # chat_human 死循环无出口，gather 等全死永不返回 → _run_module 收不了
+        # 幕 → mainflow 永远到不了 [END] → flow_done 从未发生；桥当晚暴毙后
+        # 懒对账把 running(waiting_human) 判成 crash 挂起——「戏明明演完了」。
+        # 范围外维持 gather 等全死现状：par（join 签到凑齐才算）与 mainflow
+        # 层 fork（母 walk 真终点，见下活死人修复注）。互斥 if/else 路由 fork
+        # 单活分支，两语义等价（例剧库全查过，唯一多活分支=赛后聊天）。
+        module_curtain = (not is_par) and bool(ctx.module_frames)
+        print(f"[FORK]   等待分支收场（"
+              + ("模块收幕语义：首分支收幕即收幕" if module_curtain
+                 else "纯收场等全死，不连接 join") + "）")
         try:
-            await asyncio.gather(*tasks, return_exceptions=True)
+            if module_curtain and tasks:
+                # 【2026-09-28 死路≠收幕（用户拍板「分支结束如果没到 out，就别
+                # out」）】收幕只认「跑到 [OUT]/[BREAK]」的分支（branch_main 把
+                # 停点带回来了）。死路完结（无出边优雅停，停点=None）不算收幕：
+                # 本分支移出等待，其余分支照常跑——群聊室实锤：一个 AI 挂起退
+                # 场即被当成模块收幕，掐掉还活着的兄弟分支，主流程 $shutdown
+                # 闸未拉又重进模块，死路警告一秒一条无限刷。分支报错照样收幕
+                # 上报（错误统一从 _fork_errors 走，同报错即停语义）。
+                pending = set(tasks)
+                pause_exc = None
+                while pending and not self._fork_errors and pause_exc is None:
+                    _done, pending = await asyncio.wait(
+                        pending, return_when=asyncio.FIRST_COMPLETED)
+                    curtain_hit = False
+                    for t in _done:
+                        if t.cancelled():
+                            continue
+                        if isinstance(t.exception(), FEMORunPaused):
+                            # 【2026-10-01 用户拍板：一切 error 挂起可续】分支内
+                            # 挂起放行（不再收进 _fork_errors 转失败）——掐掉兄弟
+                            # 分支后原样上抛，run_async 统一落 suspended(node_pause)。
+                            pause_exc = t.exception()
+                            continue
+                        if t.exception() is not None:
+                            curtain_hit = True   # 分支报错=收幕（错误在 _fork_errors 统一上报）
+                            continue
+                        if t.result() in ('[OUT]', '[BREAK]'):
+                            curtain_hit = True   # 真收幕：首分支跑到 OUT/BREAK
+                        # 停点=None=死路完结：不收幕，本分支移出等待集，其余照常
+                    if curtain_hit and pending:
+                        print(f"[FORK]   首分支收幕 → 掐掉未完 {len(pending)} 分支（模块收幕）")
+                        for t in pending:
+                            t.cancel()
+                        await asyncio.gather(*pending, return_exceptions=True)
+                        pending = set()
+            else:
+                # 【2026-09-28 分支报错即停】纯收场不再傻等全死：任一分支报错
+                # （branch_main 已收进 _fork_errors）→ 立即掐掉未完的兄弟分支
+                # 再上报。旧法等全场收场后才检查错误袋，错误会被还活着的兄弟
+                # 分支无限期押后——等人类输入的分支永不收场，job 假 running、
+                # error 空（AI群聊 job 2618 实锤：$ 条件报错捂在袋里，人类席
+                # 干等，AI 一个都不发言）。
+                pending = set(tasks)
+                pause_exc = None
+                while pending and not self._fork_errors and pause_exc is None:
+                    _done, pending = await asyncio.wait(
+                        pending, return_when=asyncio.FIRST_COMPLETED)
+                    for t in _done:
+                        if not t.cancelled():
+                            t.exception()      # 取回防「exception never retrieved」
+                            if isinstance(t.exception(), FEMORunPaused):
+                                pause_exc = t.exception()   # 分支挂起放行（同上，掐兄弟原样上抛）
+                if pause_exc is not None and pending:
+                    print(f"[FORK]   分支挂起 → 掐掉未完 {len(pending)} 分支（挂起放行，2026-10-01 用户拍板）")
+                    for t in pending:
+                        t.cancel()
+                    await asyncio.gather(*pending, return_exceptions=True)
+                if self._fork_errors and pending and pause_exc is None:
+                    print(f"[FORK]   分支报错 → 掐掉未完 {len(pending)} 分支（报错即停）")
+                    for t in pending:
+                        t.cancel()
+                    await asyncio.gather(*pending, return_exceptions=True)
         finally:
             if is_par:
                 self._skip_frames.discard(gateway_id)
+        # 【2026-09-19 活死人修复】fork-in-module 场景：模块的走线在 fork 网关
+        # 收尾（上面 gather 纯收场）→ _run_module 返回 → **母协程继续 mainflow**
+        # ——但 fork_branches 已把母 task 记死+env 摘牌，此后主线的每一枚
+        # checkpoint 都落在「全员死亡、envs 空」的幽灵世界上，续跑直启判定
+        # env 缺失全跳过=「秒跑完」（j1789/1785-1788 实锤——谁是卧底 的出题
+        # 审题 fork 正打在主线上，四场存档全部同病灶）。母 gather 吸收了 join
+        # （与 join 变身「幸存者接棒」同语义），在此复活账面：env 回册 +
+        # ledger 记活。mainflow 层的 fork 不复活——那里母 walk 真的结束
+        # （current=None 收尾），账面死亡是事实。
+        if ctx.module_frames:
+            self.world.register_env(ctx.facade.env)
+            self.world.ledger.revive(ctx.task_id)
         # 编译器原则：分支有错必须上报，不能静默 flow_done（branch_main 已收集）
+        if pause_exc is not None:
+            # 挂起放行（2026-10-01）：整场落 suspended(node_pause) 可续跑。
+            # 模块收幕循环不走「报错即停」的取消段——挂起退出时兄弟分支还在跑，
+            # 这里掐净（与报错即停同款收尾，CancelledError 安静退场）。
+            if pending:
+                for t in pending:
+                    t.cancel()
+                await asyncio.gather(*pending, return_exceptions=True)
+            # 兄弟分支若还留了真实错误，拼进挂起文案见光（不吞——resume 重演
+            # 时它多半还会冒出来，用户有权提前知道）。
+            if self._fork_errors:
+                extra = "; ".join(f"[{name}] {err}" for name, err in self._fork_errors)
+                self._fork_errors = []
+                print(f"[FORK]   挂起时兄弟分支尚有报错（随挂起上浮）: {extra}")
+                pause_exc = FEMORunPaused(f"{pause_exc}（另有分支报错: {extra}）")
+            raise pause_exc
         if self._fork_errors:
             detail = "; ".join(f"[{name}] {err}" for name, err in self._fork_errors)
             self._fork_errors = []
@@ -1752,12 +1881,15 @@ class FEMORunner:
     #  Action 执行调度
     # ══════════════════════════════════════════════════
 
-    def exec_action(self, action_name: str, local_vars: dict = None) -> Any:
-        """执行一个 action（从全局 actions 查找）"""
-        ad = self.script.actions.get(action_name)
-        if ad is None:
-            raise KeyError(f"Action '{action_name}' 未找到")
-        return self._exec_action_def(ad)
+    # ━━━ 已退役·观察期（2026-09-26 起）━━━ exec_action：全仓零调用的公开外壳（双窗口交叉扫描+逐项复核），
+    # 内部链路全部直接走 _exec_action_def。无报错数日后整段删除（含本注）。
+    # def exec_action(self, action_name: str, local_vars: dict = None) -> Any:
+    #     """执行一个 action（从全局 actions 查找）"""
+    #     ad = self.script.actions.get(action_name)
+    #     if ad is None:
+    #         raise KeyError(f"Action '{action_name}' 未找到")
+    #     return self._exec_action_def(ad)
+    # ━━━ 观察期退役段结束：exec_action ━━━
 
     async def _exec_action_def(self, ad) -> Any:
         """执行已找到的 action 定义，统一调度"""
@@ -1801,7 +1933,7 @@ class FEMORunner:
                 print(f"[runtime]📥 in: {im.local_name} = {val!r}")
                 kwargs[im.local_name] = val
         else:
-            # 自动推断：Python 函数参数名 == 剧本变量名（文档 §21：参数名与 vars
+            # 自动推断：Python 函数参数名 == FEMO脚本变量名（文档 §21：参数名与 vars
             # 变量名一致）。不给任何剧本做硬编码别名兜底（2026-09-02 拍板删除）；
             # 无对应变量且有默认值 → 用默认值；无默认值 → 响亮报错（原为 print
             # 警告后继续、下游 TypeError，现统一 fail loud）。
@@ -1973,14 +2105,14 @@ class FEMORunner:
     # ═══ _host_ai_backend 由 femo_bridge.py 注入，与本文件无关。actor_thinking 传递
     # ═══ 随方法恢复（宿主侧重连三层优先级的第一层重新接通）。
     async def _invoke_ai_llm(self, blocks: dict, ad, eparam: str, actor_info: dict, scope_info: list,
-                             _current_node_id: str, ai_name: str = '', wait_key: str = '',
+                             _current_node_id: str, actor_name: str = '', wait_key: str = '',
                              emit_request: bool = True) -> str:
         """调用一次 LLM（宿主子代理后端 or 直连），返回最终回复文本。
         AI 输出容错重试的每一轮都走这里。
-        ai_name：执行者演员名（_exec_ai 三级解析结果），随 ai_request 传给
+        actor_name：执行者角色名（_exec_ai 三级解析结果），随 ai_request 传给
         宿主——每个请求自带身份（2026-08-28 Par 并发修复）：par 循环体各分支
-        node id 相同而演员不同，宿主旧取法（按 node_id 键控的共享映射）会被
-        后到分支覆盖，speaker 行写上另一分支的演员名。
+        node id 相同而角色不同，宿主旧取法（按 node_id 键控的共享映射）会被
+        后到分支覆盖，speaker 行写上另一分支的角色名。
         wait_key/emit_request（2026-09-05 重构，施工清单 v4 §4⑤）：宿主后端分支
         专用——wait_key 由 _exec_ai 循环外一次生成，全部重试轮共用（宿主
         steer 后经同一 wait_key 回传）；emit_request=False 的重试轮不重发
@@ -2021,17 +2153,38 @@ class FEMORunner:
                 actor_tools = getattr(adef, 'tools_enabled', None)
                 actor_tool_list = list(getattr(adef, 'tools', None) or [])
                 actor_source = str(getattr(adef, 'source', None) or '').strip()
-                # actor 的 thinking 档位（None=剧本未声明 → 宿主剥离继承 effort，
+                # actor 的 thinking 档位（None=FEMO脚本未声明 → 宿主剥离继承 effort，
                 # 落到部署默认档位；声明了就按写的走，宿主注入对应 effort）
                 actor_thinking = str(getattr(adef, 'thinking', None) or '').strip()
             if emit_request:
+                # 【2026-09-28 执行者落空警告（用户拍板）】写了执行者却解析不到
+                # actors: 区角色（变量值不是角色名/角色未定义）时，请求会拿执行
+                # 者名兜底当座位收件人——选角账没这个键，座位派工必失败（2624
+                # 群聊室实锤：@GLM 是空变量，账里只有 ai2）。在这里响亮知情，
+                # 别等座位查找失败才在 agent_giveup 里骂。main 伪 soul 与未写
+                # 执行者的裸 AI 是设计内形态，不在此列。
+                if adef is None and (eparam or getattr(ad, 'as_actor', None)):
+                    _fb = actor_name or eparam
+                    if _fb and _fb != 'main':
+                        _msg = (f"节点 {_current_node_id} 的执行者 \"{eparam}\" 未解析到 "
+                                f"actors: 区定义的角色（变量值不是角色名，或该角色未定义）"
+                                f"——引擎拿执行者名 \"{_fb}\" 兜底当座位收件人，选角账里"
+                                f"没有这个键就派不了工。补法：剧本加 actors: 区声明角色"
+                                f"（如 `ai @ai2 = soul:ai2`），动作引用角色名。")
+                        print(f"[runtime] ⚠️ {_msg}")
+                        self._emit_event('notify_author', {
+                            'node_name': _current_node_id,
+                            'actor_name': actor_name or '',
+                            'severity': 'warning',
+                            'message': _msg,
+                        })
                 self._emit_event('ai_request', {
                     'wait_key': host_wait_key,
                     'node_name': _current_node_id,
-                    'ai_name': ai_name or '',
+                    'actor_name': actor_name or '',
                     'blocks': blocks,
                     'actor_info': actor_info,
-                    # source：剧本 actor 声明的模型（裸 id 或 provider/model），宿主据此选模型
+                    # source：FEMO脚本 actor 声明的模型（裸 id 或 provider/model），宿主据此选模型
                     'source': actor_source,
                     'scope': str(ad.scope) if getattr(ad, 'scope', None) else '',
                     'scope_info': scope_info,
@@ -2043,7 +2196,7 @@ class FEMORunner:
                 try:
                     import os as _os
                     import datetime as _dt
-                    with open(_os.path.join('user_data', 'debug-main-actor.log'), 'a', encoding='utf-8') as _f:
+                    with open(_os.path.join(_os.environ.get('FEMO_DATA_DIR') or 'user_data', 'debug-main-actor.log'), 'a', encoding='utf-8') as _f:
                         _f.write(f"[{_dt.datetime.now().isoformat()}] [引擎] ai_request 已发出: node={_current_node_id} source={actor_source!r} wait_key={host_wait_key}\n")
                 except Exception:
                     pass
@@ -2059,31 +2212,49 @@ class FEMORunner:
             try:
                 import os as _os
                 import datetime as _dt
-                with open(_os.path.join('user_data', 'debug-main-actor.log'), 'a', encoding='utf-8') as _f:
+                with open(_os.path.join(_os.environ.get('FEMO_DATA_DIR') or 'user_data', 'debug-main-actor.log'), 'a', encoding='utf-8') as _f:
                     _f.write(f"[{_dt.datetime.now().isoformat()}] [引擎] wait 返回: {str(host_result)[:200]}\n")
             except Exception:
                 pass
             # host 负责：启动子 agent、组装完整轨迹（思考链[仅工具轮]+回复+工具结果）。
-            # 引擎在这里只取最终回复（用于继续流程/事件），轨迹全文走 save_ai_turn 落库。
+            # 引擎在这里只取最终回复（用于继续流程/事件）；轨迹全文先收进
+            # self._host_steps，节点收尾时由 save_ai_finish 合写落库（showprompt 行
+            # + 全部 react step 同一事务）。旧注释曾写“走 save_ai_turn 落库”，那个
+            # 单行函数自 2026-08-29 转写分离起已无调用点，2026-09-18 注释停用。
             if isinstance(host_result, dict):
                 # 转写分离（2026-08-29）：宿主按 TranscriptStep 契约回传结构化
                 # 转写（生料契约见 femoCompiler/protocol.py——tool_calls/
                 # tool_results 结构化，[TOOL CALL #N] 模板由引擎在这里套用），
                 # 引擎逐 step 落库——cot/tool_call/tool_result 各归各位，
-                # response 只存该轮发言。旧 payload（成品字符串）兼容透传。
+                # response 只存该轮发言。
+                if 'output' not in host_result:
+                    # 【2026-09-26 交卷双读收紧】信封词汇错位响亮报错：全仓交卷
+                    # 口已核净（speech-core 信封 {output, steps?} 唯一寄信形态），
+                    # 缺 output 栏只剩编程错误一种来源——错位信封被静默读成空
+                    # 台词放行，比报错难查一个数量级（引擎必须报错红线）。旧
+                    # trajectory 单行兜底随旧宿主 payload 一并退役（已核无寄信方）。
+                    raise RuntimeError(
+                        "交卷信封词汇错位：执行体回传缺 output 栏（实收栏="
+                        f"{sorted(host_result.keys())}）。人类席信封（chat_text）寄到"
+                        "执行体席了？请核对寄信口的 speech-core 信封选择。")
                 self._host_steps = normalize_transcript_steps(host_result.get('steps'))
-                if not self._host_steps and host_result.get('trajectory'):
-                    # 兜底：旧宿主 payload 无 steps 时把整段轨迹当单行（历史形态）
-                    self._host_steps = [{'step': 0, 'cot': '', 'reply': host_result.get('trajectory') or '',
-                                        'toolCall': '', 'toolResult': ''}]
                 # 待办⑨：宿主回传的实际响应模型（provider/model），落库用；
                 # main 节点在 save_ai_finish 处固定 'main'，不吃此值。
                 self._host_model_id = str(host_result.get('model_id') or '')
                 return host_result.get('output') or ''
-            else:
+            elif isinstance(host_result, str) and host_result == '':
+                # 超时放行（wait_for_input 空返回）：AI 沉默 move on 的设计内
+                # 兜底，保持沉默放行不报错。
                 self._host_steps = []
                 self._host_model_id = ''
-                return host_result or ''
+                return ''
+            else:
+                # 【2026-09-26 交卷双读收紧】非字典/非空字符串=旧协议纯字符串
+                # 形态，全仓已核无寄信方（桥一律组装信封 dict）——响亮报错，
+                # 不再兜底当台词。
+                raise RuntimeError(
+                    "交卷格式错位：执行体回传应是信封字典（{output, steps?}），"
+                    f"实收 {type(host_result).__name__}。旧纯字符串协议已退役。")
         else:
             # 直连模式（无宿主）：函数级 import 保持局部作用域，勿上移
             _adef_direct = self._resolve_actor_def(ad, eparam)
@@ -2106,35 +2277,51 @@ class FEMORunner:
 
     def _extract_ai_assignments(self, llm_output: str, out_whitelist: Optional[set] = None) -> tuple:
         """提取 AI 输出中的 SET VARIABLE 赋值。
-        返回 (SET_VARIABLE 列表, assign_errors 列表)：
-        - 解析/赋值失败（未声明变量、不在 out 白名单等）→ assign_errors（触发重试）
+        返回 (SET_VARIABLE 列表, assign_errors 列表, 成功赋值的变量名集合)：
+        - 解析/赋值失败（表达式错、变量未声明等）→ assign_errors（触发重试）
         - 格式类失败 → SET_VARIABLE（宽容路径，交给 resolve/丢弃）
+        - out 白名单外的赋值 → 2026-09-29 拍板：预期外信号=丢弃 + 知情警告
+          （errors.warn，不重试）；值不进变量世界
         out_whitelist：本节点 out 声明的变量名集合；非 None 时 AI 只能赋值其中
-        的变量（防幻觉乱赋值），其余报 FEMOVariableError 走重试。"""
+        的变量（防幻觉乱赋值），其余丢弃并警告作者。
+        与 extract_ai_assignments 同一纪律：赋值语句必须独占一行才识别，
+        夹在句子中间的只是台词不算信号（2026-09-29 拍板）。"""
         all_matches = re.findall(
-            r'(?:SET\s+VARIABLE|设定变量)\s*[:：]\s*(?:<<|《|〈|《《)\s*(.+?)(?:>>|》|〉|》》)',
-            llm_output
+            r'^[ \t]*(?:SET[ \t]+VARIABLE|设定变量)[ \t]*[:：][ \t]*'
+            r'(?:<<|《|〈|《《)[ \t]*(.+?)(?:>>|》|〉|》》)[ \t]*\r?$',
+            llm_output,
+            re.MULTILINE,
         )
         SET_VARIABLE = []
         assign_errors = []
+        applied_names = set()
         ctx = current_task_ctx()
         facade = ctx.facade if ctx is not None else None
         for match in all_matches:
             try:
                 var_name, expr = self._parse_single_assignment(match.strip())
-                # out 白名单：AI 只能赋值本节点 out 声明的变量（防幻觉乱赋值）。
+                # out 白名单：out 未声明的赋值=预期外信号 → 丢弃 + 知情警告
+                # （2026-09-29 拍板，原为 AGENT 桶重试）。知情三件事：兜了什么
+                # （丢弃）、后果（变量世界未变）、怎么补（声明 out 或修 prompt）。
+                # 逐次如实报告不去重（守则 §六：反复出现说明流程在反复出问题）。
                 if out_whitelist is not None and var_name not in out_whitelist:
-                    raise FEMOVariableError(
-                        f"变量 '{var_name}' 不在本节点的 out 声明范围内（out 只声明了: "
-                        f"{', '.join(sorted(out_whitelist)) if out_whitelist else '无'}）。"
-                        f"AI 只能赋值 out 中声明的变量。"
-                    )
+                    declared = ', '.join(sorted(out_whitelist)) if out_whitelist else '无'
+                    node_id = ctx.current_node_id if ctx is not None else ''
+                    self.errors.warn(
+                        f"AI 试图赋值 out 未声明的变量 {var_name}，值已丢弃"
+                        f"（本节点 out 声明了: {declared}；变量世界未变）。"
+                        f"如确需此赋值，请在节点 out: 中声明 {var_name}；"
+                        f"如是 AI 幻觉，请检查 prompt。赋值语句须独占一行才会被识别。",
+                        node_id=node_id)
+                    print(f"[runtime]⚠️ 预期外赋值（已丢弃）: {var_name} ← {match!r}")
+                    continue
                 intent = parse_assign_syntax(expr, var_name)
                 op, val = intent
                 if op in ('set', 'add', 'remove') and isinstance(val, str):
                     val = self.evaluator.evaluate(val, facade, strict=False)
                 intent = (op, val)
                 facade.apply_intent(var_name, intent)
+                applied_names.add(var_name)
                 print(f"[runtime]📤 AI赋值: {var_name} {intent}")
             except FEMOVariableError as e:
                 print(f"[runtime]⚠️ AI 赋值变量错误: {match!r}, error={e}")
@@ -2142,7 +2329,7 @@ class FEMORunner:
             except Exception as e:
                 print(f"[runtime]解析失败详情: match={match!r}, error={e}")
                 SET_VARIABLE.append(match.strip())
-        return SET_VARIABLE, assign_errors
+        return SET_VARIABLE, assign_errors, applied_names
 
     async def _exec_ai(self, ad, eparam: str) -> Any:
         self._check_cancel()
@@ -2162,7 +2349,7 @@ class FEMORunner:
 
 
         # ── 发送 node_start 事件（必须在任何可能阻塞的操作之前）──
-        # scope: self 保留字段在 _scope_info_for 内展开为[发言人演员名]。
+        # scope: self 保留字段在 _scope_info_for 内展开为[发言人角色名]。
         scope_info = self._scope_info_for(ad, eparam)
         self._emit_event('node_start', {
             'node_name': self._get_current_node_id(),
@@ -2185,9 +2372,14 @@ class FEMORunner:
         from femoBridges.ContextExample import MODE_FULL
 
         self._current_prompt = prompt
+        self._current_ad = ad   # 当前节点句柄留档（mail_context 问引擎拼装用）
         # 直接传原始参数，让 _get_actor_info 上下文感知解析
         actor_info = self._get_actor_info(ad, eparam)
-        turn_id_alloc = self._alloc_turn()   # 本节点独立 turn 号（par 并发安全）
+        # 占位号（2026-09-27 收卷一拍）：仅供 collect_blocks 的 turn_id 入参契约
+        # 占位（memory/context 方法签名要它，落库/投递都不读它）。本节点全部
+        # 台账行改在收卷时刻现取新号落库——等待 LLM 的几十秒里兄弟分支会推号，
+        # 旧占位号落库会被增量窗口（turn > 交付游标）永久过滤（job 2613 实证）。
+        turn_id_alloc = self._alloc_turn()
 
         blocks = collect_blocks(
             action=ad,
@@ -2205,15 +2397,15 @@ class FEMORunner:
             base_dir=self.base_dir,
             # 默认上下文拼接模式：DSH 宿主后端由 femo_bridge 钉
             # first_full_then_incremental；直连等未钉的调用方=full（原行为）。
-            # 剧本显式声明的自定义 context 方法不受影响（block_collector 分派）。
+            # FEMO脚本显式声明的自定义 context 方法不受影响（block_collector 分派）。
             context_mode=getattr(self, '_context_mode', MODE_FULL),
         )
 
-        # ---- 存储 prompt 到 dialog ----
-        from .save_dialog import save_human_turn
+        # prompt 行落库推迟（2026-09-27 收卷一拍）：随 showprompt/转写同事务落库。
+        # prompt 的发言者身份（as_actor 人类扮演者/owner 兜底）在收卷段同款构建。
         meta_owner = self.script.meta.get('owner', [])
         raw_scope = self._raw_scope_for(ad)
-
+        femo_id = self.script.meta.get('id', 'unknown')
         prompt_actor_info = {}
         if ad.as_actor and ad.as_actor in self.script.actors:
             as_def = self.script.actors[ad.as_actor]
@@ -2222,41 +2414,20 @@ class FEMORunner:
         if 'user' not in prompt_actor_info and meta_owner:
             prompt_actor_info['user'] = str(meta_owner[0])
 
-        # 本节点所有行共用 alloc 的 turn 号；oratio 按行内序（prompt=0, showprompt=1）
-        turn_id, oratio_idx = turn_id_alloc, 0
-        femo_id = self.script.meta.get('id', 'unknown')
-        event = save_human_turn(
-            session_id=self._current_session_id,
-            turn_id=turn_id,
-            oratio_idx=oratio_idx,
-            user_input=prompt,
-            actor_info=prompt_actor_info,
-            meta_owner=meta_owner,
-            action_scope=raw_scope,
-            is_node_prompt=True,
-            femo_id=femo_id,
-            prompt_type='prompt',
-            raw_action_scope=ad.scope,
-        )
-        if event:
-            await self.engine.run_in_thread(event.wait)
-
-        # showprompt 渲染提前、落库推迟（2026-08-29 合写）：show 行改与发言行
-        # 同事务落库——要不然都有要不然都没有。prompt 行（幕后指令）保持节点
-        # 开始落库：它是"节点启动过"的痕迹，且不属于对话流。
+        # showprompt 渲染提前、落库推迟（2026-08-29 合写；2026-09-27 收卷一拍）：
+        # show 行与 prompt/转写同事务落库——要不然都有要不然都没有。
         showprompt_text = ''
         if ad.showprompt:
             showprompt_text = self.evaluator.interpolate_prompt(
                 str(ad.showprompt), facade, in_mappings=ad.in_mappings)
-        print(f"[runtime]💬 AI prompt 已存入 dialog: turn={turn_id}, oratio={oratio_idx}")
 
         # ── 发送上下文就绪事件 ──
         # 演员显示名双名制（2026-09-11 拍板，2026-09-12 三修定稿）：@戏中名（括号名）
         # ——@保留、不去重。括号名：有 soul id=Soul name；无 soul 时仅 model id
         # 为 main 的伪 soul 显示 'main'，其余不加括号。投影窗 speaker 标签/气泡
         # 浮层/直播帧全以此名为键，此处一处组装三端生效。原三级兜底
-        # （soul 块正则 → @演员名 → "AI"）原样保留在后面。
-        ai_name = None
+        # （soul 块正则 → @角色名 → "AI"）原样保留在后面。
+        actor_name = None
         soul_display = ''
         soul_id_str = str((actor_info or {}).get('soul', '') or '')
         if soul_id_str:
@@ -2276,23 +2447,23 @@ class FEMORunner:
         if role_display and not role_display.startswith('@'):
             role_display = f'@{role_display}'
         if soul_display and role_display:
-            ai_name = f"{role_display}（{soul_display}）"
+            actor_name = f"{role_display}（{soul_display}）"
         elif soul_display:
-            ai_name = soul_display
-        if not ai_name:
+            actor_name = soul_display
+        if not actor_name:
             soul_block = blocks.get('soul', '')
             match = re.search(r'名字[：:]\s*(\S+)', soul_block)
             if match:
-                ai_name = match.group(1)
-        if not ai_name:
+                actor_name = match.group(1)
+        if not actor_name:
             # 宿主后端模式兜底（2026-08-24）：无 soul 的 actor 用执行者名本身，
             # 别落到裸 "AI"——宿主投影窗的 speaker 行/角色窗 id/流式直播门控全以
             # 此名为键，"AI" 会让角色窗永远对不上号（actor_info 空老 bug 的收尾）。
             resolved_actor = self._resolve_actor_name(eparam)
             if resolved_actor:
-                ai_name = resolved_actor if str(resolved_actor).startswith('@') else f'@{resolved_actor}'
-        if not ai_name:
-            ai_name = "AI"
+                actor_name = resolved_actor if str(resolved_actor).startswith('@') else f'@{resolved_actor}'
+        if not actor_name:
+            actor_name = "AI"
 
         showprompt_for_frontend = None
         if hasattr(ad, 'showprompt') and ad.showprompt:
@@ -2303,7 +2474,7 @@ class FEMORunner:
             'node_name': self._get_current_node_id(),
             'context': blocks.get('context', ''),
             'showprompt': showprompt_for_frontend,
-            'ai_name': ai_name,
+            'actor_name': actor_name,
         })
 
         # 提前捕获当前节点 ID，供线程池回调使用
@@ -2321,7 +2492,7 @@ class FEMORunner:
         # ── AI 输出容错：赋值失败（未声明变量等）→ 错误反馈 → 重新调用本节点 ──
         # 上限 = max_retries + 1（未设置默认 2 次重试）；格式类失败进 SET_VARIABLE 宽容处理
         max_tries = max(1, (getattr(ad, 'max_retries', None) or 2) + 1)
-        # dispatcher 的剧本反馈上限（按现状规则取值；显式 0 的 falsy bug 本期不修，裁决①）
+        # dispatcher 的脚本反馈上限（按现状规则取值；显式 0 的 falsy bug 本期不修，裁决①）
         retries_max = max_tries - 1
         SET_VARIABLE = []
         assign_errors = []
@@ -2332,10 +2503,18 @@ class FEMORunner:
             getattr(od, 'var_name', '') for od in (ad.outs or [])
             if getattr(od, 'var_name', '')
         }
+        # required 缺员检查（2026-09-29 拍板）：out 声明 required 的变量必须在
+        # AI 输出里成功赋值，缺员 → assign_errors 走既有重试链（报错文案说明
+        # 本节点必须赋值什么）；不注明=optional，缺赋值照旧放行。跨重试轮累积
+        # ——前几轮已成功写入变量世界的不再要求重交。
+        required_names = {
+            od.var_name for od in (ad.outs or []) if od.required
+        }
+        satisfied_required: set = set()
         for _attempt in range(max_tries):
             try:
                 llm_output = await self._invoke_ai_llm(
-                    blocks, ad, eparam, actor_info, scope_info, _current_node_id, ai_name or '',
+                    blocks, ad, eparam, actor_info, scope_info, _current_node_id, actor_name or '',
                     wait_key=node_wait_key, emit_request=(_attempt == 0))
                 #   ↑ emit_request=False 的重试轮【不重发 ai_request】——宿主 steer
                 #     后经同一 wait_key 回传，重发会 spawn 新子代理，steer 链路断裂。
@@ -2348,12 +2527,17 @@ class FEMORunner:
                 feedback = f'- LLM 调用临时失败（限流/超时/网络）：{e}'
                 # 重试反馈不再注入 blocks['basic_safety']（2026-09-05 猫猫拍板
                 # 删除：错误提示不该出现在子代理 prompt 的系统头段；后续将改为
-                # 节点内部 react 轮次的工具结果注入）。重试调度与 ai_retry 通知
-                # 保持原样。
-                self._emit_event('ai_retry', {
+                # 节点内部 react 轮次的工具结果注入）。
+                # 【2026-09-23 ai_retry 拔管】作者知情改走 notify_author 标准
+                # 通道（warning 滞留件）——本路径原先没有并行的 notify_author，
+                # ai_retry 在这里承担唯一知情职责，换道防语义丢失。
+                self._emit_event('notify_author', {
                     'node_name': _current_node_id,
-                    'attempt': _attempt + 1,
-                    'errors': [feedback],
+                    'actor_name': actor_name or '',
+                    'severity': 'warning',
+                    'message': (f"节点 {_current_node_id}（{actor_name or ''}）"
+                                f"LLM 调用临时失败（限流/超时/网络），"
+                                f"第 {_attempt + 1} 次重试：{e}"),
                 })
                 continue
             except FEMOActorExecutionError as e:
@@ -2362,13 +2546,13 @@ class FEMORunner:
                 # runtime 既有暂停分支（分支在节点挂起、断点保留，续跑=换新执行
                 # 体重演该节点）——即 FEMOTransientError「重试用尽走暂停分支」的
                 # 同款语义；宿主不再伪装空台词让引擎错误体系失明。
-                print(f"[runtime]⚠️ 执行体失败，本场挂起（可续跑）: {e}")
+                print(f"[runtime]⚠️ 执行体失败，本次挂起（可续跑）: {e}")
                 self._emit_event('notify_author', {
                     'node_name': _current_node_id,
-                    'ai_name': ai_name or '',
+                    'actor_name': actor_name or '',
                     'severity': 'agent_giveup',
-                    'message': (f"节点 {_current_node_id}（{ai_name or ''}）的执行体失败"
-                                f"（{e.kind}）：{e.detail}——本场已挂起存档，可点「继续」重演该节点。"),
+                    'message': (f"节点 {_current_node_id}（{actor_name or ''}）的执行体失败"
+                                f"（{e.kind}）：{e.detail}——本次已挂起存档，可点「继续」重演该节点。"),
                 })
                 settled_outcome = 'failed'
                 llm_output = None
@@ -2378,12 +2562,20 @@ class FEMORunner:
                 # LLM 配置错误（无 key/模型/URL）→ FATAL 桶：先发 notify_author(fatal)
                 # 信号（v4 §4.③(d)，宪法要求发信号；宿主对 fatal 仅 log 防双份——
                 # 实际作者投递由紧随的 flow_error 三通道承担），再原样 raise——
-                # 传播到 bridge worker 统一收尾（flow_error + 全停）。
+                # 传播到 bridge worker 统一收尾。【2026-10-01 用户拍板：一切 error
+                # 挂起可续】worker 对已起步（有断点）的场落 suspended(node_pause)
+                # 可续跑，仅构造期崩溃（无断点）保持 failed 终态。
                 print(f"[runtime]💥 LLM 配置错误（FATAL）: {e}")
                 self.errors.dispatch(e, _current_node_id, bucket=ErrorCategory.FATAL,
-                                     ai_name=ai_name or '', target=FEEDBACK_TARGET_AI)
+                                     actor_name=actor_name or '', target=FEEDBACK_TARGET_AI)
                 raise
-            SET_VARIABLE, assign_errors = self._extract_ai_assignments(llm_output, out_whitelist)
+            SET_VARIABLE, assign_errors, applied_now = self._extract_ai_assignments(llm_output, out_whitelist)
+            satisfied_required |= applied_now
+            for _miss in sorted(required_names - satisfied_required):
+                assign_errors.append(
+                    f"本节点必须赋值变量 {_miss}（out: 声明为 required），"
+                    f"但输出中没有检测到对 {_miss} 的成功赋值"
+                )
             if not assign_errors:
                 settled_outcome = 'ok'
                 break
@@ -2392,7 +2584,7 @@ class FEMORunner:
             # 超限=notify_author 信号 + break（最后轮 output 宽容继续，现状语义）。
             verdict = self.errors.dispatch(
                 None, _current_node_id, errors=assign_errors, wait_key=node_wait_key,
-                ai_name=ai_name or '', max_retries=retries_max, attempt=_attempt + 1,
+                actor_name=actor_name or '', max_retries=retries_max, attempt=_attempt + 1,
                 target=FEEDBACK_TARGET_AI)
             if verdict == VERDICT_EXHAUSTED:
                 settled_outcome = 'gave_up'
@@ -2415,13 +2607,16 @@ class FEMORunner:
         meta_owner = self.script.meta.get('owner', [])
         raw_scope = self._raw_scope_for(ad)
 
-        # 收尾合写（2026-08-29）：showprompt 行 + 全部 react step 行同一事务——
-        # show 行从节点开始推迟到此刻，与发言同 commit，消灭「有 show 没发言」半行。
+        # 收尾合写（2026-08-29；2026-09-27 收卷一拍）：prompt、showprompt 与全部
+        # react step 行同一事务——turn 号此刻现取（永远新鲜），消灭「有 show 没发
+        # 言」半行与「旧号发言被增量窗口吞掉」两个病灶（job 2613 实证）。
         _adef_save = self._resolve_actor_def(ad, eparam)
         _a_source = str(getattr(_adef_save, 'source', None) or '').strip() if _adef_save is not None else ''
+        turn_id_final = self._alloc_turn()
         event = save_ai_finish(
             session_id=self._current_session_id,
-            turn_id=turn_id_alloc,
+            turn_id=turn_id_final,
+            node_prompt=prompt or None,
             showprompt=showprompt_text or None,
             steps=host_steps,
             actor_info=actor_info,
@@ -2435,7 +2630,7 @@ class FEMORunner:
         )
         if event:
             await self.engine.run_in_thread(event.wait)
-        print(f"[runtime]🔢 turn → {turn_id_alloc}, 转写合写落库（show + {len(host_steps)} steps）")
+        print(f"[runtime]🔢 turn → {turn_id_final}, 收卷一拍落库（prompt + show + {len(host_steps)} steps）")
 
         # ── 发送 ai_done 事件 ──
         self._emit_event('ai_done', {
@@ -2555,7 +2750,11 @@ class FEMORunner:
     # ══════════════════════════════════════════════════
 
 
-    _human_input_lock = None
+    # ━━━ 已退役·观察期（2026-09-26 起）━━━ _human_input_lock：类属性定义后全仓零读写
+    # （双窗口交叉扫描+逐项复核）——真正的人类输入锁在 femoAsync 的 HumanInputManager 里。
+    # 无报错数日后整段删除（含本注）。
+    # _human_input_lock = None
+    # ━━━ 观察期退役段结束：_human_input_lock ━━━
 
 
     def _update_speaker(self, new_speaker: str):
@@ -2681,7 +2880,11 @@ class FEMORunner:
             from femoCompiler.block_collector import collect_blocks
             actor_info = self._get_actor_info(ad, eparam)
             print(f"[DEBUG _exec_human] 刚获取的 actor_info (准备给人类发言用): {actor_info}")
-            turn_id_alloc = self._alloc_turn()   # 本节点独立 turn 号（par 并发安全）
+            # 占位号（2026-09-27 收卷一拍）：仅供 collect_blocks 的 turn_id 入参契约
+            # 占位（memory/context 方法签名要它，落库/投递都不读它）。本节点全部
+            # 台账行改在收卷时刻现取新号落库——等待人类的几分钟里兄弟分支会推号，
+            # 旧占位号落库会被增量窗口（turn > 交付游标）永久过滤（job 2613 实证）。
+            turn_id_alloc = self._alloc_turn()
             # oratio 分配（2026-08-29 合写）：0=节点 prompt、1=showprompt（渲染提前、
             # 与玩家输入同事务落库）、2+=玩家输入；无 showprompt 的节点输入从 1 起
             human_oratio = 2 if getattr(ad, 'showprompt', None) else 1
@@ -2708,7 +2911,7 @@ class FEMORunner:
             # 【2026-09-08 角色窗按钮修复】人类节点等待 scope 必含执行者本人：
             # 宿主把 human_wait 的 scope 冻结为等待快照（waitingHuman.waitScope），
             # 角色窗按钮按「快照含本窗角色」点亮。执行者是唯一确定要输入的人——
-            # 无论剧本 scope 怎么写（如仅 [@上帝]），都必须在快照里，否则轮到
+            # 无论FEMO脚本 scope 怎么写（如仅 [@上帝]），都必须在快照里，否则轮到
             # 执行者发言时其角色窗永远不亮。node_start 的 scope 不加此保证：
             # 宿主侧 par 并发下同名节点的 node_start 会互相覆盖（最后到达者胜），
             # 本字段在事件发出时刻现场冻结，才是角色窗判定的权威源。
@@ -2736,7 +2939,17 @@ class FEMORunner:
             self._emit_event('human_wait', {
                 'node_name': node_id,
                 'wait_key': wait_key,
+                # actor_name＝本节点的执行者（人类席位名，如 @猫猫）。2026-09-19 修：
+                # 此前人类节点不报执行者名，投影侧只能拿 scope 快照的**第一个人**当
+                # 发言人——而快照是 sorted(set(scope) | {执行者})（位置无意义），
+                # 于是 `scope: all` 的人类节点块头写成了排序第一的人（@Eve）。
+                # 与 ai_request 的 actor_name 对称：执行者是谁，由引擎在这一拍说清楚。
+                'actor_name': _human_tag,
                 'prompt': prompt,
+                # showprompt 随事件带上（2026-09-19）：人类节点此前只投 prompt，
+                # 投影侧「显示 Prompt 就没 Show Prompt」——两块都进收集的段，
+                # 显示层再决定渲染哪个，信息不丢。与 AI 侧同源（blocks）。
+                'showprompt': blocks.get('showprompt') or '',
                 'scope': scope_info,
                 'context': context_text,
                 'memory': memory_text,
@@ -2745,33 +2958,16 @@ class FEMORunner:
 
             if prompt:
                 print(f"[runtime]📝 {prompt}")
-                from .save_dialog import save_human_turn
-                meta_owner = self.script.meta.get('owner', [])
-                raw_scope = self._raw_scope_for(ad)
-
-                h_actor_info = self._get_actor_info(ad, eparam)
-                if 'user' not in h_actor_info:
-                    owners = self.script.meta.get('owner', [])
-                    if owners:
-                        h_actor_info['user'] = str(owners[0])
-
-                turn_id, oratio_idx = turn_id_alloc, 0
-                femo_id = self.script.meta.get('id', 'unknown')
-                event = save_human_turn(
-                    session_id=self._current_session_id,
-                    turn_id=turn_id,
-                    oratio_idx=oratio_idx,
-                    user_input=prompt,
-                    actor_info=h_actor_info,
-                    meta_owner=meta_owner,
-                    action_scope=raw_scope,
-                    is_node_prompt=True,
-                    femo_id=femo_id,
-                    raw_action_scope=ad.scope,
-                )
-                if event:
-                    await self.engine.run_in_thread(event.wait)
-                print(f"[runtime]💬 Human prompt 已存入 dialog: turn={turn_id}, oratio={oratio_idx}")
+            # prompt 行落库推迟（2026-09-27 收卷一拍）：随 showprompt/输入同事务
+            # 落库；prompt 文本与发言者身份（h_actor_info）在此构建、收卷段使用。
+            meta_owner = self.script.meta.get('owner', [])
+            raw_scope = self._raw_scope_for(ad)
+            h_actor_info = self._get_actor_info(ad, eparam)
+            if 'user' not in h_actor_info:
+                owners = self.script.meta.get('owner', [])
+                if owners:
+                    h_actor_info['user'] = str(owners[0])
+            femo_id = self.script.meta.get('id', 'unknown')
 
             # showprompt 渲染提前、落库推迟（2026-08-29 合写）：human 节点的 show
             # 行此前从未落库（老缺口），现在与玩家输入行同事务落库——要不然都有
@@ -2800,12 +2996,29 @@ class FEMORunner:
                 print(f"[runtime]📥 raw_input = {raw_input}")
                 # 新前端传 dict，CLI 模式传 str
                 if isinstance(raw_input, dict):
+                    if 'chat_text' not in raw_input:
+                        # 【2026-09-26 交卷双读收紧】人类席信封必须有 chat_text
+                        # 栏（执行体信封 {output} 寄到人类席=编程错误；静默读成
+                        # 空台词放行退役——引擎必须报错红线）。
+                        raise RuntimeError(
+                            "交卷信封词汇错位：人类席回传缺 chat_text 栏（实收栏="
+                            f"{sorted(raw_input.keys())}）。执行体信封寄到人类席了？"
+                            "请核对寄信口的 speech-core 信封选择。")
                     chat_text = raw_input.get('chat_text', '')
                     variables = raw_input.get('variables', {})
                     print(f"[runtime]📥 结构化输入: chat_text={chat_text!r}, variables={variables}")
+                elif isinstance(raw_input, str) and raw_input == '':
+                    # 超时放行（wait_for_input 空返回）：空输入放行的设计内兜底，
+                    # 保持沉默放行不报错。
+                    chat_text = ''
+                    print("[runtime]📥 空输入（超时放行）")
                 else:
-                    chat_text = str(raw_input) if raw_input else ''
-                    print(f"[runtime]📥 兼容旧格式（纯字符串）: chat_text={chat_text!r}")
+                    # 【2026-09-26 交卷双读收紧】非字典/非空字符串=旧协议纯字符
+                    # 串形态，全仓已核无寄信方（桥一律组装信封 dict）——响亮
+                    # 报错，不再兜底当台词。
+                    raise RuntimeError(
+                        "交卷格式错位：人类席回传应是信封字典（{chat_text, "
+                        f"variables?}}），实收 {type(raw_input).__name__}。旧纯字符串协议已退役。")
             else:
                 # CLI 模式：将多行读取封装为同步函数，放到线程池执行
                 print("（输入内容，按回车换行，输入空行或 /end 结束）")
@@ -2912,7 +3125,7 @@ class FEMORunner:
                 retry_hint = assign_err
                 verdict = self.errors.dispatch(
                     None, node_id, errors=[assign_err], wait_key=wait_key,
-                    ai_name=human_actor_name, max_retries=human_retries_max,
+                    actor_name=human_actor_name, max_retries=human_retries_max,
                     target=FEEDBACK_TARGET_HUMAN)
                 if verdict == VERDICT_EXHAUSTED:
                     human_settled_outcome = 'gave_up'
@@ -2946,22 +3159,22 @@ class FEMORunner:
             dialog_text = format_human_dialog(chat_text, variables)
             print(f"[runtime]📝 拼接后的存储文本: {dialog_text!r}")
 
-            # ── 保存人类发言（2026-08-29 合写）：show 行与输入行同一事务——
-            # 要么都有要不然都没有；输入为空（如超时放行）时只落 show 行=留痕。
-            if dialog_text or show_text:
+            # ── 保存人类发言（2026-08-29 合写；2026-09-27 收卷一拍）：prompt、
+            # show 行与输入行同一事务——turn 号此刻现取（永远新鲜），并行分支
+            # 推号再也吞不掉迟到的人类发言（job 2613 实证）。输入为空（超时
+            # 放行/赋值放弃）时落 prompt 行=超时留痕（留痕语义随行搬家）。
+            if dialog_text or show_text or prompt:
                 from .save_dialog import save_human_finish
-                meta_owner = self.script.meta.get('owner', [])
-                raw_scope = self._raw_scope_for(ad)
 
-                actor_info_save = self._get_actor_info(ad, eparam)
-                femo_id = self.script.meta.get('id', 'unknown')
+                turn_id_final = self._alloc_turn()
                 event = save_human_finish(
                     session_id=self._current_session_id,
-                    turn_id=turn_id_alloc,
+                    turn_id=turn_id_final,
                     showprompt=show_text or None,
                     user_input=dialog_text,
                     input_oratio=human_oratio,
-                    actor_info=actor_info_save,
+                    node_prompt=prompt or None,
+                    actor_info=h_actor_info,
                     meta_owner=meta_owner,
                     action_scope=raw_scope,
                     femo_id=femo_id,
@@ -2969,10 +3182,14 @@ class FEMORunner:
                 )
                 if event:
                     await self.engine.run_in_thread(event.wait)
-                print(f"[runtime]🔢 turn → {turn_id_alloc}, human 收尾合写落库（show + input oratio {human_oratio}）")
+                print(f"[runtime]🔢 turn → {turn_id_final}, human 收卷一拍落库（prompt + show + input oratio {human_oratio}）")
 
             self._emit_event('human_done', {
                 'node_name': self._get_current_node_id(),
+                # wait_key（2026-10-02）：收麦信号带上专属频道键——hub 等待镜像已
+                # 复数化（par 并发多条线各自等到人类），收麦必须按键清自己那一席；
+                # node_name 在 par 同名节点下必撞（段键弃用节点名的同款教训）。
+                'wait_key': wait_key,
                 'input': chat_text,
             })
 
@@ -3068,7 +3285,7 @@ class FEMORunner:
     async def _exec_mind(self, ad, eparam: str) -> Any:
         """mind 节点：运行时按实际执行者类型分发到 AI 或 human 路径。
 
-        执行者可能是变量（@mind(@speaker)），由剧本在运行中赋值——每轮
+        执行者可能是变量（@mind(@speaker)），由FEMO脚本在运行中赋值——每轮
         可能是人类也可能是 AI，编译期无法预判。因此 @mind 保持原样解析，
         每轮进入节点时重新解析执行者（_resolve_actor_name 读当前变量值），
         然后整体委托给 _exec_ai 或 _exec_human（事件、等待、赋值、重试等
@@ -3236,16 +3453,16 @@ class FEMORunner:
             'max_steps': self.global_max_steps,
             # 引擎场次身份：宿主据此维护「其会话 ↔ femo 场次」的一对多账本
             'session_id': self._current_session_id,
-            # 剧本全部角色（视角切换菜单用）
+            # FEMO脚本全部角色（视角切换菜单用）
             'actors': list(self.script.actors.keys()),
-            # 剧本 main 演员（source:main）名单：宿主主窗口回答制的流水可见性
-            # 判定用——main 演员是编译期静态声明，必须开跑即登记（靠 ai_request
+            # FEMO脚本 main 角色（source:main）名单：宿主主窗口回答制的流水可见性
+            # 判定用——main 角色是编译期静态声明，必须开跑即登记（靠 ai_request
             # 运行时登记会漏掉首个 main 节点之前的发言，1005 场实测教训）
             'main_actors': [
                 aname for aname, adef in self.script.actors.items()
                 if str(getattr(adef, 'source', None) or '').strip() == 'main'
             ],
-            # 剧本名（宿主剧终日记标题用）
+            # FEMO脚本名（宿主运行结束日记标题用）
             'name': str(global_meta.get('name', '') or ''),
         }
         self._emit_event('flow_start', flow_start_payload)
@@ -3298,12 +3515,35 @@ class FEMORunner:
                             self, self.world, tid, env, pos['node_id'], flow_i,
                             extra_i, 0,
                             stack=(tuple(pos.get('mod_stack') or []),
-                                   tuple(pos.get('loop_frames') or [])),
+                                   tuple(VarFacade.drop_own_loop_frames(
+                                       pos.get('loop_frames') or [], flow_i))),
                             resume_callers=pos.get('module_frames') or []))
                         direct_tasks.append(t)
                     if direct_tasks:
                         print(f"[runtime]🔁 分支直启：{len(direct_tasks)} 个 task 从断点重放")
-                        await asyncio.gather(*direct_tasks, return_exceptions=True)
+                        # 报错即停同款（2026-09-28，与 _run_fork 同病灶）：直启
+                        # 分支报错不再等全场收场——否则同款被活分支捂住。
+                        pending = set(direct_tasks)
+                        pause_exc = None
+                        while pending and not self._fork_errors and pause_exc is None:
+                            _done, pending = await asyncio.wait(
+                                pending, return_when=asyncio.FIRST_COMPLETED)
+                            for t in _done:
+                                if not t.cancelled():
+                                    t.exception()   # 取回防「exception never retrieved」
+                                    if isinstance(t.exception(), FEMORunPaused):
+                                        pause_exc = t.exception()   # 直启分支挂起放行（同 fork 收场）
+                        if pause_exc is not None and pending:
+                            print(f"[runtime]   直启分支挂起 → 掐掉未完 {len(pending)} 分支（挂起放行）")
+                            for t in pending:
+                                t.cancel()
+                            await asyncio.gather(*pending, return_exceptions=True)
+                            raise pause_exc
+                        if self._fork_errors and pending:
+                            print(f"[runtime]   直启分支报错 → 掐掉未完 {len(pending)} 分支（报错即停）")
+                            for t in pending:
+                                t.cancel()
+                            await asyncio.gather(*pending, return_exceptions=True)
                     else:
                         print("[resume-diag] ⚠️⚠️ 直启协程为零——没有任何 task 被重启，流程将立即收场（这就是'秒跑完'的直接原因）")
                     if self._fork_errors:
@@ -3311,7 +3551,7 @@ class FEMORunner:
                         self._fork_errors = []
                         raise FEMOVariableError(f"直启分支执行失败: {detail}")
                 else:
-                    # 全新开演：root task 't0' 绑执行上下文跑主流程
+                    # 全新启动运行：root task 't0' 绑执行上下文跑主流程
                     root_env = self.world.envs.get('t0')
                     root_facade = self.world.new_facade(root_env)
                     root_ctx = TaskContext(task_id='t0', facade=root_facade)
@@ -3432,7 +3672,7 @@ class FEMORunner:
         2026-08-31 猫猫拍板的 scope 默认语义：
         - 不写 scope / scope: 留空 = all（全员可见）——与显示层 2026-08-22 起的
           「空=未限定广播」语义对齐，消除 DB/显示两层分裂；
-        - scope: self 保留字段 → [发言人演员名]：只有他自己的角色窗收到该节点
+        - scope: self 保留字段 → [发言人角色名]：只有他自己的角色窗收到该节点
           的投影（god/stage 全量窗天然可见，owner 走 god 窗）；其他角色窗/其他
           角色视角不可见。DB 侧的 self 语义由 save_dialog._build_scope 按原始
           字符串独立判定（注入发言者自己+meta.owner），与本函数解耦；
@@ -3506,7 +3746,7 @@ class FEMORunner:
                 if soul_id is not None:
                     info['soul'] = str(soul_id)
                 elif str(getattr(adef, 'source', None) or '').strip() == 'main':
-                    # source:main 裸演员：伪 soul "main" 作为身份键（可见性/落库一致）
+                    # source:main 裸角色：伪 soul "main" 作为身份键（可见性/落库一致）
                     info['soul'] = 'main'
             elif atype == 'human':
                 source = getattr(adef, 'source', None)
@@ -3542,10 +3782,10 @@ class FEMORunner:
         return info
 
     def _resolve_actor_def(self, action, executor_param: str):
-        """解析动作执行者对应的演员定义。
+        """解析动作执行者对应的角色定义。
 
-        支持动态变量 @xxx 解析（执行者每轮可能是变量赋值的演员名），
-        非静态演员时回退 as_actor；找不到返回 None。
+        支持动态变量 @xxx 解析（执行者每轮可能是变量赋值的角色名），
+        非静态角色时回退 as_actor；找不到返回 None。
         """
         actor_name = executor_param
         # 支持动态变量 @xxx 解析
@@ -3559,7 +3799,7 @@ class FEMORunner:
                 break
             actor_name = resolved
 
-        # 如果仍然不是静态演员，尝试 as_actor
+        # 如果仍然不是静态角色，尝试 as_actor
         if not actor_name or actor_name not in self.script.actors:
             if hasattr(action, 'as_actor') and action.as_actor:
                 actor_name = action.as_actor

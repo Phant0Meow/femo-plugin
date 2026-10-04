@@ -8,7 +8,7 @@ script/flow，不 import FEMO_parser/FEMO_runtime，避免任何反向依赖）�
 
 两层 task 概念的桥（清单 §1.2）：
 - asyncio.Task（协程原语，femoAsync，零改动）；
-- 剧本 task 号（t0,t1,...，语义层单链）——桥 = runner 侧一张
+- FEMO脚本 task 号（t0,t1,...，语义层单链）——桥 = runner 侧一张
   `_task_coros: {task_id: asyncio.Task}` 映射表（join(N) 掐尾
   `_task_coros[tid].cancel()`，stop() 对它双保险）。
 
@@ -43,6 +43,7 @@ from femoCompiler.vars.evaluator import Evaluator
 from femoCompiler.vars.join import JoinCascade, JoinCoordinator
 from femoCompiler.vars.merge import merge_frames
 from femoCompiler.vars.model import FEMOVariableError, ScopeTable
+from femoCompiler.FEMO_errors import FEMORunPaused   # 叶子错误件：分支挂起放行用（2026-10-01）
 
 
 # ── 执行上下文 ───────────────────────────────────────────────
@@ -212,7 +213,7 @@ def assemble_world(script, builtins_getter: Optional[Callable[[str], Any]] = Non
 
 def seed_new_declarations(tw: TaskWorld, script) -> Tuple[list, list]:
     """断点续跑 vars 增删容差（2026-09-06 用户拍板）：快照世界整包恢复后，
-    新剧本声明了而快照世界没有的变量按声明初值补种；快照有而新剧本已删的
+    新脚本声明了而快照世界没有的变量按声明初值补种；快照有而新脚本已删的
     成为孤儿值（无人读即无害——不删，留档防别处引用）。
     返回 (补种名列表, 孤儿名列表)。
     ⚠️ 语义边界：补种值=声明初值，不是"运行到断点时该有的中间态"——续跑
@@ -231,7 +232,7 @@ def seed_new_declarations(tw: TaskWorld, script) -> Tuple[list, list]:
     for name in ws.snapshot():
         if name not in declared_shared:
             orphaned.append('$' + name)
-    # 2) 帧：'__script__'（剧本级）+ 模块名帧——缺失声明的补种、孤儿登记。
+    # 2) 帧：'__script__'（FEMO脚本级）+ 模块名帧——缺失声明的补种、孤儿登记。
     #    其余帧键（__for_1__ 等循环合成帧）不在声明域，不碰。
     mod_names = table.module_names()
     globals_init = {k: _normalize_initial(v)
@@ -387,16 +388,29 @@ async def branch_main(runner, tw: TaskWorld, task_id: str, child_env: TaskEnv,
     elif module_frames_inherit:
         ctx.module_frames = module_frames_inherit
     runner._task_coros[task_id] = asyncio.current_task()
+    final_node = None
     try:
         with task_ctx(ctx):
             if start_node:
-                await runner._execute_path(flow, start_node, stop_at=None,
-                                           extra_actions=extra_actions,
-                                           max_steps=max_steps)
+                # 【2026-09-28 停点外带（用户拍板「分支没到 OUT 别收幕」）】
+                # 分支停在 [OUT]/[BREAK] 上并把停点带回去（原 stop_at=None 会
+                # 走进 OUT 再死路、与真死路不可区分——模块收幕因此把「一个 AI
+                # 挂起退场」误当「模块演完」，掐掉还活着的兄弟分支，AI群聊
+                # 群聊室实锤）。收幕据此只认真到 OUT/BREAK 的完结。
+                final_node = await runner._execute_path(
+                    flow, start_node, stop_at={'[OUT]', '[BREAK]'},
+                    extra_actions=extra_actions,
+                    max_steps=max_steps)
             if ctx.resume_unwind_pending:
                 await runner._resume_module_unwind(ctx)
     except asyncio.CancelledError:
         pass                                    # 掐尾/全场停止：安静退场
+    except FEMORunPaused:
+        # 【2026-10-01 用户拍板：一切 error 挂起可续】分支内挂起原样上抛——
+        # 由 fork/直启收场循环掐掉兄弟分支后交 run_async 落 suspended。
+        # 旧法收进 _fork_errors 转 FEMOVariableError → failed 退役
+        # （实案 job 2657：狼人杀选举 fork 里的席位冻结 → 整场不可续）。
+        raise
     except Exception as e:
         runner._fork_errors.append((start_node or select_from_gateway or '?', e))
     finally:
@@ -407,6 +421,7 @@ async def branch_main(runner, tw: TaskWorld, task_id: str, child_env: TaskEnv,
             # 【2026-09-06 探针】仅直启（恢复）分支打印收场——含 forks 错误数。
             print(f"[resume-diag] 直启分支 {task_id} 收场（起点={start_node}，"
                   f"fork_errors={len(runner._fork_errors)}）")
+    return final_node                           # 停点：'[OUT]'/'[BREAK]'=真收幕；None=死路/被掐/无起点
 
 
 # ── join 接线入口（R3 接线；_execute_path 与 _run_join 两处都调它）──
@@ -424,6 +439,18 @@ async def join_sign_in(runner, tw: TaskWorld, flow, join_id: str, node,
         raise FEMOVariableError(f"join '{join_id}' 签到时无 TaskContext（协程未绑执行上下文）")
     coord = runner._coordinator_for(join_id, node, flow, tw)   # per join_id 缓存（代次内置）
     merged_env = await coord.sign_in(ctx.task_id, ctx.facade.env)
+    # 【2026-09-19 续跑栈修复】签到者栈上不该留着「本 flow 自己的循环帧」：
+    # 全员 par 分支的 env 都带 par 网关帧（fork_branches 构造期直接放帧），
+    # 断点续跑时该帧还会被 restore_stack 复原到 _stack_frames 上。于是两种
+    # 收场都会在模块出口炸 exit_module 的栈顶校验（谁是卧底 1856 场实锤：
+    # 直启续跑 + 模块内 par → 「模块 '投票' 退出时栈顶不是其帧
+    # （'__par_fork_2__'）——循环帧未平衡」）：
+    # - 迟到者（返回 None 那条）：它本就要收场退出本 flow，栈上多一帧；
+    # - 幸运者（变身者）：新栈也照搬了这帧，随后走到模块 [OUT] 撞上。
+    # 所以两条路都先剔掉「本 flow 的网关帧」——模块外层的母 for 帧照旧保留
+    # （它属于别的 flow，收场时该由对应流程自己 pop）。
+    # 收场前先摘掉「本 flow 自己的网关帧」（幂等；栈里没有就是空操作）
+    ctx.facade.drop_own_loop_frames_inplace(flow)
     if merged_env is None:
         return None
     # ── 变身：本协程携带新 task 从 join 出口继续（出口只跑一遍）──
@@ -437,6 +464,14 @@ async def join_sign_in(runner, tw: TaskWorld, flow, join_id: str, node,
     tw.register_env(merged_env)
     new_facade = tw.new_facade(merged_env)
     mod_stack, loop_keys = ctx.facade.export_stack()
+    # 【2026-09-19 续跑栈修复】签到者 env 里的「本 flow 自己的循环帧」不能
+    # 带进变身后的栈：全员 par 分支的 env 都带 par 网关帧（fork_branches
+    # 构造期直接放帧，不走 push_loop_frame），签到者的 export_stack 把它一并
+    # 导出 → 恢复后落在变身者栈顶；变身者随后走到模块 [OUT]，exit_module
+    # 校验栈顶发现是 '__par_fork_N__'，报「模块退出时栈顶不是其帧——循环帧
+    # 未平衡」（谁是卧底 1856 场实锤：断点续跑后 投票 模块退出即炸）。
+    # 只剔本 flow 的网关帧，模块外的母 for 帧照旧保留。
+    loop_keys = VarFacade.drop_own_loop_frames(loop_keys, flow)
     new_facade.restore_stack(list(mod_stack), list(loop_keys))
     new_ctx = TaskContext(task_id=merged_env.task_id, facade=new_facade,
                           current_node_id=join_id,
@@ -481,7 +516,7 @@ def make_coordinator(tw: TaskWorld, join_id: str, mode, sources,
     def merge_fn(base_frames, flat_envs, skip_frames):
         result = merge_frames(base_frames, flat_envs, skip_frames=tuple(skip_frames))
         # 模块帧占位补齐（2026-09-12）：merge_frames 只输出**有键**的帧，
-        # 而「模块帧里一个变量都没有」是合法且常见的（作者把变量池全放剧本级
+        # 而「模块帧里一个变量都没有」是合法且常见的（作者把变量池全放FEMO脚本级
         # vars:，模块只装 action/flow）。空模块帧一旦被抹掉，restore_stack
         # 重建词法链时就找不到它——join 变身当场抛「模块帧 'X' 不在 env 中
         # （词法链断裂）」。模块帧承载的是词法链而非数据，必须与 skip_frames

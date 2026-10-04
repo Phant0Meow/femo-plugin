@@ -1,0 +1,246 @@
+/* 主题层（#theme-*）：只有设计 token——颜色/字体/整值复合量。
+   换主题 = 新加一个 :root[data-theme="…"] token 块（页面顶栏按钮或 ?theme= 切换）。
+   现有主题：nocturne 剧场 / porcelain 素瓷 / jade 翡翠。结构层预留了浮影钩子
+   （--raise-lg/--raise-sm/--press-in/--rail-line），不吃影子的主题把它们定义为 none。
+   本文件必须在 app.css 之前加载（素瓷覆盖块依赖 token 已定义）。*/
+/* ═══ 主题「剧场 · Nocturne」═══════════════════════════════════
+   深夜剧场：池座是墨蓝的黑，舞台被金光照着，仪表在暗处发青光。
+   色彩纪律：金=舞台事件，青=遥测/思考链，琥珀=耳语/重试，红=失败，
+   绿/紫=工具调用/结果，蓝=输入提示。
+   token 语法（每色族四档 + 光晕）：
+     --X        家族本色          --X-dim    强描边/竖条(~.4)
+     --X-line   发丝描边(~.15)    --X-faint  极淡底色(~.07)
+     --glow-X   节点灯光晕（整条 box-shadow 值）
+   其余为整值复合 token（整条渐变/整圈光环照搬值）。加主题时
+   同名覆盖即可，结构层一个字都不用动。 */
+:root[data-theme="nocturne"] {
+  color-scheme: dark;
+  /* 纸墨：底色与字色 */
+  --bg0: #0a0d14; --bg1: #0e1219;
+  --ink: #e8e4d8; --ink-2: #a5a294; --ink-3: #6d6b60;
+  --line: rgba(232,228,216,.09); --line-strong: rgba(232,228,216,.18);
+  /* 舞台金 */
+  --gold: #d3ac66; --gold-bright: #ecd9a4;
+  --gold-dim: rgba(211,172,102,.4); --gold-line: rgba(211,172,102,.14); --gold-faint: rgba(211,172,102,.1);
+  /* 遥测青 */
+  --teal: #6fd3c4;
+  --teal-dim: rgba(111,211,196,.38); --teal-line: rgba(111,211,196,.16); --teal-faint: rgba(111,211,196,.06);
+  /* 输入提示蓝 */
+  --blue: #85b8e8;
+  --blue-dim: rgba(133,184,232,.4); --blue-line: rgba(133,184,232,.14); --blue-faint: rgba(133,184,232,.07);
+  /* 失败红 */
+  --red: #e07a6d;
+  --red-dim: rgba(224,122,109,.4); --red-line: rgba(224,122,109,.16); --red-faint: rgba(224,122,109,.08);
+  /* 耳语/重试琥珀 */
+  --amber: #d9a94e;
+  --amber-dim: rgba(217,169,78,.45); --amber-line: rgba(217,169,78,.25); --amber-faint: rgba(217,169,78,.07);
+  /* 工具绿 */
+  --green: #93c99d;
+  --green-dim: rgba(147,201,157,.45); --green-line: rgba(147,201,157,.18); --green-faint: rgba(147,201,157,.06);
+  /* 结果紫 */
+  --violet: #c7a3e2;
+  --violet-dim: rgba(199,163,226,.45); --violet-line: rgba(199,163,226,.18); --violet-faint: rgba(199,163,226,.07);
+  /* 光带与光晕（整值复合） */
+  --gold-hi: rgba(211,172,102,.5);
+  --glow-gold: 0 0 7px rgba(211,172,102,.4);
+  --glow-teal: 0 0 7px rgba(111,211,196,.35);
+  --glow-red: 0 0 7px rgba(224,122,109,.35);
+  --open-halo: 0 0 0 1px rgba(111,211,196,.07);
+  /* 浮影档位：暗色主题不用影子（结构层钩子留白即可） */
+  --raise-lg: none; --raise-sm: none; --press-in: none;
+  --rail-line: rgba(232,228,216,.09);
+  /* 面板与台面 */
+  --panel-grad: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.012));
+  --card-grad: linear-gradient(180deg, rgba(255,255,255,.032), rgba(255,255,255,.012));
+  --card-bg: rgba(255,255,255,.03);
+  --surface-raised: rgba(255,255,255,.04);
+  /* 幕帘横幅（金=公告，蓝=输入提示） */
+  --banner-grad: linear-gradient(180deg, rgba(211,172,102,.09), rgba(211,172,102,.03));
+  --banner-grad-blue: linear-gradient(180deg, rgba(133,184,232,.09), rgba(133,184,232,.03));
+  /* 舞台光与星图 */
+  --spot-warm: rgba(211,172,102,.09); --spot-cool: rgba(111,211,196,.05);
+  --star: rgba(232,228,216,.05);
+  /* 杂项复合 */
+  --selection: rgba(211,172,102,.32);
+  /* 顶栏按钮（2026-09-22 剧场版）：夜航不用影子——「门口铜牌灯」语言：
+     玻璃底 + 1px 细线勾勒；hover 金字（铜牌醒目）；激活=青线点亮带微光
+     （戏开灯）。徽章无浮雕（暗色浮雕显脏）。 */
+  --topbtn-bg: rgba(255,255,255,.03);
+  --topbtn-raise: inset 0 0 0 1px rgba(232,228,216,.1);
+  --topbtn-press: inset 0 0 0 1px rgba(111,211,196,.35), 0 0 12px rgba(111,211,196,.1);
+  --topbtn-hover-ink: var(--gold);
+  --topbtn-badge-shadow: none;
+  --scroll-thumb: rgba(232,228,216,.14);
+  --fail-ink: #d8a49c;
+  --dbg-bg: rgba(10,13,20,.92); --dbg-btn-bg: rgba(14,18,25,.85);
+  --dbg-shadow: 0 18px 48px rgba(0,0,0,.5);
+  /* 三字分工：衬线=节目单（文艺），等宽=仪表（科技感），无衬线=正文 */
+  --serif: Georgia, 'Times New Roman', 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', SimSun, serif;
+  --sans: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --mono: 'Cascadia Code', 'JetBrains Mono', Consolas, 'SFMono-Regular', Menlo, monospace;
+}
+/* 舞台光晕与星图点阵：主题的底画 */
+:root[data-theme="nocturne"] body {
+  background:
+    radial-gradient(1100px 480px at 50% -140px, var(--spot-warm), transparent 62%),
+    radial-gradient(900px 420px at 84% 110%, var(--spot-cool), transparent 60%),
+    var(--bg0);
+}
+:root[data-theme="nocturne"] body::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background-image: radial-gradient(var(--star) 1px, transparent 1.4px);
+  background-size: 26px 26px;
+}
+:root[data-theme="nocturne"] ::selection { background: var(--selection); }
+/* ═══ 主题「素瓷 · Porcelain」════════════════════════════
+   一整块素瓷：万物与底同色，凹凸全靠双向柔影（光源固定左上：
+   高光往左上、投影往右下）。无框（--line 整组透明=「外面的框不显示」）、
+   嵌套只两层：节点卡=凸起一块，横幅/下拉=凹刻铭牌，段内小卡=平面色签。 */
+:root[data-theme="porcelain"] {
+  color-scheme: light;
+  /* 素瓷底与暖墨字 */
+  --bg0: #e8e4da; --bg1: #efebe1;
+  --ink: #3d3931; --ink-2: #6f695c; --ink-3: #948d79;
+  --line: transparent; --line-strong: rgba(61,57,49,.13);
+  --rail-line: rgba(61,57,49,.14);
+  --gold: #a87c3f; --gold-bright: #7d5a26;
+  --gold-dim: rgba(168,124,63,.42); --gold-line: rgba(168,124,63,.14); --gold-faint: rgba(168,124,63,.09);
+  /* 顶缘金光收进剧场（2026-09-23 拍板）：一线金光是夜航金舞台的语言，素瓷是
+     无框新拟物素面——卡片顶缘一线光与页首仪典线一并熄掉，全页卡片从此一种脸。 */
+  --gold-hi: transparent;
+  --teal: #2e7d72;
+  --teal-dim: rgba(46,125,114,.42); --teal-line: rgba(46,125,114,.2); --teal-faint: rgba(46,125,114,.08);
+  --blue: #4a76a8;
+  --blue-dim: rgba(74,118,168,.42); --blue-line: rgba(74,118,168,.2); --blue-faint: rgba(74,118,168,.08);
+  --red: #b5544a;
+  --red-dim: rgba(181,84,74,.42); --red-line: rgba(181,84,74,.2); --red-faint: rgba(181,84,74,.09);
+  --amber: #a1782a;
+  --amber-dim: rgba(161,120,42,.45); --amber-line: rgba(161,120,42,.28); --amber-faint: rgba(161,120,42,.09);
+  --green: #4f7a58;
+  --green-dim: rgba(79,122,88,.45); --green-line: rgba(79,122,88,.2); --green-faint: rgba(79,122,88,.08);
+  --violet: #7a589c;
+  --violet-dim: rgba(122,88,156,.45); --violet-line: rgba(122,88,156,.2); --violet-faint: rgba(122,88,156,.08);
+  /* 双向柔影 */
+  --raise-lg: 6px 6px 14px rgba(167,158,140,.52), -6px -6px 14px rgba(255,255,255,.85);
+  --raise-sm: 4px 4px 9px rgba(167,158,140,.45), -4px -4px 9px rgba(255,255,255,.8);
+  --press-in: inset 3px 3px 7px rgba(167,158,140,.42), inset -3px -3px 7px rgba(255,255,255,.85);
+  --open-halo: var(--raise-lg), 0 0 0 1px rgba(46,125,114,.22);
+  --glow-gold: 2px 2px 4px rgba(167,158,140,.5), -2px -2px 4px rgba(255,255,255,.85), 0 0 5px rgba(168,124,63,.22);
+  --glow-teal: 2px 2px 4px rgba(167,158,140,.5), -2px -2px 4px rgba(255,255,255,.85), 0 0 5px rgba(46,125,114,.22);
+  --glow-red: 2px 2px 4px rgba(167,158,140,.5), -2px -2px 4px rgba(255,255,255,.85), 0 0 5px rgba(181,84,74,.25);
+  /* 台面与底同色：凸凹不靠色差，靠影子 */
+  --panel-grad: #e8e4da; --card-grad: #e8e4da; --card-bg: #e8e4da; --surface-raised: #e8e4da;
+  --banner-grad: linear-gradient(180deg, rgba(255,255,255,.5), rgba(255,255,255,0));
+  --banner-grad-blue: linear-gradient(180deg, rgba(255,255,255,.5), rgba(255,255,255,0));
+  /* 平底：无光晕无星图 */
+  --spot-warm: transparent; --spot-cool: transparent; --star: transparent;
+  /* 杂项复合 */
+  --selection: rgba(168,124,63,.26);
+  /* 顶栏新拟物按键（2026-09-22 定稿归素瓷）：真新拟物——无边框、表面带
+     左上到右下的微光渐变、够深的双向影、顶缘高光，像颗真能按下去的实体
+     键；激活反向凹刻+青字。徽章内浮雕是素瓷的小五金。 */
+  --topbtn-bg: linear-gradient(145deg, #f4f0e6, #e8e4da 58%, #dedace);
+  --topbtn-raise: 5px 5px 12px rgba(167,158,140,.55), -5px -5px 12px rgba(255,255,255,.92), inset 0 1px 0 rgba(255,255,255,.85);
+  --topbtn-press: inset 4px 4px 9px rgba(167,158,140,.48), inset -4px -4px 9px rgba(255,255,255,.85);
+  --topbtn-hover-ink: var(--ink);
+  --topbtn-badge-shadow: inset 1px 1px 2px rgba(0,0,0,.08), inset -1px -1px 2px rgba(255,255,255,.5);
+  --scroll-thumb: rgba(122,114,98,.35);
+  --fail-ink: #96453c;
+  --dbg-bg: #e8e4da; --dbg-btn-bg: #e8e4da;
+  --dbg-shadow: 10px 10px 26px rgba(150,141,122,.5), -10px -10px 26px rgba(255,255,255,.9);
+  /* 字：素瓷专用（2026-09-20 三次拍板）——全套黑体系：英文 Arial，中文思源黑体
+     （Noto Sans SC，手机默认字体的同源设计）；衬线族不再保留，名字行等全随黑体 */
+  --serif: 'Arial', 'Noto Sans SC', 'Microsoft YaHei', serif;
+  --sans: 'Arial', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+  --mono: 'Cascadia Code', 'JetBrains Mono', Consolas, 'SFMono-Regular', Menlo, monospace;
+}
+:root[data-theme="porcelain"] body { background: var(--bg0); }
+:root[data-theme="porcelain"] ::selection { background: var(--selection); }
+/* ═══ 主题「翡翠 · Jade」═══════════════════════════════════════
+   照搬 DeepSeek Web 侧栏的 UI 语言（2026-09-26，值取自其 sidepanel.html 逐字）：
+   近黑底 #0c0f12，卡片=白玻璃（4.5% 白 + 1px 细线 + 大圆角 + 黑色浮影），
+   绿=主强调（侧栏亮绿 #8fdd55，金位让给绿：节点/公告/选中/名字/按钮全绿），
+   紫=思考链（侧栏 CoT 同款），薄荷=工具调用（侧栏 ok），黄=耳语/重试（busy），
+   红=失败（bad），浅紫=工具结果（CoT 悬停紫）。
+   背景=右上绿光、左下紫光两道径向渐变（与侧栏 body 同值），无星图。
+   与另两主题不同：真浮影（侧栏用 0 10px 30px 黑影），无衬线字（侧栏全套黑体）。 */
+:root[data-theme="jade"] {
+  color-scheme: dark;
+  /* 纸墨：侧栏底色与字色原值 */
+  --bg0: #0c0f12; --bg1: rgba(0, 0, 0, 0.28);
+  --ink: #e9eef0; --ink-2: #8b96a0; --ink-3: #5d6870;
+  --line: rgba(255, 255, 255, 0.09); --line-strong: rgba(255, 255, 255, 0.16);
+  --rail-line: rgba(255, 255, 255, 0.09);
+  /* 主强调=侧栏亮绿（2026-09-26 用户拍板：整套绿用亮的那档 #8fdd55，
+     不用品牌深绿 #6fbf3a；透明淡彩底仍按侧栏惯例取 111,191,58 的 rgb） */
+  --gold: #8fdd55; --gold-bright: #8fdd55;
+  --gold-dim: rgba(111, 191, 58, 0.45); --gold-line: rgba(111, 191, 58, 0.18); --gold-faint: rgba(111, 191, 58, 0.09);
+  /* 思考链=侧栏 CoT 紫 */
+  --teal: #a06bff;
+  --teal-dim: rgba(160, 107, 255, 0.45); --teal-line: rgba(160, 107, 255, 0.2); --teal-faint: rgba(160, 107, 255, 0.08);
+  /* 输入提示=侧栏蓝灰族 */
+  --blue: #8fb0c9;
+  --blue-dim: rgba(143, 176, 201, 0.4); --blue-line: rgba(143, 176, 201, 0.16); --blue-faint: rgba(143, 176, 201, 0.07);
+  /* 失败红=侧栏 bad */
+  --red: #f87171;
+  --red-dim: rgba(248, 113, 113, 0.45); --red-line: rgba(248, 113, 113, 0.2); --red-faint: rgba(248, 113, 113, 0.08);
+  /* 耳语/重试=侧栏 busy 黄 */
+  --amber: #fbbf24;
+  --amber-dim: rgba(251, 191, 36, 0.5); --amber-line: rgba(251, 191, 36, 0.28); --amber-faint: rgba(251, 191, 36, 0.08);
+  /* 工具调用=侧栏 ok 薄荷 */
+  --green: #34d399;
+  --green-dim: rgba(52, 211, 153, 0.45); --green-line: rgba(52, 211, 153, 0.2); --green-faint: rgba(52, 211, 153, 0.08);
+  /* 工具结果（2026-09-29 用户拍板：翡翠下与工具调用同色，随薄荷绿同族；本 token 在页面上的活消费口只有工具结果的签与折叠头，另两主题的紫不受影响） */
+  --violet: #34d399;
+  --violet-dim: rgba(52, 211, 153, 0.45); --violet-line: rgba(52, 211, 153, 0.2); --violet-faint: rgba(52, 211, 153, 0.08);
+  /* 光带与光晕：绿=侧栏绿钮投影同值；卡片顶缘一线光熄掉（侧栏卡是平面玻璃） */
+  --gold-hi: transparent;
+  --glow-gold: 0 2px 10px rgba(111, 191, 58, 0.35);
+  --glow-teal: 0 0 8px rgba(160, 107, 255, 0.3);
+  --glow-red: 0 0 8px rgba(248, 113, 113, 0.3);
+  --open-halo: 0 0 0 1px rgba(111, 191, 58, 0.35), 0 0 14px rgba(111, 191, 58, 0.12);
+  /* 浮影档位：侧栏真用影子（--shadow 同值），入框=内凹黑 */
+  --raise-lg: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --raise-sm: 0 6px 18px rgba(0, 0, 0, 0.3);
+  --press-in: inset 0 2px 8px rgba(0, 0, 0, 0.35);
+  /* 台面：白玻璃平面（侧栏 --card/--card-hover 原值） */
+  --panel-grad: rgba(255, 255, 255, 0.045); --card-grad: rgba(255, 255, 255, 0.045);
+  --card-bg: rgba(255, 255, 255, 0.045); --surface-raised: rgba(255, 255, 255, 0.075);
+  /* 横幅：绿/蓝灰浅彩平底（侧栏断连横幅同款语言：单线框+浅彩底，无渐变） */
+  --banner-grad: rgba(111, 191, 58, 0.07);
+  --banner-grad-blue: rgba(143, 176, 201, 0.07);
+  /* 背景光（body 径向渐变用，见下方主题底画）：右上绿、左下紫；无星图 */
+  --spot-warm: rgba(111, 191, 58, 0.14); --spot-cool: rgba(160, 107, 255, 0.1);
+  --star: transparent;
+  /* 杂项复合：选区=侧栏原值 */
+  --selection: rgba(111, 191, 58, 0.35);
+  /* 顶栏按钮：侧栏普通钮语言——白玻璃底 + 1px 细线圈；hover 亮绿字；
+     激活=绿线圈 + 绿微光（侧栏 focus ring 语言）。徽章无浮雕。 */
+  --topbtn-bg: rgba(255, 255, 255, 0.06);
+  --topbtn-raise: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+  --topbtn-press: inset 0 0 0 1px rgba(111, 191, 58, 0.45), 0 0 12px rgba(111, 191, 58, 0.18);
+  --topbtn-hover-ink: var(--gold-bright);
+  --topbtn-badge-shadow: none;
+  --scroll-thumb: rgba(255, 255, 255, 0.14);
+  --fail-ink: #f3b0b0;
+  --dbg-bg: rgba(12, 15, 18, 0.92); --dbg-btn-bg: rgba(255, 255, 255, 0.06);
+  --dbg-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  /* 字：侧栏全套系统黑体（无衬线族）；等宽=ui-monospace 同源。
+     等宽栈补雅黑回落（2026-09-28 用户拍板）：等宽字体无汉字字形，Windows
+     浏览器会掉默认等宽中文=宋体——汉字落雅黑，数字时间戳保持等宽。 */
+  --serif: system-ui, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  --sans: system-ui, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  --mono: ui-monospace, 'Cascadia Code', Consolas, 'Microsoft YaHei', 'Noto Sans SC', monospace;
+}
+/* 主题底画：两道径向光与侧栏 body 逐字同值（右上绿光、左下紫光） */
+:root[data-theme="jade"] body {
+  background:
+    radial-gradient(1100px 460px at 88% -12%, var(--spot-warm), transparent 60%),
+    radial-gradient(850px 400px at -18% 112%, var(--spot-cool), transparent 55%),
+    var(--bg0);
+}
+:root[data-theme="jade"] ::selection { background: var(--selection); }
+/* 主会话面板只对翡翠隐藏（2026-10-03 用户拍板「主会话这一栏在翡翠主题也隐藏，
+   只在翡翠主题」）。display:none 整块离场：折叠接线与名册渲染照常跑（只是不可见），
+   换回剧场/素瓷原样回来。 */
+:root[data-theme="jade"] .sesspanel { display: none; }

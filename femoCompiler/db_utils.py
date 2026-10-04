@@ -209,6 +209,15 @@ def ensure_default_data():
         },
     ]
 
+    # ai1~ai7：空白演员位——无提示词（description 空），给多角色场景随手绑角用
+    for _i in range(1, 8):
+        default_souls.append({
+            "soul_id": f"ai{_i}",
+            "soul_name": f"AI-{_i}",
+            "description": "",
+            "user_id": "u001",
+        })
+
     for s in default_souls:
         existing_soul = conn.execute(
             "SELECT 1 FROM souls WHERE soul_id = ?", (s["soul_id"],)
@@ -319,6 +328,9 @@ def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
     return None
 
 
+# ━━ 暂时无用·未来会支持（2026-09-26 作者拍板，退出死代码观察期）━━━ 多用户基建：
+# 多个人类 actor 在不同节点发言、Chronica 按 user 分格记账的账户体系。多 user 现未启用、
+# 未来会支持——本组今日零调用属暂态而非死代码，勿删勿再退役。
 def get_user_profile(user_id: str) -> str:
     """获取用户的 profile 文本。如果用户不存在，返回空字符串。"""
     user = get_user_by_id(str(user_id))
@@ -367,6 +379,7 @@ def list_souls() -> List[Dict[str, str]]:
     return [{"soul_id": str(r["soul_id"]), "soul_name": str(r["soul_name"])} for r in rows]
 
 
+# ━━ 暂时无用·未来会支持（2026-09-26 作者拍板，退出死代码观察期）━━━ 多用户基建（同上组注）。
 def check_user_id_exists(user_id: str) -> bool:
     """检查 user_id 是否已存在"""
     conn = _get_conn()
@@ -390,6 +403,7 @@ def create_soul(soul_id: str, soul_name: str, description: str, user_id: str) ->
     print(f"[db_utils] ✅ 新建 soul: soul_id={soul_id}, soul_name={soul_name}, user_id={user_id}")
 
 
+# ━━ 暂时无用·未来会支持（2026-09-26 作者拍板，退出死代码观察期）━━━ 多用户基建（同上组注）。
 def create_user(user_id: str, password: str = "") -> None:
     """创建新的 user 条目（如果不存在）"""
     conn = _get_conn()
@@ -402,6 +416,10 @@ def create_user(user_id: str, password: str = "") -> None:
     print(f"[db_utils] ✅ 新建 user: user_id={user_id}")
 
 
+# ━━ 暂时无用·未来会支持（2026-09-26 作者拍板，退出死代码观察期）━━━ 多用户落库原语：
+# dialog/react_steps 按 user_id + user_scope/soul_scope 分格落库的底层写入口——
+# 未来多个人类 actor 在不同节点发言时走的就是这条路。现行落库走 save_dialog 合写队列
+# （同样带 scope 字段），本组今日零调用属暂态而非死代码，勿删勿再退役。
 # ═══════════════════════════════════════════════════════
 # 对话记录插入（保留原有函数，下面的注释块不动）
 # ═══════════════════════════════════════════════════════

@@ -1,7 +1,7 @@
 """引擎对外协议——TranscriptStep 契约与归一化（引擎与宿主的握手面，单一权威）。
 
 【TranscriptStep 契约（wire 形态）】
-AI 节点一场演出的结构化转写。宿主代跑 LLM 时，随 human_input 回传的
+AI 节点一次运行的结构化转写。宿主代跑 LLM 时，随 human_input 回传的
 body.steps 逐项必须长这样（直连模式未来的 agent loop 产出同构）：
 
     {
@@ -15,8 +15,9 @@ body.steps 逐项必须长这样（直连模式未来的 agent loop 产出同构
 - 生料契约：tool_calls / tool_results 是结构化原文，不带任何展示排版。
   排版（[TOOL CALL #N] 模板）由引擎在落档前套用（format_tool_blocks）——
   全世界只有引擎这一份模板，任何 harness 存出的档案格式保证一致。
-- 兼容：旧宿主 payload 的 toolCall / toolResult（成品字符串）原样透传；
-  trajectory 整段兜底在 runtime 侧（FEMO_runtime._invoke_ai_llm）。
+- 兼容：旧宿主 payload 的 toolCall / toolResult（成品字符串）原样透传。
+  【2026-09-26 交卷双读收紧】trajectory 整段兜底已退役（全仓已核无寄信方；
+  缺 output 栏/非字典回传在 runtime 侧响亮报错——引擎必须报错红线）。
 
 【档案形态（archive 形态）】
 normalize_transcript_steps 的输出，即 save_dialog.save_ai_finish 消费的
@@ -55,7 +56,7 @@ def normalize_transcript_steps(steps):
     - 新契约（tool_calls/tool_results 结构化生料）→ 套模板成档案形态；
     - 旧 payload（toolCall/toolResult 成品字符串）→ 原样透传；
     - 非法项（非 dict / 缺键）宽容降级，绝不 raise（转录是观测数据，
-      格式问题不该炸演出）。"""
+      格式问题不该炸运行）。"""
     if not isinstance(steps, list):
         return []
     out = []
@@ -99,11 +100,11 @@ def normalize_transcript_steps(steps):
 BLOCK_KEYS = {
     'basic_safety': '安全底线声明 → system 层',
     'basic_output': '输出风格/格式要求 → system 层',
-    'soul': '演员 soul 卡描述（souls.description）。宿主模式不进 prompt——走子代理 persona；直连模式进 system',
-    'user_info': '演员对应用户（human 身份）的资料 → system 层',
+    'soul': '角色 soul 卡描述（souls.description）。宿主模式不进 prompt——走子代理 persona；直连模式进 system',
+    'user_info': '角色对应用户（human 身份）的资料 → system 层',
     'context': '场上可见发言流水（scope 视角过滤后）→ user 层前部。2026-09-13 起 JSON 形态：发言条目列表，每条 {"soul_id","soul_name","steps":[...]}——steps 逐轮轨迹（dialog 行单轮；AI 行按 react 轮展开，每轮 cot/tool_call/tool_result/response 按键存在性表达 VISIBILITY），消费口径：台词=最后一个非空 response',
     'prompt': '本节点指令 → user 层；有 memory 时 user 末尾再重复一次（提醒当前任务）',
-    'memory': '该演员的记忆检索结果 → user 层中段（垫「[回忆]」提示）',
+    'memory': '该角色的记忆检索结果 → user 层中段（垫「[回忆]」提示）',
     'showprompt': '节点提醒文案（2026-09-13 起独立成块，已变量替换；不再折进 prompt——执行后端自定渲染位置，dsh 宿主折回 [提醒] 前缀）。incremental 拍与 system 层同在，随包不省',
     '_actor_info': '引擎私有（dict 非文本，身份元数据）——随包透传，不得当文本拼',
 }
@@ -111,16 +112,16 @@ BLOCK_KEYS = {
 # incremental 拍 = {context, memory, showprompt, prompt, _actor_info}——
 # 省 system 层四键（basic_safety/basic_output/soul/user_info），首轮已喂过，
 # 窗口不复读。消费方按缺键容错（宿主拼装器 str() 兜底，llmBridge .get 兜底）。
-# 契约外键：剧本可挂自定义 context 方法，其产出会以自定义键写入 blocks
+# 契约外键：FEMO脚本可挂自定义 context 方法，其产出会以自定义键写入 blocks
 # （block_collector 收集）。宿主拼装器当前不识别 → 忽略 + 告警（可见性），
 # 即自定义 context 料仅在直连模式生效——这是已知边界，不是事故。
 
 
-# ═══ 主模型下场的可见性判定（已知镜像清单）════════════════════════════════
+# ═══ 主模型参与运行的可见性判定（已知镜像清单）════════════════════════════════
 # scope 语义（谁看得见谁的台词）归引擎所有。两处消费：
-# - 子代理演员：引擎过滤（block_collector 收集 context 时按 scope 裁决）；
-# - 主模型演员（source:main）：引擎逐行发 scope 名单，宿主镜像执行同一谓词
+# - 子代理角色：引擎过滤（block_collector 收集 context 时按 scope 裁决）；
+# - 主模型角色（source:main）：引擎逐行发 scope 名单，宿主镜像执行同一谓词
 #   （接口侧 main-actor.ts isMainVisible：scope 未限定=全员可见，否则含任一
-#   main 演员=可见；main 演员本人的台词不入账——天然在主窗历史里）。
+#   main 角色=可见；main 角色本人的台词不入账——天然在主窗历史里）。
 # ⚠️ 引擎若扩展 scope 语义（新语法/新可见性规则），必须同步宿主镜像——
 # 本节即同步清单。宿主的增量投递账本（水位/steer）是投递方记账，不属引擎语义。

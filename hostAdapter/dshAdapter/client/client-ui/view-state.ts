@@ -18,7 +18,7 @@ function currentView(sessionId: string | undefined): string {
   if (sessionId === undefined) return 'god'
   const stored = viewBySession.get(sessionId)
   if (stored !== undefined) return stored
-  // 默认视图：投影窗=femo-proj- 前缀）=上帝视角全显；主会话=戏外（纯 DSH
+  // 默认视图：投影窗=femo-proj- 前缀）=上帝视角全显；主会话=FEMO外（纯 DSH
   // 原生 user+主模型页面，femo 行全隐藏——含旧版本写进主会话的历史残留行）。
   return sessionId.startsWith('femo-proj-') ? 'god' : 'offstage'
 }

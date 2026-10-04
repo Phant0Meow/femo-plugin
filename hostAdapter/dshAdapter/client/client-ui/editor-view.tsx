@@ -23,9 +23,10 @@ export interface ScriptViewInjected {
   /** Play a script on the CURRENT session (must be Femo mode). */
   runScript(sessionId: string, scriptPath?: string): Promise<void>
   /** Hard-pause the session's running Job (§8.4 B3：sessionId 归属解析必填)；
-   *  the checkpoint stays for resume. jobId 显式指定时宿主按引擎档案 host_ref
-   *  裁决归属（内存镜像滞后也能停——2026-09-06 暂停失效事故的正解路径）。
-   *  resolve 值带宿主回执（paused:false=该会话无活跃剧本，前端据此复位按钮）。 */
+   *  the checkpoint stays for resume. jobId 显式指定时宿主按引擎档案 host_refs
+   *  字典裁决归属（旧档回退 host_ref；内存镜像滞后也能停——2026-09-06 暂停
+   *  失效事故的正解路径）。
+   *  resolve 值带宿主回执（paused:false=该会话无活跃FEMO脚本，前端据此复位按钮）。 */
   pauseScript(sessionId: string, jobId?: number): Promise<{ paused?: boolean } | undefined>
   fetchErrors(sessionId: string): Promise<Array<{ ts: number; text: string }>>
   /** 打开 dsh 侧边栏（手机版 femoGen 返回键回调）。 */
@@ -41,7 +42,7 @@ export function FemoEditorView(props: FemoScriptViewProps & {
   /** 会话槽标准 share（运行时对 session-scoped 槽位必传）：proj 窗解析母会话用。 */
   useSessions?: (sel: (s: { byId: Record<string, { parentId?: string } | undefined> }) => string | undefined) => string | undefined
 }) {
-  // proj 窗入口（2026-08-23）：编辑器数据全部挂主会话——剧本记录/断点/运行态
+  // proj 窗入口（2026-08-23）：编辑器数据全部挂主会话——FEMO脚本记录/断点/运行态
   // 都在主 sid 名下。母 id 从会话表 parentId 取（proj id 的角色键可含 - ，字符串
   // 反解不可逆）；在主会话本体打开时原样使用自身 id。
   const rawSessionId = props.sessionId

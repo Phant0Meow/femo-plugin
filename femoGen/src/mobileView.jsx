@@ -28,15 +28,17 @@ import React, {
   useRef,
   useCallback,
   useEffect,
-  useMemo,
+  // useMemo, // 已退役（观察期 2026-09-26 死代码排查）：mobileView 内未使用
 } from 'react';
-import { ti, inp, btnP, btnS, getNodeSize, applyForLinkage } from './common';
+import { ti, getNodeSize, applyForLinkage, SNAP_PX, snapAndLink } from './common';
+// 已注释死导入（观察期 2026-09-26 死代码排查）：inp, btnP, btnS —— inp 唯一使用点在已退役的 MobileHumanInput 内
 import { LibPanel } from './libPanel';
-import { ProjPanel, useModelList, sourceOptions } from './projectPanel';
+import { ProjPanel } from './projectPanel';
+// 已注释死导入（观察期 2026-09-26 死代码排查）：useModelList, sourceOptions —— 唯一使用点在已退役的 MobileProjPanel 内
 import { BubbleOverlay } from './bubbleOverlay';
 import { FemoPreview } from './femoPreview';
 import { DebugPanel } from './debugPanel';
-import { FaPlay, FaPause, FaForward, FaPalette, FaUserPlus, FaTerminal, FaFolderOpen, FaFloppyDisk, IconPanelLeftOutline, FaSquareOutline } from './faIcons';
+import { FaPlay, FaStop, FaForward, FaPalette, FaUserPlus, FaTerminal, FaFolderOpen, FaFloppyDisk, IconPanelLeftOutline, FaSquareOutline } from './faIcons';
 
 // ─────────────────────────────────────────────
 // 颜色 / 主题 token
@@ -397,29 +399,31 @@ function MobileTitleBar({
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
         {/* 运行控制（2026-09-11 定型：**按钮恒定，只变展示**）——三枚芯片各自钉死
             一个动作/一套样式/一句 title，从生到死不变；运行阶段只决定渲染哪几枚：
-              绿▶「运行」   = fresh start（onRun：reset 从头开演）——未开跑与挂起态都出现
-              红⏸「暂停」   = pause（onPause）——只在跑的时候出现（2026-09-12
-              用户点名 stop→pause 全链路改名：原「停止」键，语义即挂起可续跑）
+              绿▶「运行」   = fresh start（onRun：reset 从头运行）——未开跑与挂起态都出现
+              红⏸「暂停」   = pause（onPause）——running 与挂起态都出现（2026-09-12
+              用户点名 stop→pause 全链路改名：原「停止」键，语义即挂起可续跑；
+              2026-09-20 拍板挂起态也保留暂停键=状态混乱时的强停入口，幂等按压）
               琥珀⏩「继续」= resume（onResume：从断点续跑）——只在暂停之后的挂起态出现
             挂起态顺序=常驻的运行键在前、挂起专属的继续键在后。（引擎无独立
             硬暂停语义——pause=suspended 可续跑）。同款 FA 图标芯片底
-            （色 13% 底 + 38% 边），只靠语义色区分。 */}
+            （色 13% 底 + 38% 边），只靠语义色区分。2026-09-24 用户点名暂停键
+            全状态常驻（idle 也显示，与桌面端同拍；无可停执行体=幂等知情）。 */}
         {(flowStatus === 'idle' || flowStatus === 'paused') && (
           <MobileIconBtn
             onClick={onRun}
             icon={FaPlay}
             color={T.success}
-            title="运行（从头开演）"
+            title="运行（从头运行）"
           />
         )}
-        {flowStatus === 'running' && (
+        {
           <MobileIconBtn
             onClick={onPause}
-            icon={FaPause}
+            icon={FaStop}
             color={T.danger}
-            title="暂停（可续跑）"
+            title="停止（可续跑；挂起态重复按=幂等）"
           />
-        )}
+        }
         {flowStatus === 'paused' && (
           <MobileIconBtn
             onClick={onResume}
@@ -438,7 +442,7 @@ function MobileTitleBar({
             onClick={onImport}
             icon={FaFolderOpen}
             color={T.textSecondary}
-            title="导入 .femo"
+            title="打开 .femo"
           />
         )}
         {typeof onExport === 'function' && (
@@ -446,7 +450,7 @@ function MobileTitleBar({
             onClick={onExport}
             icon={FaFloppyDisk}
             color={T.textSecondary}
-            title={exportBusy ? '保存中…' : '导出 .femo'}
+            title={exportBusy ? '保存中…' : '保存 .femo'}
             disabled={exportBusy}
           />
         )}
@@ -534,177 +538,178 @@ function MobileIconBtn({ onClick, icon: Icon, color, title, disabled = false }) 
   );
 }
 
-// ─────────────────────────────────────────────
-// FEMO 预览侧板（右侧全高滑出）
-// ─────────────────────────────────────────────
-function MobileFemoPanel({ visible, femoText, onChange, femoError, femoDirty, onApply, onRestore, onGraphToFemo, onClose }) {
-  // 头排按钮回执状态（2026-09-07 与桌面端同款设计语言）。hooks 必须在
-  // `!visible` 早退之前——条件挂载会打乱 hooks 顺序。
-  const [copied, setCopied] = useState(false);
-  const [g2tFlash, setG2tFlash] = useState(false);
-  const [applyFlash, setApplyFlash] = useState(false);
-  const copyTimerRef = useRef(null);
-  const g2tTimerRef = useRef(null);
-  const applyTimerRef = useRef(null);
+// ═══ 已退役（观察期起 2026-09-26 死代码排查，全仓零引用；观察无误后连块删除）：MobileFemoPanel（从未被渲染，FEMO 预览手机面板） ═══
+// // ─────────────────────────────────────────────
+// // FEMO 预览侧板（右侧全高滑出）
+// // ─────────────────────────────────────────────
+// function MobileFemoPanel({ visible, femoText, onChange, femoError, femoDirty, onApply, onRestore, onGraphToFemo, onClose }) {
+//   // 头排按钮回执状态（2026-09-07 与桌面端同款设计语言）。hooks 必须在
+//   // `!visible` 早退之前——条件挂载会打乱 hooks 顺序。
+//   const [copied, setCopied] = useState(false);
+//   const [g2tFlash, setG2tFlash] = useState(false);
+//   const [applyFlash, setApplyFlash] = useState(false);
+//   const copyTimerRef = useRef(null);
+//   const g2tTimerRef = useRef(null);
+//   const applyTimerRef = useRef(null);
 
-  useEffect(() => () => {
-    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
-    if (g2tTimerRef.current) clearTimeout(g2tTimerRef.current);
-    if (applyTimerRef.current) clearTimeout(applyTimerRef.current);
-  }, []);
+//   useEffect(() => () => {
+//     if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+//     if (g2tTimerRef.current) clearTimeout(g2tTimerRef.current);
+//     if (applyTimerRef.current) clearTimeout(applyTimerRef.current);
+//   }, []);
 
-  const flash = (setter, timerRef, ms = 1600) => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    setter(true);
-    timerRef.current = setTimeout(() => setter(false), ms);
-  };
+//   const flash = (setter, timerRef, ms = 1600) => {
+//     if (timerRef.current) clearTimeout(timerRef.current);
+//     setter(true);
+//     timerRef.current = setTimeout(() => setter(false), ms);
+//   };
 
-  const handleCopy = useCallback(async () => {
-    let ok = false;
-    try {
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(femoText || '');
-        ok = true;
-      } else {
-        const ta = document.createElement('textarea');
-        ta.value = femoText || '';
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        ok = document.execCommand('copy');
-        document.body.removeChild(ta);
-      }
-    } catch {
-      ok = false;
-    }
-    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
-    setCopied(ok);
-    copyTimerRef.current = setTimeout(() => setCopied(false), 1600);
-  }, [femoText]);
+//   const handleCopy = useCallback(async () => {
+//     let ok = false;
+//     try {
+//       if (navigator.clipboard && window.isSecureContext) {
+//         await navigator.clipboard.writeText(femoText || '');
+//         ok = true;
+//       } else {
+//         const ta = document.createElement('textarea');
+//         ta.value = femoText || '';
+//         ta.style.position = 'fixed';
+//         ta.style.opacity = '0';
+//         document.body.appendChild(ta);
+//         ta.select();
+//         ok = document.execCommand('copy');
+//         document.body.removeChild(ta);
+//       }
+//     } catch {
+//       ok = false;
+//     }
+//     if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+//     setCopied(ok);
+//     copyTimerRef.current = setTimeout(() => setCopied(false), 1600);
+//   }, [femoText]);
 
-  if (!visible) return null;
-  return (
-    <>
-      <div
-        onClick={onClose}
-        style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'var(--femo-mask)',
-          zIndex: 300,
-          animation: 'fadeInOverlay 0.18s ease',
-        }}
-      />
-      <div
-        style={{
-          position: 'fixed',
-          right: 0,
-          top: 0,
-          bottom: 0,
-          width: '88vw',
-          maxWidth: 420,
-          background: 'var(--femo-mobile-bg-2)',
-          borderLeft: `var(--femo-border-w) solid ${T.border}`,
-          zIndex: 301,
-          display: 'flex',
-          flexDirection: 'column',
-          animation: 'slideInFemo 0.22s cubic-bezier(0.4,0,0.2,1)',
-          boxShadow: '-8px 0 32px var(--femo-mask)',
-        }}
-      >
-        {/* 头部 */}
-        <div
-          style={{
-            padding: '14px 16px 10px',
-            borderBottom: 'var(--femo-border-w) solid var(--femo-mobile-border-strong)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexShrink: 0,
-          }}
-        >
-          <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--femo-neutral)', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'var(--femo-font-mono)' }}>
-            FEMO 预览
-          </span>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            {femoError && (
-              <button onClick={onRestore} style={mobChip(T.warning, true)}>恢复</button>
-            )}
-            <button
-              onClick={handleCopy}
-              style={mobChip(copied ? T.success : T.accent, copied)}
-            >
-              {copied ? '✓ 已复制' : '复制'}
-            </button>
-            <button
-              onClick={() => { onGraphToFemo?.(); flash(setG2tFlash, g2tTimerRef); }}
-              style={mobChip(g2tFlash ? T.success : T.accent, g2tFlash)}
-            >
-              {g2tFlash ? '✓ 已生成' : '图→文'}
-            </button>
-            <button
-              onClick={() => { onApply?.(); flash(setApplyFlash, applyTimerRef); }}
-              style={mobChip(
-                applyFlash ? (femoError ? T.danger : T.success) : T.accent,
-                applyFlash || femoDirty,
-              )}
-            >
-              {applyFlash ? (femoError ? '✕ 失败' : '✓ 已应用') : '文→图'}
-            </button>
-            <button
-              onClick={onClose}
-              style={{
-                background: 'var(--femo-mobile-border-strong)',
-                border: 'none',
-                borderRadius: 'var(--femo-radius-sm)',
-                width: 28,
-                height: 28,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                color: 'var(--femo-neutral)',
-                fontSize: 14,
-              }}
-            >
-              ✕
-            </button>
-          </div>
-        </div>
+//   if (!visible) return null;
+//   return (
+//     <>
+//       <div
+//         onClick={onClose}
+//         style={{
+//           position: 'fixed',
+//           inset: 0,
+//           background: 'var(--femo-mask)',
+//           zIndex: 300,
+//           animation: 'fadeInOverlay 0.18s ease',
+//         }}
+//       />
+//       <div
+//         style={{
+//           position: 'fixed',
+//           right: 0,
+//           top: 0,
+//           bottom: 0,
+//           width: '88vw',
+//           maxWidth: 420,
+//           background: 'var(--femo-mobile-bg-2)',
+//           borderLeft: `var(--femo-border-w) solid ${T.border}`,
+//           zIndex: 301,
+//           display: 'flex',
+//           flexDirection: 'column',
+//           animation: 'slideInFemo 0.22s cubic-bezier(0.4,0,0.2,1)',
+//           boxShadow: '-8px 0 32px var(--femo-mask)',
+//         }}
+//       >
+//         {/* 头部 */}
+//         <div
+//           style={{
+//             padding: '14px 16px 10px',
+//             borderBottom: 'var(--femo-border-w) solid var(--femo-mobile-border-strong)',
+//             display: 'flex',
+//             justifyContent: 'space-between',
+//             alignItems: 'center',
+//             flexShrink: 0,
+//           }}
+//         >
+//           <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--femo-neutral)', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'var(--femo-font-mono)' }}>
+//             FEMO 预览
+//           </span>
+//           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+//             {femoError && (
+//               <button onClick={onRestore} style={mobChip(T.warning, true)}>恢复</button>
+//             )}
+//             <button
+//               onClick={handleCopy}
+//               style={mobChip(copied ? T.success : T.accent, copied)}
+//             >
+//               {copied ? '✓ 已复制' : '复制'}
+//             </button>
+//             <button
+//               onClick={() => { onGraphToFemo?.(); flash(setG2tFlash, g2tTimerRef); }}
+//               style={mobChip(g2tFlash ? T.success : T.accent, g2tFlash)}
+//             >
+//               {g2tFlash ? '✓ 已生成' : '图→文'}
+//             </button>
+//             <button
+//               onClick={() => { onApply?.(); flash(setApplyFlash, applyTimerRef); }}
+//               style={mobChip(
+//                 applyFlash ? (femoError ? T.danger : T.success) : T.accent,
+//                 applyFlash || femoDirty,
+//               )}
+//             >
+//               {applyFlash ? (femoError ? '✕ 失败' : '✓ 已应用') : '文→图'}
+//             </button>
+//             <button
+//               onClick={onClose}
+//               style={{
+//                 background: 'var(--femo-mobile-border-strong)',
+//                 border: 'none',
+//                 borderRadius: 'var(--femo-radius-sm)',
+//                 width: 28,
+//                 height: 28,
+//                 display: 'flex',
+//                 alignItems: 'center',
+//                 justifyContent: 'center',
+//                 cursor: 'pointer',
+//                 color: 'var(--femo-neutral)',
+//                 fontSize: 14,
+//               }}
+//             >
+//               ✕
+//             </button>
+//           </div>
+//         </div>
 
-        {/* 错误提示 */}
-        {femoError && (
-          <div style={{ margin: '8px 12px 0', padding: '6px 10px', background: 'var(--femo-mobile-danger-soft)', border: 'var(--femo-border-w) solid var(--femo-mobile-danger-border)', borderRadius: 'var(--femo-radius-sm)', fontSize: 10, color: 'var(--femo-danger-weak)', lineHeight: 1.5 }}>
-            {femoError}
-          </div>
-        )}
+//         {/* 错误提示 */}
+//         {femoError && (
+//           <div style={{ margin: '8px 12px 0', padding: '6px 10px', background: 'var(--femo-mobile-danger-soft)', border: 'var(--femo-border-w) solid var(--femo-mobile-danger-border)', borderRadius: 'var(--femo-radius-sm)', fontSize: 10, color: 'var(--femo-danger-weak)', lineHeight: 1.5 }}>
+//             {femoError}
+//           </div>
+//         )}
 
-        {/* 编辑器 */}
-        <textarea
-          value={femoText}
-          onChange={(e) => onChange(e.target.value)}
-          spellCheck={false}
-          style={{
-            flex: 1,
-            background: 'transparent',
-            border: 'none',
-            outline: 'none',
-            resize: 'none',
-            padding: '12px 14px',
-            fontFamily: 'var(--femo-font-mono)',
-            fontSize: 10.5,
-            lineHeight: 1.8,
-            color: 'var(--femo-mobile-text-2-alt)',
-            touchAction: 'auto',
-            userSelect: 'text',
-            WebkitUserSelect: 'text',
-          }}
-        />
-      </div>
-    </>
-  );
-}
+//         {/* 编辑器 */}
+//         <textarea
+//           value={femoText}
+//           onChange={(e) => onChange(e.target.value)}
+//           spellCheck={false}
+//           style={{
+//             flex: 1,
+//             background: 'transparent',
+//             border: 'none',
+//             outline: 'none',
+//             resize: 'none',
+//             padding: '12px 14px',
+//             fontFamily: 'var(--femo-font-mono)',
+//             fontSize: 10.5,
+//             lineHeight: 1.8,
+//             color: 'var(--femo-mobile-text-2-alt)',
+//             touchAction: 'auto',
+//             userSelect: 'text',
+//             WebkitUserSelect: 'text',
+//           }}
+//         />
+//       </div>
+//     </>
+//   );
+// }
 
 // ─────────────────────────────────────────────
 // Bottom Panel — Library / Project / Properties
@@ -1076,288 +1081,290 @@ function MobileBottomPanel({
   );
 }
 
-// ─────────────────────────────────────────────
-// MobileLibPanel — 仓库面板（横向卡片列表）
-// ─────────────────────────────────────────────
-function MobileLibPanel({ lib, mode, locationPath, allNames, onNew, onAdd, onAddModule, onAddSpecial, onAddPosition, onEdit, onEditModule, onSelectLib, onNewModule }) {
-  const [newModName, setNewModName] = useState('');
+// ═══ 已退役（观察期起 2026-09-26 死代码排查，全仓零引用；观察无误后连块删除）：MobileLibPanel（库页签实际复用桌面版 LibPanel） ═══
+// // ─────────────────────────────────────────────
+// // MobileLibPanel — 仓库面板（横向卡片列表）
+// // ─────────────────────────────────────────────
+// function MobileLibPanel({ lib, mode, locationPath, allNames, onNew, onAdd, onAddModule, onAddSpecial, onAddPosition, onEdit, onEditModule, onSelectLib, onNewModule }) {
+//   const [newModName, setNewModName] = useState('');
 
-  const displayActions = (lib.actions || []).filter((a) => {
-    if (!a.path) return false;
-    if (a.path.length === 1 && a.path[0] === 'mainflow') return true;
-    return locationPath.every((seg, i) => a.path[i] === seg);
-  });
-  const displayModules = (lib.modules || []).filter(
-    (m) =>
-      m.path &&
-      locationPath.every((seg, i) => m.path[i] === seg) &&
-      m.path.length === locationPath.length + 1
-  );
-  const specialNodes =
-    mode === 'mainflow'
-      ? [
-          { t: 'FOR', c: 'var(--femo-primary-strong)' },
-          { t: 'PAR', c: 'var(--femo-special-par)' },
-          { t: 'END', c: 'var(--femo-danger)' },
-        ]
-      : [
-          { t: 'FOR', c: 'var(--femo-primary-strong)' },
-          { t: 'PAR', c: 'var(--femo-special-par)' },
-          { t: 'BREAK', c: 'var(--femo-warning)' },
-          { t: 'OUT', c: 'var(--femo-danger)' },
-        ];
+//   const displayActions = (lib.actions || []).filter((a) => {
+//     if (!a.path) return false;
+//     if (a.path.length === 1 && a.path[0] === 'mainflow') return true;
+//     return locationPath.every((seg, i) => a.path[i] === seg);
+//   });
+//   const displayModules = (lib.modules || []).filter(
+//     (m) =>
+//       m.path &&
+//       locationPath.every((seg, i) => m.path[i] === seg) &&
+//       m.path.length === locationPath.length + 1
+//   );
+//   const specialNodes =
+//     mode === 'mainflow'
+//       ? [
+//           { t: 'FOR', c: 'var(--femo-primary-strong)' },
+//           { t: 'PAR', c: 'var(--femo-special-par)' },
+//           { t: 'END', c: 'var(--femo-danger)' },
+//         ]
+//       : [
+//           { t: 'FOR', c: 'var(--femo-primary-strong)' },
+//           { t: 'PAR', c: 'var(--femo-special-par)' },
+//           { t: 'BREAK', c: 'var(--femo-warning)' },
+//           { t: 'OUT', c: 'var(--femo-danger)' },
+//         ];
 
-  return (
-    <div>
-      {/* Actions 行 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <span style={sectionLabel}>Actions</span>
-        <button onClick={onNew} style={{ ...mobBtnP, padding: '3px 10px', fontSize: 10 }}>+ 新建</button>
-      </div>
-      <div style={{ display: 'flex', gap: 7, overflowX: 'auto', paddingBottom: 4, WebkitOverflowScrolling: 'touch', touchAction: 'pan-x' }}>
-        {displayActions.length === 0 ? (
-          <div style={{ fontSize: 11, color: T.textMuted, padding: '4px 0' }}>暂无 Action</div>
-        ) : displayActions.map((a) => {
-          const { c, bg } = ti(a.executorType);
-          return (
-            <div
-              key={a.id}
-              onClick={() => onSelectLib?.('action', a.id)}
-              style={{
-                background: 'var(--femo-node-bg)',
-                borderRadius: 'var(--femo-radius-md)',
-                border: `var(--femo-node-border-w) solid var(--femo-node-border)`,
-                borderLeft: `var(--femo-border-w-accent) solid ${c}`,
-                padding: '6px 9px',
-                minWidth: 100,
-                maxWidth: 140,
-                flexShrink: 0,
-                cursor: 'pointer',
-              }}
-            >
-              <div style={{ fontSize: 11.5, fontWeight: 700, color: T.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3 }}>
-                {a.name}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
-                <span style={{ fontSize: 9.5, fontWeight: 700, color: c, fontFamily: 'var(--femo-font-mono)' }}>@{a.executorType}</span>
-                <button
-                  onClick={(e) => { e.stopPropagation(); onAdd(a); }}
-                  style={{ background: 'var(--femo-btn-primary)', border: 'none', borderRadius: 'var(--femo-radius-sm)', color: 'var(--femo-on-accent)', fontSize: 9, fontWeight: 700, padding: '1px 6px', cursor: 'pointer' }}
-                >
-                  +
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+//   return (
+//     <div>
+//       {/* Actions 行 */}
+//       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+//         <span style={sectionLabel}>Actions</span>
+//         <button onClick={onNew} style={{ ...mobBtnP, padding: '3px 10px', fontSize: 10 }}>+ 新建</button>
+//       </div>
+//       <div style={{ display: 'flex', gap: 7, overflowX: 'auto', paddingBottom: 4, WebkitOverflowScrolling: 'touch', touchAction: 'pan-x' }}>
+//         {displayActions.length === 0 ? (
+//           <div style={{ fontSize: 11, color: T.textMuted, padding: '4px 0' }}>暂无 Action</div>
+//         ) : displayActions.map((a) => {
+//           const { c, bg } = ti(a.executorType);
+//           return (
+//             <div
+//               key={a.id}
+//               onClick={() => onSelectLib?.('action', a.id)}
+//               style={{
+//                 background: 'var(--femo-node-bg)',
+//                 borderRadius: 'var(--femo-radius-md)',
+//                 border: `var(--femo-node-border-w) solid var(--femo-node-border)`,
+//                 borderLeft: `var(--femo-border-w-accent) solid ${c}`,
+//                 padding: '6px 9px',
+//                 minWidth: 100,
+//                 maxWidth: 140,
+//                 flexShrink: 0,
+//                 cursor: 'pointer',
+//               }}
+//             >
+//               <div style={{ fontSize: 11.5, fontWeight: 700, color: T.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3 }}>
+//                 {a.name}
+//               </div>
+//               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
+//                 <span style={{ fontSize: 9.5, fontWeight: 700, color: c, fontFamily: 'var(--femo-font-mono)' }}>@{a.executorType}</span>
+//                 <button
+//                   onClick={(e) => { e.stopPropagation(); onAdd(a); }}
+//                   style={{ background: 'var(--femo-btn-primary)', border: 'none', borderRadius: 'var(--femo-radius-sm)', color: 'var(--femo-on-accent)', fontSize: 9, fontWeight: 700, padding: '1px 6px', cursor: 'pointer' }}
+//                 >
+//                   +
+//                 </button>
+//               </div>
+//             </div>
+//           );
+//         })}
+//       </div>
 
-      {/* Modules */}
-      {displayModules.length > 0 && (
-        <>
-          <div style={{ ...sectionLabel, marginTop: 10, marginBottom: 6 }}>Modules</div>
-          <div style={{ display: 'flex', gap: 7, overflowX: 'auto', paddingBottom: 4, touchAction: 'pan-x' }}>
-            {displayModules.map((m) => (
-              <div
-                key={m.id}
-                onClick={() => onSelectLib?.('module', m.id)}
-                style={{
-                  background: 'var(--femo-node-bg)',
-                  borderRadius: 'var(--femo-radius-md)',
-                  border: `var(--femo-node-border-w) solid var(--femo-node-border)`,
-                  borderLeft: 'var(--femo-border-w-accent) solid var(--femo-tag-bg)',
-                  padding: '6px 9px',
-                  minWidth: 100,
-                  flexShrink: 0,
-                  cursor: 'pointer',
-                }}
-              >
-                <div style={{ fontSize: 11, fontWeight: 700, color: T.textPrimary, marginBottom: 5 }}>&{m.name}</div>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onAddModule(m); }}
-                    style={{ background: 'var(--femo-btn-primary)', border: 'none', borderRadius: 'var(--femo-radius-sm)', color: 'var(--femo-on-accent)', fontSize: 9, fontWeight: 700, padding: '2px 6px', cursor: 'pointer', flex: 1 }}
-                  >
-                    +画布
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onEditModule?.(m); }}
-                    style={{ background: 'var(--femo-primary)', border: 'none', borderRadius: 'var(--femo-radius-sm)', color: 'var(--femo-on-accent)', fontSize: 9, fontWeight: 700, padding: '2px 6px', cursor: 'pointer', flex: 1 }}
-                  >
-                    进入
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
+//       {/* Modules */}
+//       {displayModules.length > 0 && (
+//         <>
+//           <div style={{ ...sectionLabel, marginTop: 10, marginBottom: 6 }}>Modules</div>
+//           <div style={{ display: 'flex', gap: 7, overflowX: 'auto', paddingBottom: 4, touchAction: 'pan-x' }}>
+//             {displayModules.map((m) => (
+//               <div
+//                 key={m.id}
+//                 onClick={() => onSelectLib?.('module', m.id)}
+//                 style={{
+//                   background: 'var(--femo-node-bg)',
+//                   borderRadius: 'var(--femo-radius-md)',
+//                   border: `var(--femo-node-border-w) solid var(--femo-node-border)`,
+//                   borderLeft: 'var(--femo-border-w-accent) solid var(--femo-tag-bg)',
+//                   padding: '6px 9px',
+//                   minWidth: 100,
+//                   flexShrink: 0,
+//                   cursor: 'pointer',
+//                 }}
+//               >
+//                 <div style={{ fontSize: 11, fontWeight: 700, color: T.textPrimary, marginBottom: 5 }}>&{m.name}</div>
+//                 <div style={{ display: 'flex', gap: 4 }}>
+//                   <button
+//                     onClick={(e) => { e.stopPropagation(); onAddModule(m); }}
+//                     style={{ background: 'var(--femo-btn-primary)', border: 'none', borderRadius: 'var(--femo-radius-sm)', color: 'var(--femo-on-accent)', fontSize: 9, fontWeight: 700, padding: '2px 6px', cursor: 'pointer', flex: 1 }}
+//                   >
+//                     +画布
+//                   </button>
+//                   <button
+//                     onClick={(e) => { e.stopPropagation(); onEditModule?.(m); }}
+//                     style={{ background: 'var(--femo-primary)', border: 'none', borderRadius: 'var(--femo-radius-sm)', color: 'var(--femo-on-accent)', fontSize: 9, fontWeight: 700, padding: '2px 6px', cursor: 'pointer', flex: 1 }}
+//                   >
+//                     进入
+//                   </button>
+//                 </div>
+//               </div>
+//             ))}
+//           </div>
+//         </>
+//       )}
 
-      {/* 新建模块 */}
-      <div style={{ display: 'flex', gap: 6, marginTop: 10, alignItems: 'center' }}>
-        <input
-          value={newModName}
-          onChange={(e) => setNewModName(e.target.value)}
-          placeholder="新模块名"
-          style={{ ...mobInp, flex: 1, fontSize: 11 }}
-        />
-        <button
-          onClick={() => {
-            const name = newModName.trim();
-            if (name && (!allNames?.has || !allNames.has(name))) {
-              onNewModule(name);
-              setNewModName('');
-            }
-          }}
-          style={{ ...mobBtnP, padding: '5px 10px', fontSize: 10, flexShrink: 0 }}
-        >
-          创建
-        </button>
-      </div>
+//       {/* 新建模块 */}
+//       <div style={{ display: 'flex', gap: 6, marginTop: 10, alignItems: 'center' }}>
+//         <input
+//           value={newModName}
+//           onChange={(e) => setNewModName(e.target.value)}
+//           placeholder="新模块名"
+//           style={{ ...mobInp, flex: 1, fontSize: 11 }}
+//         />
+//         <button
+//           onClick={() => {
+//             const name = newModName.trim();
+//             if (name && (!allNames?.has || !allNames.has(name))) {
+//               onNewModule(name);
+//               setNewModName('');
+//             }
+//           }}
+//           style={{ ...mobBtnP, padding: '5px 10px', fontSize: 10, flexShrink: 0 }}
+//         >
+//           创建
+//         </button>
+//       </div>
 
-      {/* 特殊节点 + POSITION */}
-      <div style={{ marginTop: 10 }}>
-        <div style={sectionLabel}>特殊节点</div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-          {specialNodes.map((s) => {
-            const spKey = { START: 'start', IN: 'start', END: 'end', OUT: 'end', BREAK: 'break', FOR: 'for', PAR: 'par' }[s.t] || 'for';
-            return (
-              <button
-                key={s.t}
-                onClick={() => onAddSpecial(s.t)}
-                style={{
-                  background: `var(--femo-sp-${spKey}-bg)`,
-                  border: `var(--femo-border-w) solid color-mix(in srgb, ${s.c} 50%, var(--femo-node-bg))`,
-                  borderRadius: 'var(--femo-radius-sm)',
-                  padding: '4px 10px',
-                  fontSize: 10.5,
-                  fontWeight: 800,
-                  color: s.c,
-                  cursor: 'pointer',
-                  fontFamily: 'var(--femo-font-mono)',
-                }}
-              >
-                [{s.t}]
-              </button>
-            );
-          })}
-          <button
-            onClick={onAddPosition}
-            style={{
-              background: 'var(--femo-neutral-faint)',
-              border: 'var(--femo-border-w) solid var(--femo-neutral-border)',
-              borderRadius: 'var(--femo-radius-sm)',
-              padding: '4px 10px',
-              fontSize: 10.5,
-              fontWeight: 700,
-              color: 'var(--femo-neutral)',
-              cursor: 'pointer',
-              fontFamily: 'var(--femo-font-mono)',
-            }}
-          >
-            POSITION
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+//       {/* 特殊节点 + POSITION */}
+//       <div style={{ marginTop: 10 }}>
+//         <div style={sectionLabel}>特殊节点</div>
+//         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+//           {specialNodes.map((s) => {
+//             const spKey = { START: 'start', IN: 'start', END: 'end', OUT: 'end', BREAK: 'break', FOR: 'for', PAR: 'par' }[s.t] || 'for';
+//             return (
+//               <button
+//                 key={s.t}
+//                 onClick={() => onAddSpecial(s.t)}
+//                 style={{
+//                   background: `var(--femo-sp-${spKey}-bg)`,
+//                   border: `var(--femo-border-w) solid color-mix(in srgb, ${s.c} 50%, var(--femo-node-bg))`,
+//                   borderRadius: 'var(--femo-radius-sm)',
+//                   padding: '4px 10px',
+//                   fontSize: 10.5,
+//                   fontWeight: 800,
+//                   color: s.c,
+//                   cursor: 'pointer',
+//                   fontFamily: 'var(--femo-font-mono)',
+//                 }}
+//               >
+//                 [{s.t}]
+//               </button>
+//             );
+//           })}
+//           <button
+//             onClick={onAddPosition}
+//             style={{
+//               background: 'var(--femo-neutral-faint)',
+//               border: 'var(--femo-border-w) solid var(--femo-neutral-border)',
+//               borderRadius: 'var(--femo-radius-sm)',
+//               padding: '4px 10px',
+//               fontSize: 10.5,
+//               fontWeight: 700,
+//               color: 'var(--femo-neutral)',
+//               cursor: 'pointer',
+//               fontFamily: 'var(--femo-font-mono)',
+//             }}
+//           >
+//             POSITION
+//           </button>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// }
 
-// ─────────────────────────────────────────────
-// MobileProjPanel — 精简项目信息
-// ─────────────────────────────────────────────
-function MobileProjPanel({ proj, actorNames, onChange }) {
-  if (!proj) return null;
-  const u = (x) => onChange({ ...proj, ...x });
-  // dsh 可用模型列表（source 下拉数据源）
-  const [models, modelErr] = useModelList();
-  return (
-    <div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-        <div style={{ flex: 2 }}>
-          <div style={fieldLabel}>项目名称</div>
-          <input value={proj.name || ''} onChange={(e) => u({ name: e.target.value })} style={mobInp} />
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={fieldLabel}>Version</div>
-          <input value={proj.version || ''} onChange={(e) => u({ version: e.target.value })} placeholder="1.0" style={mobInp} />
-        </div>
-      </div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-        <div style={{ flex: 1 }}>
-          <div style={fieldLabel}>Database</div>
-          <input value={proj.database || ''} onChange={(e) => u({ database: e.target.value })} placeholder="memory/..." style={mobInp} />
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={fieldLabel}>Session</div>
-          <input value={proj.session || ''} onChange={(e) => u({ session: e.target.value })} placeholder="new" style={mobInp} />
-        </div>
-      </div>
+// ═══ 已退役（观察期起 2026-09-26 死代码排查，全仓零引用；观察无误后连块删除）：MobileProjPanel（项目页签实际复用桌面版 ProjPanel） ═══
+// // ─────────────────────────────────────────────
+// // MobileProjPanel — 精简项目信息
+// // ─────────────────────────────────────────────
+// function MobileProjPanel({ proj, actorNames, onChange }) {
+//   if (!proj) return null;
+//   const u = (x) => onChange({ ...proj, ...x });
+//   // dsh 可用模型列表（source 下拉数据源）
+//   const [models, modelErr] = useModelList();
+//   return (
+//     <div>
+//       <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+//         <div style={{ flex: 2 }}>
+//           <div style={fieldLabel}>项目名称</div>
+//           <input value={proj.name || ''} onChange={(e) => u({ name: e.target.value })} style={mobInp} />
+//         </div>
+//         <div style={{ flex: 1 }}>
+//           <div style={fieldLabel}>Version</div>
+//           <input value={proj.version || ''} onChange={(e) => u({ version: e.target.value })} placeholder="1.0" style={mobInp} />
+//         </div>
+//       </div>
+//       <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+//         <div style={{ flex: 1 }}>
+//           <div style={fieldLabel}>Database</div>
+//           <input value={proj.database || ''} onChange={(e) => u({ database: e.target.value })} placeholder="memory/..." style={mobInp} />
+//         </div>
+//         <div style={{ flex: 1 }}>
+//           <div style={fieldLabel}>Session</div>
+//           <input value={proj.session || ''} onChange={(e) => u({ session: e.target.value })} placeholder="new" style={mobInp} />
+//         </div>
+//       </div>
 
-      {/* Actors */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-        <span style={sectionLabel}>Actors</span>
-        <button
-          onClick={() => u({ actors: [...(proj.actors || []), { name: '', type: 'ai', soul: '', source: '', tools: null, thinking: '' }] })}
-          style={{ ...mobBtnP, padding: '2px 8px', fontSize: 10 }}
-        >
-          +
-        </button>
-      </div>
-      {(proj.actors || []).map((a, i) => {
-        const upd = (x) => u({ actors: proj.actors.map((p, j) => (j === i ? { ...p, ...x } : p)) });
-        return (
-          <div key={i} style={{ display: 'flex', gap: 5, marginBottom: 5, alignItems: 'center' }}>
-            <select value={a.type} onChange={(e) => upd({ type: e.target.value })} style={{ ...mobInp, width: 60, fontSize: 10 }}>
-              <option value="ai">ai</option>
-              <option value="human">human</option>
-            </select>
-            <input
-              value={a.name}
-              onChange={(e) => { let v = e.target.value.trim(); if (v && !v.startsWith('@')) v = '@' + v; upd({ name: v }); }}
-              placeholder="@Alice"
-              style={{ ...mobInp, flex: 1, fontSize: 11 }}
-            />
-            {a.type === 'ai' && models ? (
-              <select
-                value={a.source || ''}
-                onChange={(e) => upd({ source: e.target.value })}
-                style={{ ...mobInp, flex: 1, fontSize: 10 }}
-              >
-                {sourceOptions(models, a.source).map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                value={a.source}
-                onChange={(e) => upd({ source: e.target.value })}
-                placeholder={a.type === 'ai' ? (modelErr || 'deepseek') : '数字ID'}
-                style={{ ...mobInp, flex: 1, fontSize: 11 }}
-              />
-            )}
-            <button onClick={() => u({ actors: proj.actors.filter((_, j) => j !== i) })} style={{ background: 'none', border: 'none', color: 'var(--femo-danger-weak)', fontSize: 16, cursor: 'pointer', flexShrink: 0, padding: 2 }}>×</button>
-          </div>
-        );
-      })}
+//       {/* Actors */}
+//       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+//         <span style={sectionLabel}>Actors</span>
+//         <button
+//           onClick={() => u({ actors: [...(proj.actors || []), { name: '', type: 'ai', soul: '', source: '', tools: null, thinking: '' }] })}
+//           style={{ ...mobBtnP, padding: '2px 8px', fontSize: 10 }}
+//         >
+//           +
+//         </button>
+//       </div>
+//       {(proj.actors || []).map((a, i) => {
+//         const upd = (x) => u({ actors: proj.actors.map((p, j) => (j === i ? { ...p, ...x } : p)) });
+//         return (
+//           <div key={i} style={{ display: 'flex', gap: 5, marginBottom: 5, alignItems: 'center' }}>
+//             <select value={a.type} onChange={(e) => upd({ type: e.target.value })} style={{ ...mobInp, width: 60, fontSize: 10 }}>
+//               <option value="ai">ai</option>
+//               <option value="human">human</option>
+//             </select>
+//             <input
+//               value={a.name}
+//               onChange={(e) => { let v = e.target.value.trim(); if (v && !v.startsWith('@')) v = '@' + v; upd({ name: v }); }}
+//               placeholder="@Alice"
+//               style={{ ...mobInp, flex: 1, fontSize: 11 }}
+//             />
+//             {a.type === 'ai' && models ? (
+//               <select
+//                 value={a.source || ''}
+//                 onChange={(e) => upd({ source: e.target.value })}
+//                 style={{ ...mobInp, flex: 1, fontSize: 10 }}
+//               >
+//                 {sourceOptions(models, a.source).map((o) => (
+//                   <option key={o.value} value={o.value}>
+//                     {o.label}
+//                   </option>
+//                 ))}
+//               </select>
+//             ) : (
+//               <input
+//                 value={a.source}
+//                 onChange={(e) => upd({ source: e.target.value })}
+//                 placeholder={a.type === 'ai' ? (modelErr || 'deepseek') : '数字ID'}
+//                 style={{ ...mobInp, flex: 1, fontSize: 11 }}
+//               />
+//             )}
+//             <button onClick={() => u({ actors: proj.actors.filter((_, j) => j !== i) })} style={{ background: 'none', border: 'none', color: 'var(--femo-danger-weak)', fontSize: 16, cursor: 'pointer', flexShrink: 0, padding: 2 }}>×</button>
+//           </div>
+//         );
+//       })}
 
-      {/* Vars */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, marginTop: 8 }}>
-        <span style={sectionLabel}>Vars</span>
-        <button onClick={() => u({ vars: [...(proj.vars || []), { name: '', defaultValue: '' }] })} style={{ ...mobBtnP, padding: '2px 8px', fontSize: 10 }}>+</button>
-      </div>
-      {(proj.vars || []).map((v, i) => (
-        <div key={i} style={{ display: 'flex', gap: 5, marginBottom: 5, alignItems: 'center' }}>
-          <input value={v.name} onChange={(e) => { const upd = [...proj.vars]; upd[i] = { ...upd[i], name: e.target.value }; u({ vars: upd }); }} placeholder="变量名" style={{ ...mobInp, flex: 1 }} />
-          <input value={v.defaultValue} onChange={(e) => { const upd = [...proj.vars]; upd[i] = { ...upd[i], defaultValue: e.target.value }; u({ vars: upd }); }} placeholder="默认值" style={{ ...mobInp, flex: 2 }} />
-          <button onClick={() => u({ vars: proj.vars.filter((_, j) => j !== i) })} style={{ background: 'none', border: 'none', color: 'var(--femo-danger-weak)', fontSize: 16, cursor: 'pointer', flexShrink: 0, padding: 2 }}>×</button>
-        </div>
-      ))}
-    </div>
-  );
-}
+//       {/* Vars */}
+//       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, marginTop: 8 }}>
+//         <span style={sectionLabel}>Vars</span>
+//         <button onClick={() => u({ vars: [...(proj.vars || []), { name: '', defaultValue: '' }] })} style={{ ...mobBtnP, padding: '2px 8px', fontSize: 10 }}>+</button>
+//       </div>
+//       {(proj.vars || []).map((v, i) => (
+//         <div key={i} style={{ display: 'flex', gap: 5, marginBottom: 5, alignItems: 'center' }}>
+//           <input value={v.name} onChange={(e) => { const upd = [...proj.vars]; upd[i] = { ...upd[i], name: e.target.value }; u({ vars: upd }); }} placeholder="变量名" style={{ ...mobInp, flex: 1 }} />
+//           <input value={v.defaultValue} onChange={(e) => { const upd = [...proj.vars]; upd[i] = { ...upd[i], defaultValue: e.target.value }; u({ vars: upd }); }} placeholder="默认值" style={{ ...mobInp, flex: 2 }} />
+//           <button onClick={() => u({ vars: proj.vars.filter((_, j) => j !== i) })} style={{ background: 'none', border: 'none', color: 'var(--femo-danger-weak)', fontSize: 16, cursor: 'pointer', flexShrink: 0, padding: 2 }}>×</button>
+//         </div>
+//       ))}
+//     </div>
+//   );
+// }
 
 // ─────────────────────────────────────────────
 // MobilePropsPanel — 节点/边属性
@@ -1459,164 +1466,165 @@ function MobPropRow({ k, v }) {
   );
 }
 
-// ─────────────────────────────────────────────
-// BubbleOverlay 手机适配版
-// ─────────────────────────────────────────────
-function MobileBubbleOverlay({ bubbleOverlay, nodes, nodeStates, actionStore, onClose, submitHumanInput }) {
-  if (!bubbleOverlay) return null;
-  const node = nodes.find((n) => n.id === bubbleOverlay.nodeId);
-  if (!node || node.type !== 'action') return null;
-  const action = actionStore?.find((a) => a.id === node.actionId);
-  const ns = nodeStates[node.id] || {};
-  // mind 节点按运行时 node_type 判断（node_start 事件写入 ns.type）：
-  // 执行者运行时才确定（可能是变量赋值），静态 executorType 无法预判；
-  // 未运行（ns.type 空）时回退到静态 executorType。
-  const runType = ns.type || action?.executorType;
-  const isAI = runType === 'ai';
-  const isHuman = runType === 'human';
-  const isStreaming = ns.status === 'ai_streaming';
-  const { c } = ti(action?.executorType) || { c: 'var(--femo-neutral)' };
-  const scrollRef = useRef(null);
+// ═══ 已退役（观察期起 2026-09-26 死代码排查，全仓零引用；观察无误后连块删除）：MobileBubbleOverlay + MobileHumanInput（从未被渲染；HumanInput 只被前者使用） ═══
+// // ─────────────────────────────────────────────
+// // BubbleOverlay 手机适配版
+// // ─────────────────────────────────────────────
+// function MobileBubbleOverlay({ bubbleOverlay, nodes, nodeStates, actionStore, onClose, submitHumanInput }) {
+//   if (!bubbleOverlay) return null;
+//   const node = nodes.find((n) => n.id === bubbleOverlay.nodeId);
+//   if (!node || node.type !== 'action') return null;
+//   const action = actionStore?.find((a) => a.id === node.actionId);
+//   const ns = nodeStates[node.id] || {};
+//   // mind 节点按运行时 node_type 判断（node_start 事件写入 ns.type）：
+//   // 执行者运行时才确定（可能是变量赋值），静态 executorType 无法预判；
+//   // 未运行（ns.type 空）时回退到静态 executorType。
+//   const runType = ns.type || action?.executorType;
+//   const isAI = runType === 'ai';
+//   const isHuman = runType === 'human';
+//   const isStreaming = ns.status === 'ai_streaming';
+//   const { c } = ti(action?.executorType) || { c: 'var(--femo-neutral)' };
+//   const scrollRef = useRef(null);
 
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    el.scrollTop = el.scrollHeight;
-  }, [ns.streamingText, ns.output]);
+//   useEffect(() => {
+//     const el = scrollRef.current;
+//     if (!el) return;
+//     el.scrollTop = el.scrollHeight;
+//   }, [ns.streamingText, ns.output]);
 
-  return (
-    <>
-      <div
-        onClick={onClose}
-        style={{ position: 'fixed', inset: 0, background: 'var(--femo-mask-heavy)', zIndex: 500, animation: 'fadeInOverlay 0.18s ease' }}
-      />
-      <div
-        style={{
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: 'min(92vw, 460px)',
-          maxHeight: '78vh',
-          background: 'var(--femo-surface)',
-          borderRadius: 'var(--femo-radius-xl)',
-          boxShadow: '0 24px 64px var(--femo-mask-soft)',
-          border: `var(--femo-border-w-selected) solid ${c}`,
-          fontFamily: 'var(--femo-font-sans)',
-          zIndex: 501,
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          animation: 'popIn 0.2s cubic-bezier(0.34,1.56,0.64,1)',
-        }}
-      >
-        {/* 头部 */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: 'var(--femo-border-w) solid var(--femo-border)', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <span style={{ background: c + '18', color: c, borderRadius: 'var(--femo-radius-sm)', padding: '2px 7px', fontSize: 10, fontWeight: 800, fontFamily: 'var(--femo-font-mono)' }}>
-              @{action?.executorType || '?'}
-            </span>
-            <span style={{ fontWeight: 800, color: 'var(--femo-text-1)', fontSize: 15 }}>{action?.name || 'Node'}</span>
-          </div>
-          <button onClick={(e) => { e.stopPropagation(); onClose(); }} style={{ background: 'var(--femo-bg-2)', border: 'none', fontSize: 15, cursor: 'pointer', color: 'var(--femo-text-2-alt)', borderRadius: 'var(--femo-radius-md)', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
-        </div>
+//   return (
+//     <>
+//       <div
+//         onClick={onClose}
+//         style={{ position: 'fixed', inset: 0, background: 'var(--femo-mask-heavy)', zIndex: 500, animation: 'fadeInOverlay 0.18s ease' }}
+//       />
+//       <div
+//         style={{
+//           position: 'fixed',
+//           top: '50%',
+//           left: '50%',
+//           transform: 'translate(-50%, -50%)',
+//           width: 'min(92vw, 460px)',
+//           maxHeight: '78vh',
+//           background: 'var(--femo-surface)',
+//           borderRadius: 'var(--femo-radius-xl)',
+//           boxShadow: '0 24px 64px var(--femo-mask-soft)',
+//           border: `var(--femo-border-w-selected) solid ${c}`,
+//           fontFamily: 'var(--femo-font-sans)',
+//           zIndex: 501,
+//           display: 'flex',
+//           flexDirection: 'column',
+//           overflow: 'hidden',
+//           animation: 'popIn 0.2s cubic-bezier(0.34,1.56,0.64,1)',
+//         }}
+//       >
+//         {/* 头部 */}
+//         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: 'var(--femo-border-w) solid var(--femo-border)', flexShrink: 0 }}>
+//           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+//             <span style={{ background: c + '18', color: c, borderRadius: 'var(--femo-radius-sm)', padding: '2px 7px', fontSize: 10, fontWeight: 800, fontFamily: 'var(--femo-font-mono)' }}>
+//               @{action?.executorType || '?'}
+//             </span>
+//             <span style={{ fontWeight: 800, color: 'var(--femo-text-1)', fontSize: 15 }}>{action?.name || 'Node'}</span>
+//           </div>
+//           <button onClick={(e) => { e.stopPropagation(); onClose(); }} style={{ background: 'var(--femo-bg-2)', border: 'none', fontSize: 15, cursor: 'pointer', color: 'var(--femo-text-2-alt)', borderRadius: 'var(--femo-radius-md)', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+//         </div>
 
-        {/* 内容 */}
-        <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', lineHeight: 1.65, fontSize: 13, color: 'var(--femo-text-1)', touchAction: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          {ns.context && <div style={{ whiteSpace: 'pre-wrap', marginBottom: 10 }}>{ns.context}</div>}
-          {ns.showprompt && (
-            <div style={{ marginBottom: 10, background: 'var(--femo-bg)', padding: '8px 10px', borderRadius: 'var(--femo-radius-md)' }}>
-              <div style={{ fontWeight: 700, color: 'var(--femo-text-3)', marginBottom: 3, fontSize: 10.5 }}>[节点提示]</div>
-              <div style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{ns.showprompt}</div>
-            </div>
-          )}
-          {isHuman && ns.prompt && (
-            <div style={{ marginBottom: 10, background: 'var(--femo-bg)', padding: '8px 10px', borderRadius: 'var(--femo-radius-md)' }}>
-              <div style={{ fontWeight: 700, color: 'var(--femo-text-3)', marginBottom: 3, fontSize: 10.5 }}>[提示]</div>
-              <div style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{ns.prompt}</div>
-            </div>
-          )}
-          {runType === 'notice' && (ns.output || ns.prompt) && (
-            <div style={{ marginBottom: 10, background: 'var(--femo-bg)', padding: '8px 10px', borderRadius: 'var(--femo-radius-md)' }}>
-              <div style={{ fontWeight: 700, color: 'var(--femo-text-3)', marginBottom: 3, fontSize: 10.5 }}>[公告]</div>
-              <div style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{ns.output || ns.prompt}</div>
-            </div>
-          )}
-          {isAI && (
-            <div>
-              <div style={{ fontWeight: 700, marginBottom: 4, fontSize: 12 }}>[{ns.ai_name || 'AI'}]:</div>
-              {isStreaming ? (
-                <div style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>
-                  {ns.streamingText || ''}
-                  <span className="mob-cursor" style={{ fontWeight: 'bold', color: c }}>|</span>
-                </div>
-              ) : (
-                <div style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{ns.output || '（等待输出）'}</div>
-              )}
-            </div>
-          )}
-        </div>
+//         {/* 内容 */}
+//         <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', lineHeight: 1.65, fontSize: 13, color: 'var(--femo-text-1)', touchAction: 'auto', WebkitOverflowScrolling: 'touch' }}>
+//           {ns.context && <div style={{ whiteSpace: 'pre-wrap', marginBottom: 10 }}>{ns.context}</div>}
+//           {ns.showprompt && (
+//             <div style={{ marginBottom: 10, background: 'var(--femo-bg)', padding: '8px 10px', borderRadius: 'var(--femo-radius-md)' }}>
+//               <div style={{ fontWeight: 700, color: 'var(--femo-text-3)', marginBottom: 3, fontSize: 10.5 }}>[节点提示]</div>
+//               <div style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{ns.showprompt}</div>
+//             </div>
+//           )}
+//           {isHuman && ns.prompt && (
+//             <div style={{ marginBottom: 10, background: 'var(--femo-bg)', padding: '8px 10px', borderRadius: 'var(--femo-radius-md)' }}>
+//               <div style={{ fontWeight: 700, color: 'var(--femo-text-3)', marginBottom: 3, fontSize: 10.5 }}>[提示]</div>
+//               <div style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{ns.prompt}</div>
+//             </div>
+//           )}
+//           {runType === 'notice' && (ns.output || ns.prompt) && (
+//             <div style={{ marginBottom: 10, background: 'var(--femo-bg)', padding: '8px 10px', borderRadius: 'var(--femo-radius-md)' }}>
+//               <div style={{ fontWeight: 700, color: 'var(--femo-text-3)', marginBottom: 3, fontSize: 10.5 }}>[公告]</div>
+//               <div style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{ns.output || ns.prompt}</div>
+//             </div>
+//           )}
+//           {isAI && (
+//             <div>
+//               <div style={{ fontWeight: 700, marginBottom: 4, fontSize: 12 }}>[{ns.actor_name || 'AI'}]:</div>
+//               {isStreaming ? (
+//                 <div style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>
+//                   {ns.streamingText || ''}
+//                   <span className="mob-cursor" style={{ fontWeight: 'bold', color: c }}>|</span>
+//                 </div>
+//               ) : (
+//                 <div style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{ns.output || '（等待输出）'}</div>
+//               )}
+//             </div>
+//           )}
+//         </div>
 
-        {/* 人类输入 */}
-        {isHuman && ns.status === 'human_wait' && (
-          <MobileHumanInput nodeId={node.id} onSubmit={submitHumanInput} outVars={ns.outVars || []} />
-        )}
-      </div>
-    </>
-  );
-}
+//         {/* 人类输入 */}
+//         {isHuman && ns.status === 'human_wait' && (
+//           <MobileHumanInput nodeId={node.id} onSubmit={submitHumanInput} outVars={ns.outVars || []} />
+//         )}
+//       </div>
+//     </>
+//   );
+// }
 
-function MobileHumanInput({ nodeId, onSubmit, outVars }) {
-  const [chatText, setChatText] = useState('');
-  const [varValues, setVarValues] = useState({});
+// function MobileHumanInput({ nodeId, onSubmit, outVars }) {
+//   const [chatText, setChatText] = useState('');
+//   const [varValues, setVarValues] = useState({});
 
-  const handleSend = () => {
-    if (!chatText.trim() && !Object.values(varValues).some((v) => v?.trim())) return;
-    const assignments = {};
-    for (const [k, v] of Object.entries(varValues)) {
-      if (v?.trim()) assignments[k] = v.trim();
-    }
-    onSubmit(nodeId, chatText.trim(), assignments);
-    setChatText('');
-    setVarValues({});
-  };
+//   const handleSend = () => {
+//     if (!chatText.trim() && !Object.values(varValues).some((v) => v?.trim())) return;
+//     const assignments = {};
+//     for (const [k, v] of Object.entries(varValues)) {
+//       if (v?.trim()) assignments[k] = v.trim();
+//     }
+//     onSubmit(nodeId, chatText.trim(), assignments);
+//     setChatText('');
+//     setVarValues({});
+//   };
 
-  return (
-    <div style={{ flexShrink: 0, padding: '10px 14px 16px', borderTop: 'var(--femo-border-w) solid var(--femo-border)' }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--femo-warning)', marginBottom: 6 }}>⏳ 等待人类输入</div>
-      <textarea
-        value={chatText}
-        onChange={(e) => setChatText(e.target.value)}
-        placeholder="输入回复..."
-        rows={3}
-        style={{
-          ...inp,
-          resize: 'none',
-          width: '100%',
-          boxSizing: 'border-box',
-          fontSize: 13,
-          touchAction: 'auto',
-          userSelect: 'text',
-          WebkitUserSelect: 'text',
-        }}
-      />
-      <div style={{ display: 'flex', gap: 7, marginTop: 7, flexWrap: 'wrap', alignItems: 'center' }}>
-        <button onClick={handleSend} style={{ ...mobBtnP, padding: '7px 18px', fontSize: 12 }}>发送</button>
-        {outVars.map((varName) => (
-          <div key={varName} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--femo-text-3)', fontFamily: 'var(--femo-font-mono)' }}>{varName}:</span>
-            <input
-              value={varValues[varName] || ''}
-              onChange={(e) => setVarValues((p) => ({ ...p, [varName]: e.target.value }))}
-              placeholder="值"
-              style={{ ...inp, width: 90, fontSize: 11, padding: '4px 7px' }}
-            />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+//   return (
+//     <div style={{ flexShrink: 0, padding: '10px 14px 16px', borderTop: 'var(--femo-border-w) solid var(--femo-border)' }}>
+//       <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--femo-warning)', marginBottom: 6 }}>⏳ 等待人类输入</div>
+//       <textarea
+//         value={chatText}
+//         onChange={(e) => setChatText(e.target.value)}
+//         placeholder="输入回复..."
+//         rows={3}
+//         style={{
+//           ...inp,
+//           resize: 'none',
+//           width: '100%',
+//           boxSizing: 'border-box',
+//           fontSize: 13,
+//           touchAction: 'auto',
+//           userSelect: 'text',
+//           WebkitUserSelect: 'text',
+//         }}
+//       />
+//       <div style={{ display: 'flex', gap: 7, marginTop: 7, flexWrap: 'wrap', alignItems: 'center' }}>
+//         <button onClick={handleSend} style={{ ...mobBtnP, padding: '7px 18px', fontSize: 12 }}>发送</button>
+//         {outVars.map((varName) => (
+//           <div key={varName} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+//             <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--femo-text-3)', fontFamily: 'var(--femo-font-mono)' }}>{varName}:</span>
+//             <input
+//               value={varValues[varName] || ''}
+//               onChange={(e) => setVarValues((p) => ({ ...p, [varName]: e.target.value }))}
+//               placeholder="值"
+//               style={{ ...inp, width: 90, fontSize: 11, padding: '4px 7px' }}
+//             />
+//           </div>
+//         ))}
+//       </div>
+//     </div>
+//   );
+// }
 
 // ─────────────────────────────────────────────
 // useMobileCanvasGesture — round56 触摸仲裁 v3
@@ -1663,6 +1671,7 @@ function useMobileCanvasGesture({
   pan, setPan, scale, setScale,
   handlePortDown, handlePortUp, setConn,
   nodes, setNodes, setDrag, setSel,
+  setGuides,
   onBubbleClick,
   onNodeDoubleTap,
 }) {
@@ -1691,7 +1700,7 @@ function useMobileCanvasGesture({
   // 回调经 ref 中转：原生监听只挂一次，不随 props 身份变化重挂/漏更新
   const apiRef = useRef({});
   useEffect(() => {
-    apiRef.current = { setPan, setScale, setSel, setNodes, setConn, setDrag, handlePortDown, handlePortUp, onBubbleClick, onNodeDoubleTap };
+    apiRef.current = { setPan, setScale, setSel, setNodes, setConn, setDrag, setGuides, handlePortDown, handlePortUp, onBubbleClick, onNodeDoubleTap };
   });
 
   const dist2 = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
@@ -1897,7 +1906,11 @@ function useMobileCanvasGesture({
         apiRef.current.setNodes((prev) => {
           const draggedNode = prev.find((n) => n.id === st.nodeId);
           if (!draggedNode) return prev;
-          return applyForLinkage(prev, draggedNode, newX, newY);
+          // 吸附阈值按缩放折算：屏幕上始终是 SNAP_PX 像素手感（与桌面端同一份算子）
+          const th = SNAP_PX / Math.max(0.05, sc);
+          const r = snapAndLink(prev, draggedNode, newX, newY, th, applyForLinkage);
+          apiRef.current.setGuides?.(r.draw);
+          return r.nodes;
         });
         return;
       }
@@ -1930,6 +1943,8 @@ function useMobileCanvasGesture({
       const cancelled = e.type === 'touchcancel';
       clearTimer();
       setDragReady(null);
+      // 手势收尾清吸附对齐线（拖拽/捏合/平移任一相位结束都不留残线）
+      apiRef.current.setGuides?.(null);
 
       // 登记表摘除已结束触点；统计仍存活的画布触点（e.touches 为准）
       for (let i = 0; i < e.changedTouches.length; i += 1) {
@@ -1986,6 +2001,7 @@ function useMobileCanvasGesture({
 
       if (st.phase === 'nodeDrag') {
         apiRef.current.setDrag(null);
+        apiRef.current.setGuides?.(null);
         stateRef.current = { phase: 'idle' };
         return;
       }
@@ -2124,6 +2140,7 @@ drag, setDrag, conn, setConn, isPanning, setNodes,
   handlePortDown, handlePortUp, handleBodyMouseUp,
   handleCanvasDragOver, handleCanvasDrop,
   canvasContent, canvasOpacity,
+  setGuides,
   // Library
   lib, mode, locationPath, allNames,
   onNew, onAdd, onAddModule, onAddSpecial, onAddPosition,
@@ -2175,6 +2192,7 @@ const { dragReady } = useMobileCanvasGesture({
     cvRef, tfRef, pan, setPan, scale, setScale,
     handlePortDown, handlePortUp, setConn,
     nodes, setNodes, setDrag, setSel,
+    setGuides,
     onBubbleClick,
     onNodeDoubleTap,
   });
@@ -2731,33 +2749,35 @@ const mobBtnP = {
   fontFamily: 'var(--femo-font-sans)',
 };
 
-const mobBtnS = {
-  padding: '5px 12px',
-  borderRadius: 'var(--femo-radius-sm)',
-  background: 'transparent',
-  color: T.textSecondary,
-  border: `var(--femo-border-w-strong) solid ${T.border}`,
-  cursor: 'pointer',
-  fontSize: 11.5,
-  fontWeight: 600,
-  fontFamily: 'var(--femo-font-sans)',
-};
+// ═══ 已退役（观察期起 2026-09-26 死代码排查，全仓零引用；观察无误后连块删除）：mobBtnS（全仓零引用） ═══
+// const mobBtnS = {
+//   padding: '5px 12px',
+//   borderRadius: 'var(--femo-radius-sm)',
+//   background: 'transparent',
+//   color: T.textSecondary,
+//   border: `var(--femo-border-w-strong) solid ${T.border}`,
+//   cursor: 'pointer',
+//   fontSize: 11.5,
+//   fontWeight: 600,
+//   fontFamily: 'var(--femo-font-sans)',
+// };
 
-// FEMO 面板头排统一芯片配方（2026-09-07 与桌面端 femoPreview 同构）：浅色
-// 同系底 + 1px 同色细边，仅用颜色区分语义。可点击态用主题强调色（灰底像
-// 禁用）；不再混用 mobBtnS 粗描边与 mobBtnP 无边填充。
-const mobChip = (color, active = false) => ({
-  padding: '4px 10px',
-  borderRadius: 'var(--femo-radius-sm)',
-  background: `color-mix(in srgb, ${color} ${active ? 15 : 10}%, transparent)`,
-  border: `1px solid color-mix(in srgb, ${color} ${active ? 45 : 35}%, transparent)`,
-  color,
-  cursor: 'pointer',
-  fontSize: 10,
-  fontWeight: 700,
-  fontFamily: 'var(--femo-font-sans)',
-  transition: 'background 0.15s, color 0.15s, border-color 0.15s',
-});
+// ═══ 已退役（观察期起 2026-09-26 死代码排查，全仓零引用；观察无误后连块删除）：mobChip（只被已退役的 MobileFemoPanel 使用） ═══
+// // FEMO 面板头排统一芯片配方（2026-09-07 与桌面端 femoPreview 同构）：浅色
+// // 同系底 + 1px 同色细边，仅用颜色区分语义。可点击态用主题强调色（灰底像
+// // 禁用）；不再混用 mobBtnS 粗描边与 mobBtnP 无边填充。
+// const mobChip = (color, active = false) => ({
+//   padding: '4px 10px',
+//   borderRadius: 'var(--femo-radius-sm)',
+//   background: `color-mix(in srgb, ${color} ${active ? 15 : 10}%, transparent)`,
+//   border: `1px solid color-mix(in srgb, ${color} ${active ? 45 : 35}%, transparent)`,
+//   color,
+//   cursor: 'pointer',
+//   fontSize: 10,
+//   fontWeight: 700,
+//   fontFamily: 'var(--femo-font-sans)',
+//   transition: 'background 0.15s, color 0.15s, border-color 0.15s',
+// });
 
 const mobBtnDanger = {
   padding: '6px 14px',
@@ -2786,9 +2806,7 @@ function useMobile(breakpoint = 768) {
 
 export {
   MobileLayout,
-  MobileFemoPanel,
-  MobileBubbleOverlay,
-  MobileHumanInput,
+  // 已注释死导出（观察期 2026-09-26 死代码排查）：MobileFemoPanel, MobileBubbleOverlay, MobileHumanInput（三者全仓零引用/传递性死，定义体已就地注释）
   MobileTitleBar,
   MobileBottomPanel,
   useMobileCanvasGesture,

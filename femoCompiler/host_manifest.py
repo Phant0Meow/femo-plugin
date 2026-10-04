@@ -13,9 +13,11 @@ models 注入（validate_actor_sources 消费）。
 
 DEFAULT_THINKING_LEVELS = ('off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max')
 DEFAULT_USER_ID = 'u001'
+DEFAULT_HOST_NAME = 'standalone'
 
 _thinking_levels = DEFAULT_THINKING_LEVELS
 _default_user_id = DEFAULT_USER_ID
+_host_name = DEFAULT_HOST_NAME
 
 
 def apply_manifest(data):
@@ -23,10 +25,20 @@ def apply_manifest(data):
 
     返回人话 notes 列表（桥启动日志用）；格式不合法的键忽略并说明，
     绝不因清单问题炸启动。"""
-    global _thinking_levels, _default_user_id
+    global _thinking_levels, _default_user_id, _host_name
     if not isinstance(data, dict):
         return ['宿主清单格式不合法（需要 JSON 对象），已忽略，用内置缺省']
     notes = []
+    # host = 宿主的自称（"dsh" / "zcode" …）。投影中心拿它当来源标签：多宿主共演
+    # 同一次时，每行/每段/每格信任集都按它分命名空间（2026-09-19 联机改造）。
+    # 引擎自己不用它，只负责把它读进来交给桥（桥再注册给 hub）。
+    host = data.get('host')
+    if host is not None:
+        if isinstance(host, str) and host.strip():
+            _host_name = host.strip()
+            notes.append(f'host = {_host_name}')
+        else:
+            notes.append('host 不合法（需非空字符串），已忽略')
     levels = data.get('thinking_levels')
     if levels is not None:
         if (isinstance(levels, list) and len(levels) > 0
@@ -51,8 +63,16 @@ def thinking_levels():
 
 
 def default_user_id():
-    """当前生效的缺省用户 id（owner 未声明的剧本归属；soul 创建缺省）。"""
+    """当前生效的缺省用户 id（owner 未声明的脚本归属；soul 创建缺省）。"""
     return _default_user_id
+
+
+def host_name():
+    """当前生效的宿主自称（清单的 'host' 字段；缺省 'standalone'）。
+
+    投影中心的行来源标签、段键命名空间、多宿主信任集都用它——见
+    femo2host/projection_hub.py 的 feed(source) 与 set_owner(host)。"""
+    return _host_name
 
 
 def load_manifest_file(path):

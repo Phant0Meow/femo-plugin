@@ -21,17 +21,22 @@ from typing import List, Dict
 
 
 class FEMONormalizer:
-    """FEMO 脚本标准化器"""
+    """FEMO脚本标准化器"""
 
     def __init__(self):
-        self._gateway_counter = 0
+        # ━━━ 已退役·观察期（2026-09-26 起）━━━ _gateway_counter 唯一消费者是下方
+        # 已退役的 _next_gateway_id，随其一并退役（零行为变化：只是不再初始化一个没人读的计数器）。
+        # self._gateway_counter = 0
         # 节点定义存储：key 为不带括号的节点名（普通动作名如 EveMove 或 &module）
         self._definitions: Dict[str, str] = {}
 
-    def _next_gateway_id(self, prefix: str = "gw") -> str:
-        """生成唯一的网关 ID，形如 __fork_1__, __join_2__"""
-        self._gateway_counter += 1
-        return f"__{prefix}_{self._gateway_counter}__"
+    # ━━━ 已退役·观察期（2026-09-26 起）━━━ _next_gateway_id：全仓零调用（双窗口交叉扫描+逐项复核），
+    # 网关 ID 已由别的方式生成。无报错数日后整段删除（含本注与上方计数器注）。
+    # def _next_gateway_id(self, prefix: str = "gw") -> str:
+    #     """生成唯一的网关 ID，形如 __fork_1__, __join_2__"""
+    #     self._gateway_counter += 1
+    #     return f"__{prefix}_{self._gateway_counter}__"
+    # ━━━ 观察期退役段结束：_next_gateway_id ━━━
 
     def _process_flow_block(self, inner_lines: List[str], base_indent: int) -> List[str]:
         """处理一个 flow 块的内部内容，返回标准化后的行列表（保持原缩进），
@@ -44,7 +49,7 @@ class FEMONormalizer:
         old_def_keys = set(self._definitions.keys())
 
         # 1. 计算内部行的最小缩进（从内容行实际缩进取最小值；
-        #    初始 None 防止 base_indent+2 假设被 4 空格缩进剧本打破）
+        #    初始 None 防止 base_indent+2 假设被 4 空格缩进FEMO脚本打破）
         min_indent = None
         for line in inner_lines:
             if line.strip():

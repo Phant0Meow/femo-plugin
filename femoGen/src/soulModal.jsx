@@ -58,7 +58,7 @@ function SoulModal({ open, onClose, onCreated, createUrl = '/api/souls/create' }
     >
       <div
         style={{
-          background: 'var(--femo-surface)',
+          background: 'var(--femo-modal-bg)',
           borderRadius: 'var(--femo-radius-xl)',
           padding: '28px 32px',
           width: 420,
@@ -146,7 +146,9 @@ function SoulModal({ open, onClose, onCreated, createUrl = '/api/souls/create' }
             disabled={soulFormSubmitting}
             style={{
               ...btnP,
-              background: 'var(--femo-primary)',
+              // 主操作按钮统一走 btnP 的 --femo-btn-primary（浅色=主蓝不变；
+              // 深色=按钮专用灰蓝）。此前覆写 var(--femo-primary) 绕开了按钮口，
+              // 深色下比其他蓝按钮亮一截（2026-09-21 归一）。
               opacity: soulFormSubmitting ? 0.6 : 1,
               cursor: soulFormSubmitting ? 'not-allowed' : 'pointer',
             }}

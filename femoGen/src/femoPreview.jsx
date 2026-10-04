@@ -18,6 +18,9 @@ const chip = (color, active = false) => ({
   color,
   cursor: 'pointer',
   fontSize: 10,
+  // 行高必须钉死：✓/✕ 回退符号字体（如 Segoe UI Symbol）上下伸部更高，
+  // line-height:normal 时行盒被撑高——「✓已应用」会比旁边纯文字钮高一截
+  lineHeight: '14px',
   fontWeight: 700,
   fontFamily: 'var(--femo-font-sans)',
   transition: 'background 0.15s, color 0.15s, border-color 0.15s',

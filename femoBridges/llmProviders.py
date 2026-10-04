@@ -105,41 +105,45 @@ def detect_provider() -> Optional[str]:
     return None
 
 
-def get_provider_config(provider: str) -> Dict[str, Any]:
-    """获取指定供应商的配置，并从环境变量读取实际值"""
-    cfg = PROVIDER_CONFIG.get(provider)
-    if not cfg:
-        raise ValueError(f"不支持的供应商: {provider}")
-
-    env_prefix = cfg["env_prefix"]
-    api_key = os.getenv(f"{env_prefix}_API_KEY")
-    if not api_key:
-        raise ValueError(f"环境变量 {env_prefix}_API_KEY 未设置")
-
-    api_url = os.getenv(f"{env_prefix}_API_URL") or cfg["default_url"]
-    model = os.getenv(f"{env_prefix}_API_MODEL") or cfg["default_model"]
-
-    # 构建请求头
-    headers = {"Content-Type": "application/json"}
-
-    # 大多数供应商使用 Bearer Token，放在 Authorization 头中
-    use_bearer = True
-    for k, v in cfg.get("headers_extra", {}).items():
-        headers[k] = v.replace("${API_KEY}", api_key)
-        # 如果已经设置了 Authorization 或 x-api-key，则说明使用自定义认证方式
-        if k.lower() in ("authorization", "x-api-key"):
-            use_bearer = False
-
-    # 对于未指定特殊认证方式的供应商，统一添加 Bearer Token
-    if use_bearer and "Authorization" not in headers:
-        headers["Authorization"] = f"Bearer {api_key}"
-
-    return {
-        "api_key": api_key,
-        "api_url": api_url,
-        "model": model,
-        "headers": headers,
-    }
+# ━━━ 已退役·观察期（2026-09-26 起）━━━ get_provider_config：全仓零调用
+# （唯一引用是 llmBridge 一行从未使用的 import，已随本次同步摘除；
+# 实际取配置走 stream_chat 的环境变量入参）。无报错数日后整段删除（含本注）。
+# def get_provider_config(provider: str) -> Dict[str, Any]:
+#     """获取指定供应商的配置，并从环境变量读取实际值"""
+#     cfg = PROVIDER_CONFIG.get(provider)
+#     if not cfg:
+#         raise ValueError(f"不支持的供应商: {provider}")
+#
+#     env_prefix = cfg["env_prefix"]
+#     api_key = os.getenv(f"{env_prefix}_API_KEY")
+#     if not api_key:
+#         raise ValueError(f"环境变量 {env_prefix}_API_KEY 未设置")
+#
+#     api_url = os.getenv(f"{env_prefix}_API_URL") or cfg["default_url"]
+#     model = os.getenv(f"{env_prefix}_API_MODEL") or cfg["default_model"]
+#
+#     # 构建请求头
+#     headers = {"Content-Type": "application/json"}
+#
+#     # 大多数供应商使用 Bearer Token，放在 Authorization 头中
+#     use_bearer = True
+#     for k, v in cfg.get("headers_extra", {}).items():
+#         headers[k] = v.replace("${API_KEY}", api_key)
+#         # 如果已经设置了 Authorization 或 x-api-key，则说明使用自定义认证方式
+#         if k.lower() in ("authorization", "x-api-key"):
+#             use_bearer = False
+#
+#     # 对于未指定特殊认证方式的供应商，统一添加 Bearer Token
+#     if use_bearer and "Authorization" not in headers:
+#         headers["Authorization"] = f"Bearer {api_key}"
+#
+#     return {
+#         "api_key": api_key,
+#         "api_url": api_url,
+#         "model": model,
+#         "headers": headers,
+#     }
+# ━━━ 观察期退役段结束：get_provider_config ━━━
 
 
 def stream_chat(

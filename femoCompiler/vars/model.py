@@ -36,7 +36,7 @@ class VarDecl:
     """变量声明 IR。
     name: 规范名——$ 前缀剥掉、@ 保留（'$@选中的人' → '@选中的人'）
     shared: 维度 A（True=shared 全局一份 / False=context 每 task 一份）
-    owner: 维度 B（None=剧本级 global / 模块完整路径串=module local，
+    owner: 维度 B（None=FEMO脚本级 global / 模块完整路径串=module local，
            如 'Outer.Inner'——完整路径天然区分嵌套同名子模块）
     initial: 声明初值（字面量已 parse 的 Python 值）"""
     name: str
@@ -159,7 +159,7 @@ class ScopeTable:
         for decl in decls:
             key = (decl.owner, decl.name)
             if key in self._by_owner_name:
-                where = f"模块 {decl.owner}" if decl.owner else "剧本 vars:"
+                where = f"模块 {decl.owner}" if decl.owner else "FEMO脚本 vars:"
                 # 编译期语法层错误 → SyntaxError（与 parse_script 编译期校验
                 # 家族一致；ScopeTable 只在编译期建表，运行时只查表不建表）
                 raise SyntaxError(
@@ -174,7 +174,7 @@ class ScopeTable:
 
     def module_def_chain(self, mod_path: str) -> Tuple[str, ...]:
         """模块的静态定义链（外→内）。未知模块 → 只含自身。
-        剧本级用 () —— 由调用方以空链表达。"""
+        FEMO脚本级用 () —— 由调用方以空链表达。"""
         if mod_path in self._mod_def_chains:
             return self._mod_def_chains[mod_path]
         return tuple(mod_path.split('.')) if mod_path else ()
@@ -182,8 +182,8 @@ class ScopeTable:
     def lookup(self, name: str, def_chain: Tuple[str, ...]) -> Optional[VarDecl]:
         """名字 → 声明（词法可见域，拍板 6）。
         def_chain = 当前执行模块的静态定义链（外→内，如 ('Outer','Inner')；
-        剧本级传 ()）。查找顺序：定义链**由内到外**构造 owner 路径串
-        （'Outer.Inner' → 'Outer'）逐级查 → 剧本级 global。
+        FEMO脚本级传 ()）。查找顺序：定义链**由内到外**构造 owner 路径串
+        （'Outer.Inner' → 'Outer'）逐级查 → FEMO脚本级 global。
         先命中先得 = Python shadowing；查不到返回 None。"""
         for depth in range(len(def_chain), 0, -1):
             owner_path = '.'.join(def_chain[:depth])
@@ -205,7 +205,7 @@ class ScopeTable:
                 if d.shared and d.initial is not None}
 
     def initials_global_context(self) -> Dict[str, Any]:
-        """剧本级 context 变量初值——root task 的 '__script__' 帧装配用。"""
+        """FEMO脚本级 context 变量初值——root task 的 '__script__' 帧装配用。"""
         return {d.name: d.initial for (owner, _), d in self._by_owner_name.items()
                 if owner is None and not d.shared}
 
@@ -225,7 +225,7 @@ class ScopeTable:
 def build_scope_table(global_vars: Dict[str, Any],
                       module_vars: Dict[str, Dict[str, Any]]) -> ScopeTable:
     """声明源 → ScopeTable。
-    global_vars: 剧本 vars 块（key 可带 $/@，如 {'x': 1, '$s': '', '$@选中的人': ''}）
+    global_vars: FEMO脚本 vars 块（key 可带 $/@，如 {'x': 1, '$s': '', '$@选中的人': ''}）
     module_vars: {模块完整路径: 该模块 vars 块}——路径化扁平输入，
     parser 接线时遍历书写嵌套产出（'Outer' / 'Outer.Inner'）。
     替代 FEMO_parser.extract_var_decls + _assign_module_var_decls（duck 字典

@@ -1,34 +1,35 @@
 meta:
   name = 狼人杀警长版
-  version = 2.0
+  version = 2.1
   owner = 001
   session = new
   output_style = |
-    这是一局狼人杀游戏！你的身份牌决定了你所在的阵营，你要动脑子，努力让自己的阵营获胜。你要努力赢！
+    这是新的一局狼人杀游戏！从这里开始后面都是新的，不要被过去的记录误导。
+       你的身份牌决定了你所在的阵营，你要动脑子，努力让自己的阵营获胜。你要努力赢！
     这是6人局：2狼，2神（预言家、女巫），2村民。其中村民和神是好人阵营，狼人是狼人阵营。
     第一天白天有警长竞选：上警的玩家竞选警长，警下玩家投票选出警长。警长白天放逐投票计1.5票，并决定每天从他的哪一边开始发言。
+    投票平票不空过：平票的玩家进入平票 PK，每人简短申辩后由其余玩家在他们之中重投一次，得票多者被放逐（警长竞选平票则得票多者当选）；若 PK 重投再次平票，放逐投票今日无人出局、警长竞选无人当选。
     发言要有逻辑分析，不能瞎猜。第一天夜晚没有信息，不要幻觉。推理要依赖真实的聊天记录。
-    当你们想要指定玩家成为行动时，必须@他，且只能使用场上存活玩家名单中真实存在的玩家名。
-    名单里没有的名字绝不能用——例如名单里有 @Eve，输出变量时就写 @Eve；名单里没有 Kate，就绝不能写 @Kate。
+    当你们想要指定玩家成为行动对象时，必须@他，且只能使用场上存活玩家名单中真实存在的玩家名。
+    名单里没有的名字绝不能用——例如名单里有 @1号，输出变量时就写 @1号；名单里没有 Kate，就绝不能写 @Kate。
     发言精炼有逻辑，不要长篇大论；夜晚行动回合的回复要简短。
     你没有调用任何工具的能力，严禁使用工具，直接根据你看到的聊天记录发言。
 
 actors:
-  ai @Eve = soul:the1stlittlesoul
-  ai @小猫咪 = soul:littlecat
-  human @人 = soul:human, source:0
-  ai @小机 = soul:debugcoder1
-  ai @小灵 = soul:debugcoder2
-  ai @Portia = soul:Portia
-  ai @AI助手 = source:main
+  ai @1号 = soul:ai1
+  ai @2号 = soul:ai2
+  ai @3号 = soul:ai3
+  ai @4号 = soul:ai4
+  ai @5号 = soul:ai5
+  human @6号 = soul:human, source:0
+  ai @god = soul:ai6
 
 code:
-  werewolf_utils = file:"werewolf_utils2.py"
+  werewolf_utils = file:"D:\myFiles\dsh\femo-plugin\femoExamples\狼人杀\werewolf_utils2.py"
 
 vars:
   roles = {}
-  $alive = [@Eve, @小猫咪, @AI助手, @Portia, @人, @小机]
-  all = [@Eve, @小猫咪, @AI助手, @Portia, @人, @小机, @小灵]
+  $alive = [@1号, @2号, @3号, @4号, @5号, @6号]
   $wolves = []
   $wolf_room = []
   $witch_has_antidote = true
@@ -43,7 +44,7 @@ vars:
   @player = ""
   @狼人 = ""
   day = 0
-  @上帝 = @小灵
+  @上帝 = @god
   @预言家 = ""
   @女巫 = ""
   @村民1 = ""
@@ -53,8 +54,16 @@ vars:
   order = []
   speaker_order = []
   voter_order = []
+  is_pk = false
+  $pk_candidates = []
+  $pk_voters = []
+  vote_route = ""
+  election_route = ""
 
 action roleCard @func(werewolf_utils.assign_roles):
+  in:
+    players = alive
+    god = @上帝
   out:
     roles, wolves, wolf_room, @预言家, @女巫, @村民1, @村民2
 
@@ -83,7 +92,7 @@ module NightPhase:
       当你决定击杀对象时，需要输出：SET VARIABLE:<<@KILL = @目标名字>>
     scope: wolf_room
     out:
-      @KILL(string, "击杀目标")
+      @KILL(required)
 
   action seer_check @mind(@预言家):
     prompt: |
@@ -91,7 +100,7 @@ module NightPhase:
       你需要通过变量赋值语句：SET VARIABLE:<<@CHECK = @目标名字>> 告诉上帝你的查验对象。
     scope: [@上帝, @预言家]
     out:
-      @CHECK(string, "查验目标")
+      @CHECK(required)
 
   action seer_result @func(werewolf_utils.check_role):
     in:
@@ -120,7 +129,7 @@ module NightPhase:
       {witch_prompt_text}
     scope: [@上帝, @女巫]
     out:
-      SAVE(bool, "是否救人"), @POISON(string, "毒杀目标")
+      SAVE, @POISON
 
   action resolve_night @func(werewolf_utils.resolve_night):
     in:
@@ -131,6 +140,7 @@ module NightPhase:
       has_antidote = witch_has_antidote
       has_poison = witch_has_poison
       wolves = wolves
+      god = @上帝
     out:
       dead_tonight, alive, wolves, wolf_room, witch_has_antidote, witch_has_poison
 
@@ -201,6 +211,8 @@ module DayPhase:
     announcement = ""
     @VOTE = ""
     eliminated_today = ""
+    announce_text = ""
+    @pk_speaker = ""
 
   action announce @func(werewolf_utils.announce_death):
     in:
@@ -230,7 +242,7 @@ module DayPhase:
       最后输出：SET VARIABLE: <<@VOTE = @目标名字>>
     scope: [@上帝, @voter]
     out:
-      @VOTE(string, "投票目标")
+      @VOTE(required)
 
   action collect_vote @func(werewolf_utils.collect_vote):
     in:
@@ -247,13 +259,69 @@ module DayPhase:
       wolves = wolves
       roles_dict = roles
       sheriff = @sherif
+      god = @上帝
     out:
-      eliminated_today, alive, wolves, wolf_room, game_over, winner
+      eliminated_today, alive, wolves, wolf_room, game_over, winner, is_pk, $pk_candidates, vote_route
 
   action announce_vote @ai(@上帝):
     prompt: |
-      投票结束。系统计票记录：{vote_results}。{eliminated_today} 被放逐（「无人」代表平票或全员弃票，今日无人出局；警长票按1.5票计）。存活玩家：{alive}。
+      投票结束。系统计票记录：{vote_results}。{eliminated_today} 被放逐（「无人」代表全员弃票，或平票——平票时接下来进入平票 PK 环节；警长票按1.5票计）。存活玩家：{alive}。
       你是上帝，请告诉大家投票结果，谁都投了谁。本环节只宣布投票结果，不许说下一步的行动。不可以在发言中透露玩家身份。
+    scope: all
+
+  action pk_announce @func(werewolf_utils.pk_announce):
+    in:
+      pk_candidates = $pk_candidates
+      alive_players = alive
+      sheriff = @sherif
+      day = day
+    out:
+      announce_text, $pk_voters
+
+  action pk_announce_all @notice:
+    prompt: |
+      "{announce_text}"
+    scope: all
+
+  action pk_speak @mind(@pk_speaker):
+    prompt: |
+      【平票 PK】你是{@pk_speaker}，你在放逐投票中与其他玩家平票，现在轮到你为自己申辩。
+      平票的玩家：{$pk_candidates}。当前存活玩家：{alive}。
+      请精炼地为自己申辩：为什么你不该被放逐，或者指出与你平票的玩家哪里更可疑。
+      不要暴露自己的身份，也不要在此输出任何 SET VARIABLE 赋值——本环节没有要你填的变量。
+    scope: all
+
+  action pk_vote @mind(@voter):
+    prompt: |
+      【平票 PK 投票】你是{@voter}。刚才的放逐投票出现了平票，现在进行 PK 重投。
+      平票的玩家：{$pk_candidates}。你只能从他们之中选择一人投出，得票多者将被放逐。
+      请先简要说明你的判断，最后输出：SET VARIABLE: <<@VOTE = @平票玩家之一>>
+      只能填写平票玩家名单中的真实名字。
+    scope: [@上帝, @voter]
+    out:
+      @VOTE(required)
+
+  action pk_init @assign:
+    out:
+      @VOTE = ""
+      $vote_results = {}
+
+  action pk_process @func(werewolf_utils.pk_decide_votes):
+    in:
+      votes = $vote_results
+      pk_candidates = $pk_candidates
+      alive_players = alive
+      roles_dict = roles
+      wolves = wolves
+      sheriff = @sherif
+      day = day
+      god = @上帝
+    out:
+      eliminated_today, alive, wolves, wolf_room, game_over, winner, vote_route, announce_text
+
+  action pk_result_all @notice:
+    prompt: |
+      "{announce_text}"
     scope: all
 
   action 移交警徽 @mind(@sherif):
@@ -265,7 +333,7 @@ module DayPhase:
       请警长选择移交警徽
     scope: [@上帝, @sherif]
     out:
-      @sherif(string, "警徽去向")
+      @sherif(required)
 
   action 决定发言顺序 @ai(@sherif):
     prompt: |
@@ -274,7 +342,7 @@ module DayPhase:
       从右边开始：SET VARIABLE: <<speak_from = 右>>
     scope: [@上帝, @sherif]
     out:
-      speak_from(string, "发言方向")
+      speak_from(required)
 
   action get_order @func(werewolf_utils.get_order):
     in:
@@ -297,6 +365,14 @@ module DayPhase:
     [移交警徽_2]: 移交警徽
     [决定发言顺序]: 决定发言顺序
     [get_order]: get_order
+    [pk_announce]: pk_announce
+    [pk_all]: pk_announce_all
+    [pk_speak]: pk_speak
+    [pk_init]: pk_init
+    [pk_vote]: pk_vote
+    [pk_collect]: collect_vote
+    [pk_process]: pk_process
+    [pk_result]: pk_result_all
 
     [IN] -> [announce]
     [announce] -> [god]
@@ -313,6 +389,18 @@ module DayPhase:
     -> [process_vote]
     [process_vote] -> [announce_vote]
     [announce_vote] -> fork:
+      -> if (vote_route == "pk") -> [pk_announce]
+      -> if ((vote_route != "pk") and (@sherif != "") and (@sherif in alive == false)) -> [移交警徽_2]
+      -> if ((vote_route != "pk") and ((@sherif == "") or (@sherif in alive == true))) -> [OUT]
+    [pk_announce] -> [pk_all]
+    [pk_all] -> for @pk_speaker in $pk_candidates:
+      -> [pk_speak] ->
+    -> [pk_init]
+    [pk_init] -> par @voter in $pk_voters:
+      -> [pk_vote] -> [pk_collect] ->
+    -> [pk_process]
+    [pk_process] -> [pk_result]
+    [pk_result] -> fork:
       -> if ((@sherif != "") and (@sherif in alive == false)) -> [移交警徽_2]
       -> if ((@sherif == "") or (@sherif in alive == true)) -> [OUT]
     [移交警徽_2] -> [OUT]
@@ -335,6 +423,14 @@ module DayPhase:
 #    [移交警徽_2] = 452, 107
 #    [决定发言顺序] = -159, 230
 #    [get_order] = -10, 160
+#    [pk_announce] = 640, 225
+#    [pk_all] = 640, 295
+#    [pk_speak] = 640, 365
+#    [pk_init] = 640, 435
+#    [pk_vote] = 640, 505
+#    [pk_collect] = 640, 575
+#    [pk_process] = 640, 645
+#    [pk_result] = 640, 715
 
 module Election:
   meta:
@@ -344,6 +440,8 @@ module Election:
     @start = ""
     want_badge = false
     @vote_target = ""
+    announce_text = ""
+    @pk_speaker = ""
 
   action init @assign:
     out:
@@ -357,7 +455,7 @@ module Election:
       若不上警，请直接简短说明你放弃上警，不要输出任何赋值。
     scope: [@上帝, @player]
     out:
-      want_badge(bool, "是否上警")
+      want_badge
 
   action collect_candidacy @func(werewolf_utils.collect_candidacy):
     in:
@@ -376,7 +474,7 @@ module Election:
       随便选，越没道理越好。
     scope: all
     out:
-      @start(string, "起始发言玩家")
+      @start
 
   action 生成发言顺序 @func(werewolf_utils.get_speaker_order_from_start):
     in:
@@ -407,7 +505,7 @@ module Election:
       只能填写警上玩家名单中的真实名字。
     scope: [@上帝, @voter]
     out:
-      @vote_target(string, "投票目标")
+      @vote_target(required)
 
   action 收集投票 @func(werewolf_utils.collect_vote):
     in:
@@ -423,13 +521,63 @@ module Election:
       candidates = $sheriff_candidates
       alive = alive
     out:
-      @sherif(string, "当选警长")
+      @sherif, is_pk, $pk_candidates, election_route
+
+  action 竞选pk播报 @func(werewolf_utils.pk_announce_election):
+    in:
+      pk_candidates = $pk_candidates
+      candidates = $sheriff_candidates
+      alive_players = alive
+    out:
+      announce_text, $pk_voters
+
+  action 竞选pk公告 @notice:
+    prompt: |
+      "{announce_text}"
+    scope: all
+
+  action 竞选pk申辩 @mind(@pk_speaker):
+    prompt: |
+      【警长竞选 · 平票 PK】你是{@pk_speaker}，你在警长竞选中与其他候选人平票，现在轮到你为自己拉票。
+      平票的候选人：{$pk_candidates}。当前存活玩家：{alive}。
+      请精炼地补充你的竞选理由，说明为什么你更适合当警长。
+      不要暴露自己的身份，也不要在此输出任何 SET VARIABLE 赋值——本环节没有要你填的变量。
+    scope: all
+
+  action 竞选pk投票 @mind(@voter):
+    prompt: |
+      【警长竞选 · 平票 PK 投票】你是{@voter}，刚才的警长竞选投票出现平票，现在进行 PK 重投。
+      平票的候选人：{$pk_candidates}。你只能从他们之中选择一人投票，得票多者当选警长。
+      最后必须输出：SET VARIABLE: <<@vote_target = @平票候选人之一>>
+      只能填写平票候选人名单中的真实名字。
+    scope: [@上帝, @voter]
+    out:
+      @vote_target(required)
+
+  action 竞选pk重置 @assign:
+    out:
+      @vote_target = ""
+      $vote_results = {}
+
+  action 竞选pk结算 @func(werewolf_utils.pk_decide_election):
+    in:
+      votes = $vote_results
+      pk_candidates = $pk_candidates
+      candidates = $sheriff_candidates
+      alive = alive
+    out:
+      @sherif, election_route, announce_text
+
+  action 竞选pk结果公告 @notice:
+    prompt: |
+      "{announce_text}"
+    scope: all
 
   action 宣布警长 @ai(@上帝):
     prompt: |
       计票结果：{$vote_results}。
       警长竞选结束。当前警长：{@sherif}。
-      如果 {@sherif} 为空，则宣布无人当选警长（平票或无人上警）。
+      如果 {@sherif} 为空，则宣布无人当选警长（平票 PK 后仍无人胜出，或无人上警）。
       请向全体玩家宣布警长归属，并说明警长的特权：白天放逐投票计1.5票，每天决定从警长的哪一边开始发言。
     scope: all
 
@@ -445,6 +593,14 @@ module Election:
     [收集投票]: 收集投票
     [处理选举]: 处理选举
     [宣布警长]: 宣布警长
+    [竞选pk播报]: 竞选pk播报
+    [竞选pk公告]: 竞选pk公告
+    [竞选pk申辩]: 竞选pk申辩
+    [竞选pk重置]: 竞选pk重置
+    [竞选pk投票]: 竞选pk投票
+    [竞选pk收票]: 收集投票
+    [竞选pk结算]: 竞选pk结算
+    [竞选pk结果]: 竞选pk结果公告
 
     [IN] -> [init]
     [init] -> par @player in alive:
@@ -457,27 +613,46 @@ module Election:
     [生成投票者列表] -> par @voter in voter_order:
       -> [投票] -> [收集投票] ->
     -> [处理选举]
-    [处理选举] -> [宣布警长]
+    [处理选举] -> fork:
+      -> if (election_route == "pk") -> [竞选pk播报]
+      -> if (election_route != "pk") -> [宣布警长]
+    [竞选pk播报] -> [竞选pk公告]
+    [竞选pk公告] -> for @pk_speaker in $pk_candidates:
+      -> [竞选pk申辩] ->
+    -> [竞选pk重置]
+    [竞选pk重置] -> par @voter in $pk_voters:
+      -> [竞选pk投票] -> [竞选pk收票] ->
+    -> [竞选pk结算]
+    [竞选pk结算] -> [竞选pk结果]
+    [竞选pk结果] -> [宣布警长]
     [宣布警长] -> [OUT]
 
 #  sketch:
-#    [PAR] = 0, 172
-#    [PAR_出] = 5, 439
-#    [FOR] = 139, 255
-#    [PAR_2] = 269, 356
-#    [PAR_2_出] = 263, 99
-#    [OUT] = 130, 91
-#    [init] = -5, 72
-#    [是否上警] = -4, 256
-#    [collect_candidacy] = -2, 346
-#    [上帝指定起始] = 133, 430
-#    [生成发言顺序] = 133, 329
-#    [警上发言] = 132, 168
-#    [生成投票者列表] = 261, 429
-#    [投票] = 257, 258
-#    [收集投票] = 258, 169
-#    [处理选举] = 257, -9
-#    [宣布警长] = 125, -6
+#    [PAR] = 0, 164
+#    [PAR_出] = 0, 440
+#    [FOR] = 137, 268
+#    [PAR_2] = 282, 356
+#    [PAR_2_出] = 282, 74
+#    [OUT] = 137, 74
+#    [init] = -5, 64
+#    [是否上警] = -5, 258
+#    [collect_candidacy] = -5, 346
+#    [上帝指定起始] = 132, 430
+#    [生成发言顺序] = 132, 346
+#    [警上发言] = 132, 154
+#    [生成投票者列表] = 277, 430
+#    [投票] = 277, 258
+#    [收集投票] = 277, 154
+#    [处理选举] = 277, -10
+#    [宣布警长] = 132, -10
+#    [竞选pk播报] = 460, 60
+#    [竞选pk公告] = 460, 130
+#    [竞选pk申辩] = 460, 200
+#    [竞选pk重置] = 460, 270
+#    [竞选pk投票] = 460, 340
+#    [竞选pk收票] = 460, 410
+#    [竞选pk结算] = 460, 480
+#    [竞选pk结果] = 460, 550
 
 module chat:
   action chat @mind(@player):
@@ -485,7 +660,7 @@ module chat:
       游戏结束啦，随便聊聊吧～
     scope: all
 
-  action chat_human @human(@人):
+  action chat_human @human(@3号):
     scope: all
 
   flow:
@@ -499,7 +674,7 @@ module chat:
     [hub] -> fork:
       -> [AI_line]
       -> [human_line]
-    [AI_line] -> for @player in [@Eve, @小猫咪, @小机, @小灵, @Portia, @AI助手]:
+    [AI_line] -> for @player in [@1号, @2号, @4号, @5号, @6号, @god]:
       -> [chat] ->
     -> [OUT]
     [human_line] -> [chat_human]

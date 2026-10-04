@@ -29,23 +29,27 @@
  * 本 typedef 是插件模式词汇表的门面快照，改签名先改这里再动组件。
  */
 
-export { default, default as FemoEditorApp } from '../femoGen/src/FemoWorAuto'
+// ═══ 已退役（观察期起 2026-09-27 femo2host 死代码排查，全仓零引用；观察无误后连块删除）：FemoEditorApp 命名导出（default 导出仍活，dsh editor-page.tsx 在用） ═══
+export { default } from '../femoGen/src/FemoWorAuto'
 
 /**
  * @typedef {Object} FemoEditorPluginProps
  * @property {true} plugin 插件模式旗标（必传 true；缺省 false = standalone 直连形态）。
  * @property {string} sessionId 当前打开的 femo 主会话 id——画布数据面全挂它
- *   （剧本记录/断点/运行态/jobIds；投影窗传母会话 id，见 editor-view 的锚点解析）。
+ *   （FEMO脚本记录/断点/运行态/jobIds；投影窗传母会话 id，见 editor-view 的锚点解析）。
  * @property {boolean} [enginePending=false] 引擎有活跃执行体/待命指示（运行按钮态）。
+ * @property {() => void} [onEngineRetry] 引擎冷启动中点「引擎启动中…」芯片 →
+ *   宿主立即重拉 session-state（2026-09-19 冷启动补拉：宿主侧自动轮询为主，
+ *   此回调给用户「立即重探」的抓手；不传=芯片退化纯展示，standalone 形态即此）。
  * @property {() => void} onRun 点「运行」→ 宿主 job_start（B1：前端纯显示者，
  *   run_request 触发链已退役）。
  * @property {(jobId?: number) => Promise<{paused?: boolean, state?: string} | undefined>} onPause
  *   点「暂停」→ 宿主 job_pause（§8.4 B3 归属解析：宿主只认本会话绑定的 Job）。
- *   paused:false = 该会话无活跃剧本（编辑器据此复位按钮）；失败原样 reject（可见报错）。
+ *   paused:false = 该会话无活跃FEMO脚本（编辑器据此复位按钮）；失败原样 reject（可见报错）。
  * @property {(text: string) => Promise<void>|void} onPersistScript 画布定稿 →
- *   宿主保存会话剧本记录（{path, text, rev} 乐观锁；409 冲突弹窗由宿主侧装配层处理）。
+ *   宿主保存会话FEMO脚本记录（{path, text, rev} 乐观锁；409 冲突弹窗由宿主侧装配层处理）。
  * @property {() => {text?: string, path?: string, rev?: number} | undefined} getRecordScript
- *   读当前会话剧本记录（刷新/重启后画布恢复的数据源）。
+ *   读当前会话FEMO脚本记录（刷新/重启后画布恢复的数据源）。
  * @property {(name: string) => Promise<void>|void} onExport 导出 → 宿主落盘 + 记账
  *   （femo_files.json 账本记 'export'）。
  * @property {() => Promise<void>|void} onImport 导入入口 → 宿主两级导入
@@ -53,16 +57,21 @@ export { default, default as FemoEditorApp } from '../femoGen/src/FemoWorAuto'
  * @property {() => Promise<Array<{path: string, name: string, source: string, firstSeenAt: number, lastUsedAt: number, exists: boolean, size?: number, mtimeMs?: number}>>} onListFemoFiles
  *   导入/导出历史清单（条目形状与 host 侧 femo-files.ts 的 FemoFileEntry 对齐；
  *   exists=false = 文件已不在盘上，前端变灰）。
- * @property {(path: string) => Promise<void>|void} onPickFemoFile 从清单打开一份剧本
+ * @property {(path: string) => Promise<void>|void} onPickFemoFile 从清单打开一份FEMO脚本
  *   （宿主读盘回文本，导入=引用不拷贝）。
  * @property {(path: string) => Promise<void>|void} onForgetFemoFile 从清单移除条目
  *   （不动盘上文件）。
  * @property {() => void} onBackToShell 手机版返回键 → 打开 dsh 侧边栏。
- * @property {string} [savedPath=''] 当前剧本落盘地址（''/缺省 = 未保存；
+ * @property {string} [savedPath=''] 当前FEMO脚本落盘地址（''/缺省 = 未保存；
  *   宿主据此决定 base_dir 语义与 script_name）。
  * @property {string} [initialScript=''] 会话快照文本（画布初始/恢复内容）。
  * @property {string} [initialCheckpoint=''] 断点节点 id（恢复定位/续跑起点标识）。
  * @property {boolean} [initialRunning=false] 打开时引擎是否在跑（按钮初始态）。
+ * @property {boolean} [sessionStateLoaded=false] 宿主会话态是否已取回（session-state
+ *   首轮已 setState）。false=未取回：恢复 effect 不裁决有/无FEMO脚本、不开恢复闸，
+ *   SSE 补帧全部入缓冲等真恢复——防「挂载首拍误开闸，补发帧撞空画布报
+ *   无法匹配节点」（2026-09-24）。缺省 false 对 standalone 无感（plugin=false
+ *   时恢复 effect 首行早退）。
  * @property {number} [initialJobId] 当前 Job 号（暂停/继续按钮跟随；场次回放定位）。
  * @property {number[]} [jobIds] 本会话激活过的全部 Job（按激活顺序；场次回放候选清单）。
  * @property {boolean} [initialWaitingHuman=false] 是否有等待人类输入的节点（横幅/按钮态）。

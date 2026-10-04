@@ -1,4 +1,6 @@
 # npm 发布排除清单（与 sync-github.ps1 的排除项对齐）
+# MEOW_MODIFICATIONS.md = 作者的改动笔记，只在私有源仓留存，不进 npm 包（2026-09-20 拍板）
+MEOW_MODIFICATIONS.md
 *.bak-*
 *.log
 *.pyc
@@ -8,6 +10,7 @@ node_modules/
 __pycache__/
 dist/
 .dsh-meow/
+developer/
 user_data/
 .wrangler/
 .git/

@@ -73,7 +73,7 @@ module NightPhase:
       当你决定击杀对象时，需要输出：SET VARIABLE:<<@KILL = @目标名字>>
     scope: wolf_room
     out:
-      @KILL(string, "击杀目标")
+      @KILL(required)
 
   action seer_check @mind(@预言家):
     prompt: |
@@ -81,7 +81,7 @@ module NightPhase:
       你需要通过变量赋值语句：SET VARIABLE:<<@CHECK = @目标名字>> 告诉上帝你的查验对象。
     scope: [@上帝, @预言家]
     out:
-      @CHECK(string, "查验目标")
+      @CHECK(required)
 
   action seer_result @func(werewolf_utils.check_role):
     in:
@@ -103,7 +103,7 @@ module NightPhase:
       只能对存活玩家用药：{alive}。
     scope: [@上帝, @女巫]
     out:
-      SAVE(bool, "是否救人"), @POISON(string, "毒杀目标")
+      SAVE, @POISON
 
   action resolve_night @func(werewolf_utils.resolve_night):
     in:
@@ -211,7 +211,7 @@ module DayPhase:
       最后输出：SET VARIABLE: <<@VOTE = @目标名字>>
     scope: [@上帝, @voter]
     out:
-      @VOTE(string, "投票目标")
+      @VOTE(required)
 
   action collect_vote @func(werewolf_utils.collect_vote):
     in:

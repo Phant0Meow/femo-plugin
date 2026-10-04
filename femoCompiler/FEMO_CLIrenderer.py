@@ -75,10 +75,14 @@ class CLIRenderer:
         if self.verbose:
             print(f"   📖 上下文: {length} 条记录")
 
-    def on_memory_ready(self, data: dict):
-        length = data.get("length", 0)
-        if self.verbose:
-            print(f"   🧠 记忆: {length} 条记录")
+    # ━━━ 已退役·观察期（2026-09-26 起）━━━ on_memory_ready：全仓没有任何地方发出 'memory_ready'
+    # 事件（双窗口交叉扫描：引擎全部事件发射点已逐一对账），本方法经 handle_event 永不可达。
+    # 无报错数日后整段删除（含本注）。
+    # def on_memory_ready(self, data: dict):
+    #     length = data.get("length", 0)
+    #     if self.verbose:
+    #         print(f"   🧠 记忆: {length} 条记录")
+    # ━━━ 观察期退役段结束：on_memory_ready ━━━
 
     def on_ai_token(self, data: dict):
         token = data.get("token", "")
@@ -92,18 +96,22 @@ class CLIRenderer:
         sys.stdout.write(token)
         sys.stdout.flush()
 
-    def on_ai_response(self, data: dict):
-        """非流式时的完整回复（备用）"""
-        response = data.get("output", "")
-        if not self._streaming:
-            print()
-            if self._current_node_name:
-                print(f"[{self._current_node_name}]:")
-            print(response)
-        else:
-            # 流式已经在 on_ai_token 输出完毕，这里只收尾
-            print()  # 结束换行
-        self._streaming = False
+    # ━━━ 已退役·观察期（2026-09-26 起）━━━ on_ai_response：引擎事件词表里 AI 落库事件是
+    # 'ai_done'（FEMO_runtime:2505），从无 'ai_response'——自述"备用"的这条路从未被备用过
+    # （双窗口交叉扫描+逐项复核）。无报错数日后整段删除（含本注）。
+    # def on_ai_response(self, data: dict):
+    #     """非流式时的完整回复（备用）"""
+    #     response = data.get("output", "")
+    #     if not self._streaming:
+    #         print()
+    #         if self._current_node_name:
+    #             print(f"[{self._current_node_name}]:")
+    #         print(response)
+    #     else:
+    #         # 流式已经在 on_ai_token 输出完毕，这里只收尾
+    #         print()  # 结束换行
+    #     self._streaming = False
+    # ━━━ 观察期退役段结束：on_ai_response ━━━
 
     def on_human_wait(self, data: dict):
         prompt = data.get("prompt", "")
@@ -151,8 +159,12 @@ class CLIRenderer:
         error = data.get("error", "未知错误")
         print(f"\n❌ 运行错误: {error}")
 
-    def on_error(self, data: dict):
-        print(f"\n❌ 错误: {data.get('message', '')}")
+    # ━━━ 已退役·观察期（2026-09-26 起）━━━ on_error：引擎从无 'error' 事件——错误分流走
+    # 'notify_author'/'node_retry'（FEMO_errors 常量），流程错误走 'flow_error'。
+    # 本方法经 handle_event 永不可达（双窗口交叉扫描+逐项复核）。无报错数日后整段删除（含本注）。
+    # def on_error(self, data: dict):
+    #     print(f"\n❌ 错误: {data.get('message', '')}")
+    # ━━━ 观察期退役段结束：on_error ━━━
 
     # ── 特殊交互：清屏并显示上下文（用于 /godview 和 /@actor） ──
     def clear_and_show_context(self, title: str, context: str):
@@ -169,11 +181,14 @@ class CLIRenderer:
         print("（继续输入内容，或输入 /end 结束）")
         self._context_shown = True   # 手动切换视角后视为已展示上下文，避免紧接着的人类节点再重复显示
 
+    # ━━━ 已退役·观察期（2026-09-26 起）━━━ finish_stream：全仓零调用（双窗口交叉扫描+逐项复核）。
+    # 流式收尾实际由 on_flow_done/on_flow_error 内的打印衔接。无报错数日后整段删除（含本注）。
     # ── 流式输出结束后的收尾 ──
-    def finish_stream(self):
-        if self._streaming:
-            print()
-            self._streaming = False
+    # def finish_stream(self):
+    #     if self._streaming:
+    #         print()
+    #         self._streaming = False
+    # ━━━ 观察期退役段结束：finish_stream ━━━
 
 
 # ── 辅助函数：将旧的 print 迁移到事件 ──
@@ -188,11 +203,16 @@ def emit_step(runner, step_no, prev_node, current_node, kind):
         })
 
 
-def emit_context_ready(runner, length):
-    if runner._event_callback:
-        runner._event_callback('context_ready', {'length': length})
-
-
-def emit_memory_ready(runner, length):
-    if runner._event_callback:
-        runner._event_callback('memory_ready', {'length': length})
+# ━━━ 已退役·观察期（2026-09-26 起）━━━ emit_context_ready / emit_memory_ready：
+# 仅被 FEMO_runtime import、从未调用（runtime:2361 直接用 _emit_event 发 context_ready；
+# memory_ready 事件全仓无生产者）。两处 import 已随本次同步摘除。
+# 无报错数日后整段删除（含本注）。
+# def emit_context_ready(runner, length):
+#     if runner._event_callback:
+#         runner._event_callback('context_ready', {'length': length})
+#
+#
+# def emit_memory_ready(runner, length):
+#     if runner._event_callback:
+#         runner._event_callback('memory_ready', {'length': length})
+# ━━━ 观察期退役段结束：emit_context_ready / emit_memory_ready ━━━

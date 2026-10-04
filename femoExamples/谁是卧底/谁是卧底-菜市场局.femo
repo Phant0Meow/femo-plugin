@@ -3,10 +3,15 @@
 # 你（人类 @猫猫），再加上下场跟你们一起玩的 @小白(source:main) —— 一共 7 个人。
 # 7 人局：1 名卧底 + 1 个白板 + 5 平民。
 # 每轮换一种"陈述方式"（见 undercover_utils.ROUND_TASKS），防止一局玩成复读机。
-# 流程：发牌(私密看牌) → [循环: 陈述 → 投票 → 结算 →(平票)PK] → 终局揭底 → 散场吐槽。
+# 词对不再从固定题库抽（20 对很快就撞），改由场外 @出题官 现场出：
+#   u.quiz_seed() 现算一张题签（时刻+随机码+随机方向/关系/角度+禁用表+最近用过的词）
+#   → @出题官 出词 → u.check_quiz() 硬校验 → 不合格连同理由打回重出（最多 4 次，
+#   再不行自动换回内置题库，保证牌局一定开得起来）。已用的词对记在 quiz_used.json，
+#   下一局继续禁用——所以这个功能是**跨局**生效的。
+# 流程：出题 → 发牌(私密看牌) → [循环: 陈述 → 投票 → 结算 →(平票)PK] → 终局揭底 → 散场吐槽。
 meta:
   name = 谁是卧底·菜市场局
-  version = 2.1
+  version = 3.0
   session = new
   output_style = |
     这是一台桌上的「谁是卧底」牌局，不是分析会。说话要像一个真人玩桌游：短、口语、带你自己的脾气，一到两句就够。
@@ -23,6 +28,7 @@ actors:
   ai @张较真 = soul:uc_zhang
   ai @戚老师 = soul:uc_qi
   ai @王炸 = soul:uc_wang
+  ai @出题官 = soul:uc_quizmaster, source:deepseek-official/deepseek-v4-flash
   ai @小白 = soul:the1stlittlesoul, source:main
   human @猫猫 = soul:human, source:0
 
@@ -34,6 +40,15 @@ vars:
   words = {}
   words_text = {}
   deck_word = []
+  # —— 出题官相关（2026-09-16 加）：题签 → 现场词 → 校验结果 ——
+  quiz_seed_text = ""
+  civilian_word = ""
+  undercover_word = ""
+  quiz_ok = false
+  quiz_problem = ""
+  quiz_note = ""
+  quiz_try = 0
+  quiz_max = 4
   $alive = [@老李, @胖婶, @张较真, @戚老师, @王炸, @小白, @猫猫]
   @卧底 = ""
   @白板 = ""
@@ -59,10 +74,84 @@ action 结束判定 @func(u.next_round_stage):
   out:
     game_over, winner
 
+# ================================================================ 出题
+# 场外 @出题官 现场出题：出题、审题都在 scope: self 里，玩家看不到任何词面。
+# 唯一例外是 [打回]——@notice 不支持 scope: self（见那里的注释），它是全员可见的，
+# 所以它的文案里不许出现任何词面，只留一句不涉密的旁白。
+module 出题:
+  action 记一次 @assign:
+    out:
+      quiz_try += 1
+
+  action 出题种子 @func(u.quiz_seed):
+    out: quiz_seed_text
+
+  action 抽题 @mind(@出题官):
+    prompt: |
+      {quiz_seed_text}
+
+      你是本局的出题官。请按上面这张题签，出一组《谁是卧底》的词：
+      · 平民词：所有平民共用的那个词；
+      · 卧底词：跟平民词【相近但不同】的词——像「拖鞋／凉鞋」那样，
+        同一类、都眼熟，但谁也不能一眼看出是两样东西。
+      硬要求：
+      1. 两个词必须是同一类里两个相近的东西／说法，日常可感知，不能是抽象概念；
+      2. 不能是同一个词，不能一个包含另一个，不能「苹果／苹果汁」这种一眼分明；
+      3. 上面的禁用表、最近用过的词、老题库里的题，一律不许再用；
+      4. 必须照上面的【本次指定方向】【本次指定关系】【本次指定角度】来出，
+         【这一次必须换一套完全不同的东西，别又出你上一把想的那对】；
+      5. 词长按题签要求，普通常用词，别生僻。
+      输出格式 —— 必须逐字照写下面两行（词换成你出的词），不要写别的解释：
+      SET VARIABLE: <<civilian_word = 平民词>>
+      SET VARIABLE: <<undercover_word = 卧底词>>
+      可以在两行之后补一句你自己的阴阳话（一句话，别多）。
+    showprompt: |
+      【出题】@出题官 把袖子一撸，从围裙兜里摸出记题的小本子。
+    scope: self
+    out: civilian_word, undercover_word
+    max_retries: 2
+
+  action 审题 @func(u.check_quiz):
+    in:
+      civilian_word = civilian_word
+      undercover_word = undercover_word
+      attempt = quiz_try
+      max_attempt = quiz_max
+    out:
+      quiz_ok, quiz_problem, civilian_word, undercover_word, quiz_note
+
+  # 【2026-09-16 改】@notice 不支持 scope: self：公告没有发言者，self（仅本人+owner）
+  # 无从落地，编译器会报「scope: self 不生效」，而且公告默认就是全员可见。
+  # 所以这条公告里绝不能带 {quiz_problem}——它含被退回的那对词，出题失败重出时
+  # 会把候选词当众抖给玩家（这局打回没触发过所以没漏，但那是运气）。
+  # 打回原因只留在 quiz_problem 变量与题签里：抽题是 AI 动作，scope: self 对 AI 节点有效。
+  action 打回 @notice:
+    prompt: |
+      出题官翻了个白眼，把这一稿划掉，重新想。
+
+  flow:
+    [记一次]: 记一次
+    [出题种子]: 出题种子
+    [抽题]: 抽题
+    [审题]: 审题
+    [打回]: 打回
+
+    [IN] -> [记一次]
+    [记一次] -> [出题种子]
+    [出题种子] -> [抽题]
+    [抽题] -> [审题]
+    # 不合格且还有次数 → 回[记一次]重出（题签会重算，且带上被打回的那对）
+    [审题] -> if (quiz_ok == false and quiz_try < quiz_max) -> [打回]
+    [打回] -> [记一次]
+    # 合格 → 出题完毕（次数用尽时 check_quiz 已经兜底换内置题库并置 quiz_ok = true）
+    [审题] -> if (quiz_ok == true) -> [OUT]
+
 module 发牌:
   action 发牌 @func(u.deal_cards):
     in:
       players = $alive
+      civilian_word = civilian_word
+      undercover_word = undercover_word
     out:
       roles, words, @卧底, @白板, deck_word
 
@@ -77,6 +166,7 @@ module 发牌:
   action 开局公告 @notice:
     prompt: |
       {u.board_notice(roles)}
+      {quiz_note}
       规矩：每轮每人说一句描述自己的牌（不许把词念出来），然后全体投票，得票最多的人出局。
       投票平票 → 平票的几位当场申辩一句、其余人重投；再平票就由这几位里送走一人，僵局不空转。
       卧底全被投出去＝平民赢；卧底活到最后＝卧底赢；白板只要没被投出去，它自己就算赢。
@@ -326,6 +416,7 @@ module 赛后:
     -> [OUT]
 
 mainflow:
+  [出题]: &出题
   [发牌]: &发牌
   [发言]: &发言
   [投票]: &投票
@@ -334,7 +425,8 @@ mainflow:
   [赛后]: &赛后
   [结束判定]: 结束判定
 
-  [START] -> [发牌]
+  [START] -> [出题]
+  [出题] -> [发牌]
   [发牌] -> [发言]
   [发言] -> [投票]
   [投票] -> [结算]

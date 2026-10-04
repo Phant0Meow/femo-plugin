@@ -5,7 +5,7 @@
  * tool_calls/tool_results 结构化原文，不带排版；[TOOL CALL #N] 模板由引擎
  * 落档前套用，全世界只有引擎那一份）。本文件唯一职责：把 harness 子会话的
  * 事件流水账翻译成该契约。subagent.ts（子代理路径）与 main-actor.ts（主模型
- * 下场路径）都从这里取——换 harness 需要重写的翻译逻辑就这一个文件。
+ * 参与运行路径）都从这里取——换 harness 需要重写的翻译逻辑就这一个文件。
  */
 
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
@@ -36,7 +36,7 @@ export interface Transcript {
 }
 
 /** Extract plain text from content blocks (text + tool-result content). */
-function blocksToText(content: unknown): string {
+export function blocksToText(content: unknown): string {
   if (!Array.isArray(content)) return ''
   return content.map((block) => {
     const b = block as { type?: string; text?: unknown; content?: unknown }

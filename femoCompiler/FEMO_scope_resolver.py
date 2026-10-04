@@ -33,7 +33,7 @@ def resolve_scope(
                 if sid is not None:
                     soul_scope.append(str(sid))
                 elif str(getattr(actor, 'source', None) or '').strip() == 'main':
-                    # source:main 裸演员：伪 soul "main" 作为可见性键（参考 human
+                    # source:main 裸角色：伪 soul "main" 作为可见性键（参考 human
                     # 用 source 当身份的处理，但主模型不是 user——落 soul_scope）
                     soul_scope.append('main')
             elif hasattr(actor, 'type') and actor.type.value == 'human':
@@ -84,7 +84,7 @@ def resolve_scope(
             if soul_id is not None:
                 soul_scope.append(str(soul_id))
             elif str(getattr(actor, 'source', None) or '').strip() == 'main':
-                # source:main 裸演员：伪 soul "main" 作为可见性键
+                # source:main 裸角色：伪 soul "main" 作为可见性键
                 soul_scope.append('main')
         # Human actor
         elif hasattr(actor, 'type') and actor.type.value == 'human':
@@ -147,6 +147,9 @@ def _resolve_single_actor(item: str, actors: Dict[str, Any], var_manager) -> str
     # 纯数字字符串等，不应该出现在这里
     raise ValueError(f"scope 中出现非法 token：{item}")
 
+# ━━ 暂时无用·未来会支持（2026-09-26 作者拍板，退出死代码观察期）━━━ 多用户可见域基建：
+# user_scope/soul_scope 的库格式归一（scope 体系=多 user 可见性模型），多 user 现未启用、
+# 未来会支持——今日零调用属暂态而非死代码，勿删勿再退役。
 def scope_to_db_format(
     user_scope: List[int],
     soul_scope: List[int],
@@ -180,7 +183,7 @@ def ids_match_scope(scope_list: List[str], target_ids: List[str]) -> bool:
 
 def scope_str_to_actor_list(scope_str: str, actors: Dict[str, Any], var_manager) -> List[str]:
     """
-    将 scope 字符串解析为演员名列表（用于前端展示）。
+    将 scope 字符串解析为角色名列表（用于前端展示）。
     例如 "[@God, @Diana] + my_list" -> ['@God', '@Diana', '@Ellis', '@Cat']
     """
     # ── 0. 保留字段：all（大小写不敏感）= 全可见（所有 actors）──

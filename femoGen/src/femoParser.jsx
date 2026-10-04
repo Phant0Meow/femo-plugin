@@ -2,7 +2,7 @@
 // ═══ femoParser.jsx ═══
 // ═══════════════════════════════════════════════════════════════
 
-import { TYPES, SPECIAL_COLORS, actionId } from './common';
+// 已注释死导入（观察期 2026-09-26）：import { TYPES, SPECIAL_COLORS, actionId } from './common';（整行未使用）
 // ═══ 统一报错链路（2026-09-07 解耦）═══
 // parser 内所有语法检查点不再各自 throw new Error(手拼字符串)，统一调
 // reporter（femoDiagnostics.js）：error 阻断（抛 FEMOSyntaxError）、warning
@@ -267,7 +267,7 @@ function parseFEMO(text, rep = null) {
 
 // join(all)/join(N) 的引擎现状是"等全部（N 个）上游到齐再放行"。若 join 的
 // 目标节点位于流程环路上（能从目标出发绕回目标自己），环上的 fork 会先于
-// join 发生、又只有 join 放行后才会再发生——等待集永远凑不齐，剧本必然无声
+// join 发生、又只有 join 放行后才会再发生——等待集永远凑不齐，FEMO脚本必然无声
 // 卡死（实锤：警长版被"图到文本"自动加 join(all) 后 DayPhase 永远进不去）。
 // ⚠️ 前端图模型不建 join 节点（join(...) 按文档等价于普通多线，解析期摊平
 // 成普通边），所以这里从**原文**扫描 join(...) 块拿目标节点，再到解析后的
@@ -315,7 +315,7 @@ function validateJoinOnCycle(result, text, rep = null) {
         rep.warning(
           `join(...) 的目标 [${target}] 位于流程环路上（从它出发能绕回它自己）。` +
           '当前引擎的 join 会等待上游到齐，而环路里的一部分上游只有 join 放行之后才会发生，' +
-          '这会让剧本永远等待下去。请把循环里的合流改成普通多线汇入' +
+          '这会让FEMO脚本永远等待下去。请把循环里的合流改成普通多线汇入' +
           '（逐条 [A] -> [next]，到即走），不要用 join(...):。',
           { line, lineText, where: f.where }
         );
@@ -358,6 +358,13 @@ function _declName(raw) {
 function validateDeclarations(result, rep = null) {
   rep = rep || createReporter();
   const topVars = new Set((result.vars || []).map((v) => _declName(v.name)));
+  // 预定义变量 all / allAI / allHUMAN（与引擎 parse_script 自动补声明对齐，
+  // 2026-10-04）：all=全部角色名、allAI=全部 AI 角色、allHUMAN=全部人类角色，
+  // 条件裸名 / for 迭代器按已声明放行。作者在 vars: 显式声明（含 $ 前缀）
+  // 时以作者为准（引擎同款守卫——但校验语义上「已声明」两头一致，此处无需分支）。
+  topVars.add('all');
+  topVars.add('allAI');
+  topVars.add('allHUMAN');
   const actors = new Set((result.actors || []).map((a) => a.name));
   const moduleVars = new Map();
   for (const m of result.modules || []) {
@@ -643,7 +650,7 @@ function validateActionSyntax(result, rep = null) {
       }
       if (String(action.executorActor || '').trim()) {
         rep.warning(
-          `action "${action.name}"（${ctx}）→ @notice 的执行者参数被整体忽略（公告没有发言者），导出时会剥掉`,
+          `action "${action.name}"（${ctx}）→ @notice 的执行者参数被整体忽略（公告没有发言者），保存时会剥掉`,
           { where: 'action 校验' }
         );
       }
@@ -668,7 +675,9 @@ function validateActionSyntax(result, rep = null) {
         );
       }
     }
-    // ⑤ out: 目标保留字
+    // ⑤ out: 目标保留字 + 括号标注检查（2026-09-29 二刀拍板，与引擎
+    // _parse_out_multi 同一规则：括号里只认 required/optional，旧
+    // (类型, "标签") 写法废除）
     for (const line of String(action.outVars || '').split('\n')) {
       for (const item of line.split(',')) {
         const target = _outTargetRoot(item);
@@ -678,6 +687,18 @@ function validateActionSyntax(result, rep = null) {
             `是 Python 保留字，不能用作变量名，请改名`,
             { where: 'action 校验' }
           );
+        }
+        const pm = String(item || '').trim().match(/^([$\w.{}@]+)\(([^)]*)\)(.*)$/);
+        if (pm) {
+          const key = pm[2].trim().replace(/^["']+|["']+$/g, '').toLowerCase();
+          if (pm[3].trim() || (key !== 'required' && key !== 'optional')) {
+            rep.error(
+              `action "${action.name}"（${ctx}）→ out: 项 "${item.trim()}" ` +
+              `不支持括号标注：括号里只认 required/optional（如 name(required)），` +
+              `直接写变量名即可`,
+              { where: 'action 校验' }
+            );
+          }
         }
       }
     }
@@ -734,7 +755,7 @@ function validateActionSyntax(result, rep = null) {
   }
 
   // 收集到的 error 聚合抛出（一条则单条直抛，多条带计数头）
-  rep.throwIfErrors('编译错误：剧本语法检查未通过');
+  rep.throwIfErrors('编译错误：脚本语法检查未通过');
 }
 
 function splitTopBlocks(lines) {

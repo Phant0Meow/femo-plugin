@@ -9,8 +9,9 @@
 // 手机端等于没有导入入口。于是先出这份「导入过 / 导出过」的历史清单，
 // 从清单里挑一个就能开。
 //
-// 浏览按钮只给电脑端：onBrowse 传了才渲染。手机端传 undefined——对话框开在
-// 电脑屏幕上，手机上按了也够不着，留着只会让人以为按坏了。
+// 浏览按钮分设备给（2026-09-30 起）：电脑端 onBrowse=系统文件对话框（对话框
+// 就在眼前）；手机端 onBrowseDir=工程目录浮层（femoDirBrowse，对话框够不着、
+// 但 projects/ 目录可以在服务端围栏内浏览）。传了才渲染，不传不占位。
 //
 // 版面（2026-09-11 二版，猫猫：三行太占地方 + 来源列看不懂）：
 //   每项两行 —— 上行「文件名 ···· 大小 时间」右对齐成两列，下行灰色路径；
@@ -81,6 +82,10 @@ export function FemoFileList({
   onPick,
   /** 电脑端专属：给了才渲染右上角「浏览…」（走系统文件对话框的旧路径）。 */
   onBrowse,
+  /** 手机端专属（2026-09-30）：给了才渲染「浏览目录…」——工程目录浮层
+   *  （femoDirBrowse，服务端 projects/ 围栏内浏览）。系统对话框开在电脑屏幕
+   *  上手机够不着，这是手机端自己的二级入口。 */
+  onBrowseDir,
   /** 从清单移除一条（2026-09-13）：给了才渲染每行右侧的 ⊖ 键。
    *  语义红线：只从清单划掉，**绝不动源文件**——文案与图标都按这个写。 */
   onForget,
@@ -98,6 +103,7 @@ export function FemoFileList({
 
   const busy = busyPath !== null;
   const canBrowse = typeof onBrowse === 'function';
+  const canBrowseDir = typeof onBrowseDir === 'function';
   const canForget = typeof onForget === 'function';
   const missingCount = files.filter((f) => f.exists === false).length;
 
@@ -120,7 +126,7 @@ export function FemoFileList({
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: 'var(--femo-surface)',
+          background: 'var(--femo-modal-bg)',
           borderRadius: 'var(--femo-radius-xl)',
           width: 540,
           maxWidth: '100%',
@@ -145,10 +151,10 @@ export function FemoFileList({
         >
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--femo-text-1)', letterSpacing: '0.01em' }}>
-              打开 FEMO 剧本
+              打开 FEMO脚本
             </div>
             <div style={{ fontSize: 11, color: 'var(--femo-text-4)', marginTop: 2 }}>
-              从导入过 / 导出过的文件里挑一个
+              从打开过 / 保存过的文件里挑一个
             </div>
           </div>
           {canBrowse && (
@@ -171,6 +177,28 @@ export function FemoFileList({
               }}
             >
               浏览…
+            </button>
+          )}
+          {canBrowseDir && (
+            <button
+              onClick={onBrowseDir}
+              disabled={busy}
+              title="浏览工程目录（user_data/projects/）挑选文件"
+              style={{
+                padding: '6px 14px',
+                borderRadius: 'var(--femo-radius-md)',
+                background: 'var(--femo-surface)',
+                color: 'var(--femo-text-2)',
+                border: 'var(--femo-border-w-strong) solid var(--femo-border-strong)',
+                cursor: busy ? 'wait' : 'pointer',
+                fontSize: 12,
+                fontWeight: 700,
+                fontFamily: 'var(--femo-font-sans)',
+                opacity: busy ? 0.55 : 1,
+                flexShrink: 0,
+              }}
+            >
+              浏览目录…
             </button>
           )}
           <button
@@ -220,7 +248,9 @@ export function FemoFileList({
               还没有记录。
               {canBrowse
                 ? <>点右上角<b style={{ color: 'var(--femo-text-2)' }}>「浏览…」</b>选一个 .femo 文件，之后它就会留在这份清单里。</>
-                : <>先在电脑端导入或导出一次 .femo，之后这里就能直接选了。</>}
+                : canBrowseDir
+                  ? <>点右上角<b style={{ color: 'var(--femo-text-2)' }}>「浏览目录…」</b>从工程目录里挑一个，之后它就会留在这份清单里。</>
+                  : <>先在电脑端打开或保存一次 .femo，之后这里就能直接选了。</>}
             </div>
           )}
 

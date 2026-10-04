@@ -20,7 +20,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-presets'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import { engineRoot } from './config'
-import { readSessionEvents } from './session-events'
+import { readSessionEvents } from './compat/session-events'
 
 /** Femo sessions carry this agentPreset marker in their session header. */
 export const FEMO_PRESET = 'femo-plugin'

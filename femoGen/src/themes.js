@@ -25,6 +25,7 @@ export const FEMO_THEMES = [
   { id: 'auto', name: '跟随 DSH', desc: '自动跟随 dsh 本体主题（白天→DSH 浅色 / 黑夜→DSH 深色）' },
   { id: 'dsh', name: 'DSH 浅色', desc: 'dsh 本体白天设计语言（deepseek 蓝 + bluish 色阶 + 系统字体）' },
   { id: 'dsh-dark', name: 'DSH 深色', desc: 'dsh 本体黑夜设计语言（深色 bluish 层级 + 亮色状态）' },
+  { id: 'web', name: '翡翠', desc: '深色玻璃 + 翡翠绿主紫辅 + 系统字体 + 按压缩放（源自 webAdapter 操作台设计语言）' },
 ];
 
 // ── 主题 CSS（由 common.jsx 的 FontStyle 注入，两种模式都生效）──
@@ -86,6 +87,7 @@ export const THEME_CSS = `
   --femo-bg-2: #f1f3f5;              /* 次级背景（输入框底等） */
   --femo-bg-hover: #e1e5ee;          /* 列表项 hover 背景 */
   --femo-surface: #ffffff;           /* 卡片/输入框表面 */
+  --femo-modal-bg: var(--femo-surface); /* 弹窗/浮层面板专用口：浮层整面盖在画布上，给玻璃 surface 的主题必须在此换实色（判据同 --femo-debug-bg） */
   --femo-on-accent: #ffffff;         /* 彩色按钮（主/成功/警告/标签）上的文字 */
 
   /* ── 边框 ── */
@@ -187,7 +189,20 @@ export const THEME_CSS = `
 
   /* ── 面板底色（边栏/标题栏等 chrome；round27 对齐 dsh 浅色 sidebar-fill bluish-50）── */
   --femo-panel-bg: #F9FAFB;                       /* 浅色=官方 sidebar-fill */
+  --femo-debug-bg: var(--femo-panel-bg);           /* 调试窗整窗底（默认同面板底；玻璃主题在此换实色——
+                                                      调试窗整面铺在画布上，半透明会和底下的节点连线混在一起） */
   --femo-btn-primary: var(--femo-primary);         /* 功能按钮底（浅色=主蓝历史值） */
+  /* 运行控制芯片底（按钮专用口，2026-09-21）：浅色=主语义色原值；
+     深色主题在 dsh-dark 块覆盖为「更深更灰」版——实心按钮要压艳度，
+     而主语义色仍被状态点/报错文字/节点色共用（暗底上要亮才可读），故分口。 */
+  --femo-btn-success: var(--femo-success);
+  --femo-btn-danger: var(--femo-danger);
+  --femo-btn-warning: var(--femo-warning);
+  /* 运行控制芯片字色专用口（2026-09-28）：默认同 on-accent（实心彩底配深/白字）；
+     按钮底改玻璃/深芯片的主题（web）在此覆盖为亮字，实心彩底主题不用动。 */
+  --femo-btn-fg-success: var(--femo-on-accent);
+  --femo-btn-fg-danger: var(--femo-on-accent);
+  --femo-btn-fg-warning: var(--femo-on-accent);
 
   /* ── 滚动条 ── */
   --femo-scrollbar-w: 8px;           /* 滚动条粗细 */
@@ -394,10 +409,18 @@ export const THEME_CSS = `
   /* ── 面板底色（round12：边栏/标题栏/右栏对齐 dsh sidebar-fill bluish-900；画布 app-bg 已是 bg-base=聊天底色）── */
   --femo-panel-bg: #1b1b1c;
 
-  /* ── 功能按钮底色（round20：dsh 官方深色功能钮实为 deepseek-500 #4176e6 品牌深蓝——
-      见 ui-conversation InputBar「#3964FE light / #679EFE dark」注释与 ChatView 状态渐变用 500；
-      用户确认 400 太亮，统一落 500。选中态/焦点仍用 --femo-primary(400) 不受影响）── */
-  --femo-btn-primary: #4176e6;
+  /* ── 功能按钮底色（2026-09-21 二次定色：用户点名深色下蓝按钮「更深一点、
+      灰度一点」——从品牌深蓝 #4176e6 落到灰蓝 #41619c（与 type-ai-bg 同族，
+      保留蓝相但压明度压艳度；此前 round20 曾从 400 落 500，本次再压一档）。
+      选中态/焦点仍用 --femo-primary(400) 不受影响）── */
+  --femo-btn-primary: #41619c;
+
+  /* ── 运行控制芯片底（2026-09-21：实心三键深色专用版——同往下压明度+艳度，
+      与角色底色莫兰迪家族同语言但保留更多彩度（round15 教训：别全灰）。
+      白字对比仍足；主语义色不动，状态点/报错文字照旧亮）── */
+  --femo-btn-success: #359257;            /* 深灰绿（原 #22c55e） */
+  --femo-btn-danger: #aa4d4d;             /* 深灰红（原 #f25a5a） */
+  --femo-btn-warning: #b0812f;            /* 深灰金（原 #f59e0b） */
 
   /* ── 节点阴影（round9：双层投影——近接触影+远环境影，卡片"坐"在画布上）── */
   --femo-node-shadow-rest: inset 0 1px 0 rgba(255,255,255,0.05), inset 0 0 0 1px rgba(255,255,255,0.03), 0 2px 6px rgba(0,0,0,0.3), 0 10px 24px rgba(0,0,0,0.38);
@@ -434,6 +457,251 @@ export const THEME_CSS = `
   /* 按钮文字保持白字（主色为亮蓝，白字对比可读）；移动壳/预览壳为固有深色区，保持一致不覆盖 */
 }
 
+/* ══ 翡翠主题（id=web，显示名 2026-09-30 改）：webAdapter console（index.html）的设计语言 ══
+   取值来源：hostAdapter/webAdapter/console/index.html 的 :root token（逐项对齐）。
+   设计基调：深色 · 玻璃 · 绿主紫辅——#0c0f12 底、白 alpha 玻璃面、
+   web 绿（#6fbf3a/#8fdd55）作主语义色、web 紫（#a06bff）作辅角色色、
+   双 radial 光晕背景（右上绿/左下紫）、圆角收敛放松一档、系统字体栈。
+   与 dsh-dark 的分工：dsh-dark 是"金线黑底"的剧场语言；web 是"玻璃绿光"的控制台语言。 */
+[data-femo-theme="web"] {
+  /* ── 背景：web 双 radial 光晕直接住进 app-bg（唯一消费点是 background:，可放整段多层背景）── */
+  --femo-app-bg:
+    radial-gradient(1400px 560px at 88% -12%, rgba(111,191,58,0.13), transparent 60%),
+    radial-gradient(1000px 480px at -14% 110%, rgba(160,107,255,0.09), transparent 55%),
+    #0c0f12;
+  /* 玻璃面：web 卡片 rgba(255,255,255,0.045)/hover 0.075 同款；
+     节点表面提到 0.07——画布上有连线穿行，玻璃要有存在感但不糊住线条 */
+  --femo-bg: rgba(255,255,255,0.035);
+  --femo-bg-2: rgba(255,255,255,0.06);
+  --femo-bg-hover: rgba(255,255,255,0.085);
+  --femo-surface: rgba(255,255,255,0.05);
+  --femo-panel-bg: rgba(255,255,255,0.045);
+  --femo-node-bg: rgba(255,255,255,0.07);
+  /* 调试窗整窗实色：整面铺在画布上，玻璃会把底下的节点连线透进来混成一片 */
+  --femo-debug-bg: #11151a;
+  /* 弹窗面板实色：玻璃 surface 只给坐在页面底上的卡片用——弹窗浮层整面盖在画布上，
+     透底会和下面的节点连线混成一片（判据同上），取 web 深底提半档的实色 */
+  --femo-modal-bg: #11151a;
+
+  /* ── 主色：web 绿。primary 取 green-bright #8fdd55（暗底上的可读档），
+     hover 提亮一档；web 原绿 #6fbf3a 落到按钮底（btn-primary）── */
+  --femo-primary: #8fdd55;
+  --femo-primary-strong: #a9ee79;
+  --femo-primary-soft: rgba(111,191,58,0.14);
+  --femo-primary-soft-2: #24371c;                    /* 实色暗绿：流式气泡底/工具栏激活 */
+  --femo-primary-soft-faint: rgba(143,221,85,0.08);
+  --femo-primary-glow-weak: rgba(143,221,85,0.14);
+  --femo-primary-glow: rgba(143,221,85,0.28);
+  --femo-primary-glow-strong: rgba(143,221,85,0.42);
+  --femo-primary-glow-x: rgba(143,221,85,0.62);
+  --femo-primary-overlay: rgba(143,221,85,0.92);
+
+  /* ── 节点名说明框（点名字发光+弹出公告/指令）的交互强调色：web 全站绿语言——
+     交互态跟主题主色走，不跟节点类型色（蓝绿紫的类型身份留给芯片徽章）。
+     其余主题不定值：canvasNodes 行内 var() 回退各节点自己的类型色，零变化 ── */
+  --femo-info-accent: var(--femo-primary);
+
+  /* ── 危险：web bad #f87171 ── */
+  --femo-danger: #f87171;
+  --femo-danger-weak: rgba(248,113,113,0.85);
+  --femo-danger-strong: #fca5a5;
+  --femo-danger-soft: #3d2326;
+  --femo-danger-soft-2: #47282c;
+  --femo-danger-border: rgba(248,113,113,0.35);
+  --femo-danger-glow-weak: rgba(248,113,113,0.15);
+  --femo-danger-glow: rgba(248,113,113,0.3);
+  --femo-danger-glow-strong: rgba(248,113,113,0.5);
+
+  /* ── 警告：web busy #fbbf24 ── */
+  --femo-warning: #fbbf24;
+  --femo-warning-strong: #fcd34d;
+  --femo-warning-soft: #453a20;
+  --femo-warning-border: rgba(251,191,36,0.35);
+
+  /* ── 成功：web ok #34d399 ── */
+  --femo-success: #34d399;
+  --femo-success-strong: #6ee7b7;
+  --femo-success-text: #6ee7b7;
+  --femo-success-soft: #1f3b30;
+
+  /* ── 文本：web text #e9eef0 / muted #8b96a0 / faint #5d6870 三级映射 ── */
+  --femo-text-1: #e9eef0;
+  --femo-text-2: #aeb8bf;
+  --femo-text-2-alt: #8b96a0;
+  --femo-text-3: #8b96a0;
+  --femo-text-4: #5d6870;
+  --femo-text-4-weak: #47525a;
+  --femo-neutral: #8b96a0;
+  --femo-neutral-faint: rgba(255,255,255,0.05);
+  --femo-neutral-border: rgba(255,255,255,0.14);
+
+  /* ── 边框：web line rgba(255,255,255,0.09)/strong 0.16（玻璃细线）── */
+  --femo-border: rgba(255,255,255,0.09);
+  --femo-border-strong: rgba(255,255,255,0.16);
+  --femo-tag-bg: #3d464d;
+  --femo-tag-bg-faint: rgba(255,255,255,0.07);
+  --femo-scrollbar: rgba(255,255,255,0.16);
+  /* 暗底粗色条刺眼——与 dsh-dark 同判：强调边收 1px；玻璃节点留 1.5px 类型条认身份 */
+  --femo-border-w-accent: 1px;
+  --femo-border-w-node: 1.5px;
+
+  /* ── 遮罩 / 阴影（web 影子更深：0 10px 30px rgba(0,0,0,0.35) 的家族档）── */
+  --femo-mask-soft: rgba(0,0,0,0.55);
+  --femo-mask: rgba(0,0,0,0.65);
+  --femo-mask-heavy: rgba(0,0,0,0.75);
+  --femo-mask-blue: rgba(0,0,0,0.65);
+  --femo-shadow-sm: rgba(0,0,0,0.25);
+  --femo-shadow-md: rgba(0,0,0,0.35);
+  --femo-shadow-lg: rgba(0,0,0,0.45);
+  --femo-shadow-xl: rgba(0,0,0,0.55);
+  --femo-shadow-blue: rgba(0,0,0,0.3);
+
+  /* ── 画布点阵：中性白微光（web 背景无点阵，但画布需要点阵定位感，压到若隐若现）── */
+  --femo-canvas-dot: rgba(255,255,255,0.13);
+  --femo-canvas-dots: radial-gradient(circle, var(--femo-canvas-dot) 1.2px, transparent 1.2px);
+
+  /* ── 角色色：沿用 dsh-dark 提亮版（暗底可读，类型语义跨主题不换相），
+     唯 assign 换 web 紫 #a06bff 家族——辅色留给它，绿主紫辅的"紫"落点 ── */
+  --femo-type-ai: #8FB8F0;
+  --femo-type-ai-bg: #3E5C94;
+  --femo-type-human: #85D6A8;
+  --femo-type-human-bg: #3E6B4E;
+  --femo-type-mind: #EDA3A3;
+  --femo-type-mind-bg: #744949;
+  --femo-type-func: #EDBE72;
+  --femo-type-func-bg: #75603A;
+  --femo-type-assign: #C9A8FF;
+  --femo-type-assign-bg: #5A4795;
+  --femo-type-notice: #A8D8BC;
+  --femo-type-notice-bg: #4A6B58;
+  --femo-special-par: #C9A8FF;
+  --femo-special-par-bg: #5A4795;
+
+  /* ── 特殊节点：与其它节点同玻璃底，类型身份走彩边彩字（同 dsh-dark 形态）── */
+  --femo-sp-start-bg: var(--femo-node-bg);
+  --femo-sp-end-bg: var(--femo-node-bg);
+  --femo-sp-break-bg: var(--femo-node-bg);
+  --femo-sp-for-bg: var(--femo-node-bg);
+  --femo-sp-par-bg: var(--femo-node-bg);
+  --femo-node-border-mix-base: var(--femo-node-bg);
+
+  /* ── 移动端壳：web 深色三档（比 dsh-dark 壳更冷一档，贴 #0c0f12 底）── */
+  --femo-mobile-bg: #0c0f12;
+  --femo-mobile-bg-2: #11151a;
+  --femo-mobile-bg-3: #171d22;
+  --femo-mobile-surface: #11151a;
+  --femo-mobile-surface-hover: #1a2126;
+  --femo-mobile-border: rgba(255,255,255,0.10);
+  --femo-mobile-border-light: rgba(255,255,255,0.16);
+  --femo-mobile-border-strong: #232b31;
+  --femo-mobile-text-1: #e9eef0;
+  --femo-mobile-text-2: #8b96a0;
+  --femo-mobile-text-2-alt: #aeb8bf;
+  --femo-mobile-text-3: #5d6870;
+  --femo-mobile-danger-soft: #3d2326;
+  --femo-mobile-danger-border: rgba(248,113,113,0.4);
+  --femo-mobile-mask: rgba(6,8,10,0.78);
+
+  /* ── FEMO 预览条：web 深色代码槽 ── */
+  --femo-preview-bg: #0c0f12;
+  --femo-preview-bg-2: #11151a;
+  --femo-preview-text: #aeb8bf;
+  --femo-preview-text-2: #5d6870;
+  --femo-preview-border: rgba(255,255,255,0.10);
+
+  /* ── 形状：web 圆角放松一档（卡片 16 / 小件 10 → sm8 md10 lg12 xl16）── */
+  --femo-radius-xs: 3px;
+  --femo-radius-sm: 8px;
+  --femo-radius-md: 10px;
+  --femo-radius-lg: 12px;
+  --femo-radius-xl: 16px;
+  --femo-radius-top: 14px 14px 0 0;
+  --femo-radius-bubble: 10px 10px 10px 3px;
+
+  /* ── 字体：web 系统栈（控制台不做品牌字体，system-ui 直出）── */
+  --femo-font-sans: system-ui, 'Segoe UI', 'MiSans', 'Microsoft YaHei', sans-serif;
+  --femo-font-mono: ui-monospace, Consolas, 'JetBrains Mono', monospace;
+  --femo-font-body: system-ui, 'Segoe UI', 'MiSans', 'Microsoft YaHei', sans-serif;
+
+  /* ── 实心按钮：对齐 webAdapter 侧栏「灵魂席位」运行控制的语言——
+     唯一主操作=web 绿实底 + 深绿黑字（绿渐变的实色等价档）；次要动作
+     （暂停/继续）=中性深芯片 + 亮字，不再用红/琥珀实心糖果钮（web 操作台
+     全站只有绿色一种彩色按钮，其余都是玻璃芯片）── */
+  --femo-on-accent: #0d1a08;
+  --femo-btn-primary: #6fbf3a;
+  --femo-btn-success: #6fbf3a;             /* 运行=web 绿主按钮（与创建/挂载同款） */
+  --femo-btn-fg-success: var(--femo-on-accent);  /* 绿底深字（web button.primary） */
+  /* 暂停=灰红玻璃芯片（2026-09-30 二次改色，用户点单）：照抄 webAdapter 侧栏
+     button.danger 款（灵魂标签页在用）——白玻璃底+灰红 35% 描边+#f87171 灰红字，
+     打断类控制键的收敛红。继续（warning）保持绿玻璃：暂停=打断、继续=推进，红绿分义。
+     DSH 深/浅不定这些口，行内 var() 回退=红/琥珀实心+边框同底色，零变化 */
+  --femo-btn-danger: rgba(255,255,255,0.06);           /* 暂停底=白玻璃（webAdapter button 基底同款） */
+  --femo-btn-danger-border: rgba(248,113,113,0.35);    /* 暂停描边=灰红 35% */
+  --femo-btn-fg-danger: #f87171;                       /* 暂停字/图标=灰红（web --bad） */
+  --femo-btn-warning: rgba(111,191,58,0.14);           /* 继续底=同族绿玻璃 */
+  --femo-btn-warning-border: rgba(143,221,85,0.42);
+  --femo-btn-fg-warning: var(--femo-primary-strong);
+
+  /* ── 节点：玻璃面 + 白 alpha 细边（web 卡片边线语言，不是金线）── */
+  --femo-node-border: rgba(255,255,255,0.14);
+  --femo-node-border-w: 1px;
+
+  /* ── 节点阴影：玻璃工艺——顶部内高光 + 双层黑影（web shadow 家族）── */
+  --femo-node-shadow-rest: inset 0 1px 0 rgba(255,255,255,0.07), 0 2px 6px rgba(0,0,0,0.3), 0 10px 24px rgba(0,0,0,0.35);
+  --femo-node-shadow-sel: inset 0 1px 0 rgba(255,255,255,0.09), 0 4px 10px rgba(0,0,0,0.32), 0 16px 36px rgba(0,0,0,0.45);
+  --femo-node-shadow-rest-sm: inset 0 1px 0 rgba(255,255,255,0.06), 0 2px 10px rgba(0,0,0,0.32);
+  --femo-node-shadow-sel-sm: inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 24px rgba(0,0,0,0.42);
+
+  /* ── 连线：全线亮绿（用户拍板 2026-09-28）——普通顺序边与强调边（循环/for/自环）
+     同一 web 亮绿，选中更亮一档；流光光珠纯白通用 ── */
+  --femo-edge: #8fdd55;
+  --femo-edge-sel: #c3f19a;
+  --femo-edge-flow: #8fdd55;
+  --femo-edge-w: 1px;
+  --femo-edge-w-thin: 0.85px;
+  --femo-edge-w-sel: 1.5px;
+  --femo-edge-sheen: #ffffff;
+
+  /* ── 类型徽章：暗底 + 亮字（同 dsh-dark 语言；module 徽章=web .badge 绿底深字）── */
+  --femo-badge-bg-ai: var(--femo-type-ai-bg);
+  --femo-badge-fg-ai: #CFE2FA;
+  --femo-badge-bg-human: var(--femo-type-human-bg);
+  --femo-badge-fg-human: #D4F0E0;
+  --femo-badge-bg-mind: var(--femo-type-mind-bg);
+  --femo-badge-fg-mind: #FAD4D4;
+  --femo-badge-bg-func: var(--femo-type-func-bg);
+  --femo-badge-fg-func: #FAE8C2;
+  --femo-badge-bg-assign: var(--femo-type-assign-bg);
+  --femo-badge-fg-assign: #E4D9FF;
+  --femo-badge-bg-notice: var(--femo-type-notice-bg);
+  --femo-badge-fg-notice: #D8F0E2;
+  --femo-badge-bg-module: #6fbf3a;
+  --femo-badge-fg-module: #0d1a08;
+
+  /* 注意：不跟 dsh-dark 的 .femo-special-label 白字覆盖——web 的 on-accent 是
+     深绿黑字，跟了会把特殊节点标签写成深字配深玻璃底；行内类型亮字即可读。 */
+}
+
+/* ── web 主题专属动效（webAdapter 操作台签名，只在 web 主题下点亮）── */
+/* 流光：绿边配白光珠，随主题启用 */
+[data-femo-theme="web"] .femo-edge-comet { opacity: 1; }
+/* 按压缩放（web button:active scale(0.96) 同款，画布按钮收一点到 0.97） */
+[data-femo-theme="web"] button:active { transform: scale(0.97); }
+/* 绿选区（web ::selection 同款） */
+[data-femo-theme="web"] ::selection { background: rgba(111,191,58,0.35); }
+/* 仓库卡片 hover 变亮（webAdapter 灵魂页卡片同款：底与边同步提亮一档；
+   卡片自带的 grabTransition 含背景/边框两段，hover 平滑亮起回落）。
+   卡片底色/边框是行内样式，这里必须 !important 才盖得动——作用域锁死 web 主题，
+   且桌面无抓起态、手机触摸无 hover，与抓起态高亮互不抢。 */
+[data-femo-theme="web"] [data-femo-lib-drag^="action:"]:hover,
+[data-femo-theme="web"] [data-femo-lib-drag^="module:"]:hover,
+[data-femo-theme="web"] [data-femo-lib-drag^="position:"]:hover {
+  background: rgba(255, 255, 255, 0.10) !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+}
+[data-femo-theme="web"] [data-femo-lib-drag^="special:"]:hover {
+  background: rgba(255, 255, 255, 0.10) !important;
+}
 
 /* ══ 深色主题（占位，配色待后续设计）══
 [data-femo-theme="dark"] {

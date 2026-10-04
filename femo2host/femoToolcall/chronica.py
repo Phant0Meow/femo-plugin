@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-chronica.py — 直查活体 Chronica.wor（femo 运行台账 SQLite）。与 femo-chat.mjs 同族的剧场应急工具。
+chronica.py — 直查活体 Chronica.wor（femo 运行台账 SQLite）。宿主无关剧场应急工具（原与 femo-chat.mjs 同族；femo-chat 读 DSH 会话 zstd，2026-09-22 已移回 dshAdapter）。
 
 设计理念（2026-08-26 用户口述）：prompt 是教 AI 怎么说话，不属于对话流；
-showprompt 属于剧本正经旁白，属于正经对话流的一部分。
+showprompt 属于FEMO脚本正经旁白，属于正经对话流的一部分。
 因此本工具把台账拆成两幕呈现：
   【对话流】= showprompt 旁白 + AI 发言 + 人类输入（按时间线交织）；
   【幕后指令】= 节点 prompt（附录，非对话流）。
@@ -124,11 +124,14 @@ def main():
         "FROM dialog WHERE session_id=? ORDER BY id", (sid,)
     ):
         events.append((ts or 0, _classify(uid), tid, str(p), us, ss))
-    for ts, tid, soul, resp, us, ss in cur.execute(
-        "SELECT timestamp, turn_id, soul_id, response, user_scope, soul_scope "
+    for ts, tid, soul, resp, us, ss, model_id in cur.execute(
+        "SELECT timestamp, turn_id, soul_id, response, user_scope, soul_scope, model_id "
         "FROM react_steps WHERE session_id=? ORDER BY id", (sid,)
     ):
-        events.append((ts or 0, "ai", tid, f"{soul}: {resp}", us, ss))
+        # model_id（2026-10-02 存储层贯通）：本轮实际响应出处——provider/model
+        # 或 web:<站点名>（main=主模型下场渠道标记）；空=宿主未实现/未取到。
+        via = f" [via {model_id}]" if str(model_id or '').strip() else ""
+        events.append((ts or 0, "ai", tid, f"{soul}: {resp}{via}", us, ss))
     events.sort(key=lambda e: e[0])
 
     # ── 第一幕：对话流（旁白 / AI / 人类）──

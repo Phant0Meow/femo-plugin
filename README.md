@@ -11,12 +11,12 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-lightgrey?style=flat-square)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/Python-3.6%2B-blue?style=flat-square&logo=python)](https://www.python.org/)
 [![dsh插件](https://img.shields.io/badge/dsh-插件-blue?style=flat-square)](https://github.com/Phant0Meow/femo-plugin)
-[![剧本生成器](https://img.shields.io/badge/femo-剧本生成器-green?style=flat-square&logo=github)](https://github.com/Phant0Meow/femo-plugin/tree/main/femoGen)
+[![FEMO脚本生成器](https://img.shields.io/badge/femo-FEMO脚本生成器-green?style=flat-square&logo=github)](https://github.com/Phant0Meow/femo-plugin/tree/main/femoGen)
 [![语法文档](https://img.shields.io/badge/femo-语法文档-79b8d4?style=flat-square&logo=readthedocs)](https://github.com/Phant0Meow/femo-plugin/blob/main/%E8%AF%AD%E6%B3%95%E6%96%87%E6%A1%A3.md)
 
-# femo（Flow Emerges Mag Opus） —— 用写剧本的方式编排多智能体世界 <img width="31" height="35" alt="femo-logo" src="https://github.com/user-attachments/assets/942b2fe4-a96c-43d5-be76-67f4f8a6a72e" />
+# femo（Flow Emerges Mag Opus） —— 用写脚本的方式编排多智能体世界 <img width="31" height="35" alt="femo-logo" src="https://github.com/user-attachments/assets/942b2fe4-a96c-43d5-be76-67f4f8a6a72e" />
 
-> **新**：femo 现在以自包含插件的形式接入 **dsh（DeepSeek Harness）**——在 dsh 会话里直接开演多智能体剧本。见下方 **femo × dsh** 章节。
+> **新**：femo 现在以自包含插件的形式接入 **dsh（DeepSeek Harness）**——在 dsh 会话里直接启动运行多智能体FEMO脚本。见下方 **femo × dsh** 章节。
 
 ## **写harness的你，想改流程，要改多少文件，花多少时间？**
   
@@ -46,7 +46,7 @@ Agent 工作流改一次，要翻 5 个文件、调 2 小时、祈祷别崩。
 就算不用网页端拖拽，纯手写，femo代码也只需要200～300行就可跑通上述狼人杀全流程（其中还有prompt占行数）。
 视角分离只需要一行“scope: [@上帝] + 狼队”，并发投票只需要一行“par @player in allplayers:”。
 
-# 这是一种编排多Agent剧本的语言 + 一个编译器。
+# 这是一种编排多AgentFEMO脚本的语言 + 一个编译器。
 
 ## 你为什么选择femo？
 
@@ -54,7 +54,7 @@ Agent 工作流改一次，要翻 5 个文件、调 2 小时、祈祷别崩。
 搭多agent工作流，现在方案不是很多吗？
 
 **femo**：
-有些方案太复杂了，学习成本高。而femo语法简单直观，“剧本”好写好读。
+有些方案太复杂了，学习成本高。而femo语法简单直观，“FEMO脚本”好写好读。
 
 **你可能会说**：
 简单我也不想学。
@@ -71,7 +71,7 @@ femo有网页端零代码生成工作流。比如你想要好几个AI群聊，�
   femo支持for、par等各种语法，支持外接Python模块，你想写很复杂的功能也可以。
   还有原生人类节点，布置“人+AI+程序”的系统流程很顺手。
 - 而且还有些零代码平台，他们不让你带走你的工作流，你只能在他们平台上用。
-  femo却是后端编译器开源，你把编译器拿走放进你的项目，你的项目就可以跑任何femo剧本。
+  femo却是后端编译器开源，你把编译器拿走放进你的项目，你的项目就可以跑任何femo脚本。
 - 而且femo的多agent并发架构也挺好的。
 
 **你可能会说**：
@@ -85,12 +85,12 @@ femo有网页端零代码生成工作流。比如你想要好几个AI群聊，�
 |-----------|-----------|
 | 零代码拖拖拽拽出工作流 | ✅ 内置 femoGen 可视化编辑器 |
 | 就算写代码也希望语法简单 | ✅ femo语法行数比同类工作流都少 |
-| 改流程不改代码 | ✅ 剧本即流程——改剧本就行，不用改代码 |
+| 改流程不改代码 | ✅ FEMO脚本即流程——改脚本就行，不用改代码 |
 | AI 不串台、视角隔离 | ✅ 一行 `scope: [@A, @B]` 搞定 |
 | 嵌入自己的系统 | ✅ 编译器开源可接，Apache2.0商用友好；或者直接当 dsh 插件用，开箱即接 |
 | 人类也能加入 AI 群聊 | ✅ 原生 human 节点 |
 | 接入Python代码模块处理复杂任务 | ✅ 原生 func 节点，可接Python模块 |
-| 想把剧本分享给朋友，或者跑社区大神写好的优秀剧本 | ✅ 剧本可分享，复制剧本一键跑通 |
+| 想把FEMO脚本分享给朋友，或者跑社区大神写好的优秀FEMO脚本 | ✅ FEMO脚本可分享，复制FEMO脚本一键跑通 |
 
 ## 【快速开始！】 
 所以这个操作步骤够不够无脑？↓↓↓
@@ -108,12 +108,12 @@ dsh plugin --profile web add github:Phant0Meow/femo-plugin
 ```
 
 2. 重启 dsh web。完事。
-3. 会话里对主模型说话——它现在是导演：
-   - `femo-mount` 挂载剧本、`femo-run` 开演；心里没底就先 `femo-debug` 零 token 干跑自检。
-   - 或者直接让导演给你写一个剧本——写之前它会先读语法文档（`语法文档.md`），不凭印象猜语法。
-4. 聊天窗口就是舞台监视器：角色发言是彩色气泡，节点提示是公告条，流程状态是居中灰字。轮到 human 节点时直接打字，你的回复会桥接进引擎！
-5. 想拖拽？内置 femoGen 可视化编辑器零代码生成剧本，还自带零 token 干跑调试器。
-6. 或者复制这个femo剧本试试（放到插件文件夹的 `user_data/projects/` 下）：
+3. 会话里对主模型说话——它现在是主Agent：
+   - `femo-mount` 挂载FEMO脚本、`femo-run` 启动运行；心里没底就先 `femo-debug` 零 token 干跑自检。
+   - 或者直接让主Agent给你写一个FEMO脚本——写之前它会先读语法文档（`语法文档.md`），不凭印象猜语法。
+4. 聊天窗口就是运行监视器：角色发言是彩色气泡，节点提示是公告条，流程状态是居中灰字。轮到 human 节点时直接打字，你的回复会桥接进引擎！
+5. 想拖拽？内置 femoGen 可视化编辑器零代码生成FEMO脚本，还自带零 token 干跑调试器。
+6. 或者复制这个femo脚本试试（放到插件文件夹的 `user_data/projects/` 下）：
 
 ```femo
 meta:
@@ -143,7 +143,7 @@ mainflow:
   [START] -> [input]:input -> EveMove -> CatMove -> [input]    // 比较像mermaid语法。可以最后指回到[input]节点形成一个循环。
 ```
 
-   （想接自己的Python？func 节点 + `file:"xxx.py"`（相对剧本所在目录解析）就行，详见`语法文档.md`。）
+   （想接自己的Python？func 节点 + `file:"xxx.py"`（相对FEMO脚本所在目录解析）就行，详见`语法文档.md`。）
 
 7. 然后你就可以和Eve以及小猫咪聊天了！
 
@@ -151,15 +151,15 @@ mainflow:
 
 ## femo × dsh：接入 DeepSeek Harness（dsh）的自包含插件
 
-femo 现在以自包含插件的形式接入 dsh（DeepSeek Harness）——引擎、桥接器、可视化编辑器、用户数据目录全在一个文件夹里。整个文件夹搬到哪里都能用，不需要任何外部 femo 安装。
+femo 现在以自包含插件的形式接入 dsh（DeepSeek Harness）——引擎（常驻进程 femo_daemon.py）、宿主接口层、可视化编辑器、用户数据目录全在一个文件夹里。整个文件夹搬到哪里都能用，不需要任何外部 femo 安装。
 
-一个 dsh 会话 = 主模型会话 + 多智能体剧本引擎：
+一个 dsh 会话 = 主模型会话 + 多智能体FEMO脚本引擎：
 
-- **主模型 = 导演**：可以正常聊天，也能写/改剧本（`femo-mount` 挂载）、零 token 干跑自检（`femo-debug`）、一键开演（`femo-run`）。剧本运行时引擎接管会话，空闲时主模型照常可用；运行中你在主窗口跟主模型说话 = 完整的一轮原生对话，戏内戏外不掺一轮。
-- **上帝/角色视角 = 子代理投影窗**：每个角色一个投影窗，角色发言投影进对应窗口；主会话表面只留戏外内容——主模型上下文天然干净。
-- **聊天窗口 = 舞台监视器**：角色发言渲染为彩色气泡，节点提示渲染为公告条，流程状态居中灰字。
+- **主模型 = 主Agent**：可以正常聊天，也能写/改脚本（`femo-mount` 挂载）、零 token 干跑自检（`femo-debug`）、一键启动运行（`femo-run`）。FEMO 运行时引擎接管会话，空闲时主模型照常可用；运行中你在主窗口跟主模型说话 = 完整的一轮原生对话，FEMO内外不掺一轮。
+- **上帝/角色视角 = 子代理投影窗**：每个角色一个投影窗，角色发言投影进对应窗口；主会话表面只留FEMO外内容——主模型上下文天然干净。
+- **聊天窗口 = 运行监视器**：角色发言渲染为彩色气泡，节点提示渲染为公告条，流程状态居中灰字。
 - 每轮发给 LLM 的 system prompt 与上下文由 femo 引擎按角色组装（soul 卡片 + 记忆 + scope 视角隔离）；AI 节点可走 dsh 子代理（原生工具调用 + 思考链），也可走引擎内置 LLM 桥。
-- 剧本语言升级为 `.femo`：scope 视角隔离、par 并行、fork/join 网关、断点续跑、`@mind` 运行时分发、AI 角色可用 `source` 指定模型；编译期校验，写错立即报错（详见`语法文档.md`）。
+- FEMO脚本语言升级为 `.femo`：scope 视角隔离、par 并行、fork/join 网关、断点续跑、`@mind` 运行时分发、AI 角色可用 `source` 指定模型；编译期校验，写错立即报错（详见`语法文档.md`）。
 - 配置都在 profile 的 `cordis.patch.yml` 里，全部可省略：`provider` / `model` / `apiUrl`（引擎 AI 节点的 LLM 路由）、`hostAiBackend`、`python`、`femoRoot` 等，不配置也能开箱即用。不想一键安装？把整个文件夹放进 profile 的 `node_modules`（或 junction 过去），`pip install requests`，在 `cordis.patch.yml` 注册 `femo-plugin`，重启 dsh web 即可。注意：插件根目录应注册在 `hostAdapter/dshAdapter` 文件夹下，它会自动往上找两层文件夹。
 
 目前还比较早期，bug 不少，欢迎开发者一起来品鉴——它真的非常好玩。
@@ -169,22 +169,22 @@ femo 现在以自包含插件的形式接入 dsh（DeepSeek Harness）——引�
 ```
 femo-plugin/                  ← 整个文件夹就是插件
 ├── hostAdapter/              宿主适配层（2026-09-13 重构归拢）：
-│   ├── dshAdapter/             dsh 接口侧（host/ 宿主进程 TS + client/ 聊天窗 bundle + python/ 桥进程，见其 README.md）
+│   ├── dshAdapter/             dsh 接口侧（host/ 宿主进程 TS + client/ 聊天窗 bundle，引擎直连常驻进程；python/ 桥转发壳退役倒计时，见其 README.md）
 │   └── zcodeAdapter/           zcode 接口侧（mcp 网关 / hooks / skills / commands）
 ├── femo2host/                引擎→宿主边界层（2026-09-13 重构归拢）：
 │   ├── femo_api.py             引擎门面（宿主唯一 import 入口）
 │   ├── femo_gen_api.jsx        编辑器门面（宿主 client bundle 唯一 import 入口）
 │   └── femoToolcall/           AI 工具箱：femo_debugger / chronica / femo-chat
-├── femoGen/                可视化剧本编辑器（React/Vite）
+├── femoGen/                可视化FEMO脚本编辑器（React/Vite）
 ├── femoCompiler/            femo 引擎：parser / runtime / 并发 / SQLite 记忆
 ├── femoBridges/             LLM 桥 + getDir（用户目录解析）
-├── femoExamples/           示例与测试剧本（.femo）+ 伴生 @func 模块
-├── user_data/              ★ 运行时数据：projects（你的剧本）/ memory（台账）/ host-history（会话显示：projections 投影窗 + drafts 草稿）/ jobs（后端 Job 状态）
+├── femoExamples/           示例与测试脚本（.femo）+ 伴生 @func 模块
+├── user_data/              ★ 运行时数据：projects（你的脚本）/ memory（台账）/ host-history（会话显示：projections 投影窗 + drafts 草稿）/ jobs（后端 Job 状态）
 ├── host.manifest.json      宿主能力清单（thinking 档位/默认用户——接别的 harness 换这份文件）
 ├── （dsh 插件根 = hostAdapter/dshAdapter/：package.json / lib / build.mjs / cordis.patch.yml / host.manifest.json / tsconfig 都在那里）
 ```
 
-**用户数据自包含**：数据库、剧本、checkpoint 都落在本文件夹的 `user_data/` 下——整个文件夹打包/拷贝，数据跟着走。
+**用户数据自包含**：数据库、FEMO脚本、checkpoint 都落在本文件夹的 `user_data/` 下——整个文件夹打包/拷贝，数据跟着走。
 
 ## 配置（cordis.patch.yml 可覆盖）
 
@@ -195,7 +195,7 @@ femo-plugin/                  ← 整个文件夹就是插件
 | `provider` / `model` / `apiUrl` | deepseek / deepseek-v4-flash / api.deepseek.com | 引擎 AI 节点的 LLM 路由（引擎内置桥） |
 | `hostAiBackend` | `true` | AI 节点走宿主子代理（原生工具调用 + 思考链）；旧配置名 `dshAiBackend` 兼容 |
 | `dshProvider` | `deepseek-official` | 裸 id `source` 归属的 dsh LLM provider；空 source 跟随主模型（见语法文档） |
-| `defaultActorTools` | `true` | 角色未声明 `tools:` 时的工具开关；剧本里可逐角色 `tools: true/false` 或白名单 |
+| `defaultActorTools` | `true` | 角色未声明 `tools:` 时的工具开关；脚本里可逐角色 `tools: true/false` 或白名单 |
 
 手动装配时的注册写法（一键安装可跳过）：
 
@@ -273,62 +273,61 @@ export const KNOWN_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([
 
 </details>
 
-## 剧本（会话操作）
+## FEMO脚本（会话操作）
 
-`.femo` 剧本放在 `user_data/projects/`（子目录或直接文件）。侧边栏 🎭 按钮新建 femo 会话，会话顶部「femo 剧本」面板选择/编辑/保存并运行；👁 视角切换（上帝/角色视角/🎬 戏外主模型）。
+`.femo` FEMO脚本放在 `user_data/projects/`（子目录或直接文件）。侧边栏 🎭 按钮新建 femo 会话，会话顶部「FEMO脚本」面板选择/编辑/保存并运行；👁 视角切换（上帝/角色视角/🎬 FEMO外主模型）。
 
 ### @func / `file:` 文件放置约定
 
-剧本 `code:` 区通过 `file:"xxx.py"` 引用 Python 模块，地址按以下规则解析：
+FEMO脚本 `code:` 区通过 `file:"xxx.py"` 引用 Python 模块，地址按以下规则解析：
 
 | 写法 | 解析 |
 |---|---|
 | 绝对路径，如 `file:"D:/a/b.py"` | 直接使用 |
-| 相对路径，如 `file:"utils/battle.py"` | 相对**剧本文件所在目录**解析（不是项目根、不是 CWD） |
-| 剧本未保存（纯文本运行）时用相对路径 | 报错：提示先「导出 .femo」保存剧本，或改用绝对路径 |
+| 相对路径，如 `file:"utils/battle.py"` | 相对**脚本文件所在目录**解析（不是项目根、不是 CWD） |
+| 脚本未保存（纯文本运行）时用相对路径 | 报错：提示先「导出 .femo」保存FEMO脚本，或改用绝对路径 |
 | 文件不存在 | 报错 `Python Bridge: 文件不存在 <完整路径>`（不静默兜底） |
 
-官方示例 @func 模块（wait.py 等）就放在各示例剧本旁边（如 `femoExamples/fiat/`、`femoExamples/常用工具python/`）作为参考样本（首启自动复制机制已于 2026-09-12 移除，也没有任何全局回退查找位置）。自定义模块请放在剧本同目录（或子目录），与剧本一起移动。
+官方示例 @func 模块（wait.py 等）就放在各示例FEMO脚本旁边（如 `femoExamples/fiat/`、`femoExamples/常用工具python/`）作为参考样本（首启自动复制机制已于 2026-09-12 移除，也没有任何全局回退查找位置）。自定义模块请放在FEMO脚本同目录（或子目录），与FEMO脚本一起移动。
 
-## 出错了怎么办（剧本容错）
+## 出错了怎么办（FEMO脚本容错）
 
-写剧本不用怕演员演砸，运行时的错误各有个的去处：
+写脚本不用怕角色演砸，运行时的错误各有个的去处：
 
-- **网络/限流自动兜底**：模型限流、网络抖动这类临时毛病，请求层自动退避重试（最长约 15 分钟），你无感；实在连不上，该节点按"沉默收场"处理，剧本继续往下走，不会中途断掉
-- **演错了自动重来**：演员忘了写 SET VARIABLE、写错变量名这类剧本错误，引擎会把报错发回给演员本人（子代理窗/主窗口能看到 ⚠️），让 ta 修正后重演；次数由节点 `max_retries` 控制（默认 2 次）
-- **每次报错都告诉你**：每次剧本错误都会实时出现在聊天窗（⚠️）和错误面板，不管重试有没有救回来；被跳过的节点会在剧终汇总报给导演，不会悄悄吞掉
-- **致命错误立即喊停**：配置缺失（没 key/没模型）、剧本语法错误这类救不回来的，立刻停下并把原因报给你
+- **网络/限流自动兜底**：模型限流、网络抖动这类临时毛病，请求层自动退避重试（最长约 15 分钟），你无感；实在连不上，该节点按"沉默收场"处理，FEMO脚本继续往下走，不会中途断掉
+- **演错了自动重来**：角色忘了写 SET VARIABLE、写错变量名这类脚本错误，引擎会把报错发回给角色本人（子代理窗/主窗口能看到 ⚠️），让 ta 修正后重演；次数由节点 `max_retries` 控制（默认 2 次）
+- **每次报错都告诉你**：每次脚本错误都会实时出现在聊天窗（⚠️）和错误面板，不管重试有没有救回来；被跳过的节点会在运行结束汇总报给主Agent，不会悄悄吞掉
+- **致命错误立即喊停**：配置缺失（没 key/没模型）、脚本语法错误这类救不回来的，立刻停下并把原因报给你
 
 人类节点同样有容错：变量赋值不合法时输入框会带着错误提示重新打开，改到合法为止（同样受 `max_retries` 约束，超限按超时放行留痕）。
 
 ## 调试（零 token 干跑）
 
-正式运行前先空跑一遍：`femo_debugger.py` 伪装成宿主（FakeHost），AI 动作与人类输入全部由调试器合成替答——**不调用任何模型**，引擎仍按真实管线跑完整流程（赋值校验、条件边、循环、par/fork、module、`@func` 落库全套走一遍），所以它既测剧本 bug，也暴露引擎 bug。
+正式运行前先空跑一遍：`femo_debugger.py` 伪装成宿主（FakeHost），AI 动作与人类输入全部由调试器合成替答——**不调用任何模型**，引擎仍按真实管线跑完整流程（赋值校验、条件边、循环、par/fork、module、`@func` 落库全套走一遍），所以它既测FEMO脚本 bug，也暴露引擎 bug。
 
 - **人看**：femoGen 左下角打开调试窗 → 头部「编译」按钮，DebugLogBus 流水（节点进出 / 变量 `old → new` / 合成赋值与来源 / 重试 / 告警）实时流进面板
-- **AI 看**：主模型有 `femo-debug` 工具——把当前挂载的剧本干跑一遍，流水 + 终报（每轮结局与报错、节点执行顺序、边覆盖、变量快照 diff、未达节点）一次性回给主模型，写/改完剧本先自检再开演
+- **AI 看**：主模型有 `femo-debug` 工具——把当前挂载的脚本干跑一遍，流水 + 终报（每轮结局与报错、节点执行顺序、边覆盖、变量快照 diff、未达节点）一次性回给主模型，写/改完FEMO脚本先自检再启动运行
 - **无副作用**：不起 Job、不占会话、不写生产台账（引擎落库走独立沙盒 `cache/debug-sandbox/`，滚动保留最近 3 天）、可反复跑；同一时刻只允许一条干跑
-- **更细的玩法**（CLI，用法见 `femo_debugger.py` 文件头）：`run <剧本> --module 名` 单测某模块、`--set 变量=值` 定向注入初始状态、`--assign-prob 0.7` 概率沉默、`--flaky 0.3` 注入无效赋值测重试链路、`--runs N` 多轮换种子
+- **更细的玩法**（CLI，用法见 `femo_debugger.py` 文件头）：`run <FEMO脚本> --module 名` 单测某模块、`--set 变量=值` 定向注入初始状态、`--assign-prob 0.7` 概率沉默、`--flaky 0.3` 注入无效赋值测重试链路、`--runs N` 多轮换种子
 
 ## 暂停与继续（运行控制）
 
 每一次运行是一个独立的 **Job**，有自己的档案（`user_data/runs/`）：跑到哪个节点、变量世界什么样、正在演还是被挂起，全记在里面。所以：
 
-- **暂停 ≠ 作废**：随时点「暂停」，演出挂起存档（断点保留可续跑），画布按钮变「继续」，点一下从断点接着演，不是从头重跑
-- **「从头」**：作废断点重新开演（按钮就在「继续」旁边）
-- **改了剧本再点「继续」**：会被拒绝并明说（改了剧本就是新戏）——想跑新版请点「从头」
+- **暂停 ≠ 作废**：随时点「暂停」，运行挂起存档（断点保留可续跑），画布按钮变「继续」，点一下从断点接着演，不是从头重跑
+- **「从头」**：作废断点重新启动运行（按钮就在「继续」旁边）
+- **改了FEMO脚本再点「继续」**：会被拒绝并明说（改了FEMO脚本就是新戏）——想跑新版请点「从头」
 - **断电/重启不丢**：引擎重启时自动对账，上次没演完的 Job 标记为挂起，「继续」照常可用
 - **AI 也能找回戏**：`femo-run` 工具有 `fresh_start` / `pause` / `resume` / `list_jobs` 四个动作——主模型可以自己列出历史 Job、把落下的戏续上（哪怕隔了好几场）
 
-> 备注：直连模式（不走 dsh 子代理、用引擎内置 LLM 桥）下 AI 调用失败时，演出同样走「挂起存档」而不是报错卡死；画布上显示的是「已暂停」，点「继续」即可重试该节点。
+> 备注：直连模式（不走 dsh 子代理、用引擎内置 LLM 桥）下 AI 调用失败时，运行同样走「挂起存档」而不是报错卡死；画布上显示的是「已暂停」，点「继续」即可重试该节点。
 
 ## 开发与测试
 
 ```bash
 npm install
-powershell -ExecutionPolicy Bypass -File scripts/link-workspace.ps1   # 建 @deepseek-ai 构建镜像（Windows junction）
+powershell -ExecutionPolicy Bypass -File developer/scripts/link-workspace.ps1   # 建 @deepseek-ai 构建镜像（Windows junction）
 npm run build                 # lib/index.js（host）+ lib/client.js（browser）
-python hostAdapter/dshAdapter/python/dev-bridge-test.py   # 桥接器协议冒烟
 ```
 
 ## 许可证
@@ -336,11 +335,11 @@ python hostAdapter/dshAdapter/python/dev-bridge-test.py   # 桥接器协议冒�
 Apache-2.0
 
 ## 设计哲学
-- 🔗 **流程解耦**：femo 把「流程定义」和「代码实现」彻底解耦。Harness 是死的，femo 是活的——改流程只需要改剧本，其他交给编译器。
-- 🎬 **用剧本写流程**：语法灵感来自 YAML + Mermaid + Python，写多 Agent 交互就像写剧本，让**在场**的 AI 自然地共享上下文，极短代码就能跑一个简易版斯坦福小镇。
+- 🔗 **流程解耦**：femo 把「流程定义」和「代码实现」彻底解耦。Harness 是死的，femo 是活的——改流程只需要改脚本，其他交给编译器。
+- 🎬 **用FEMO脚本写流程**：语法灵感来自 YAML + Mermaid + Python，写多 Agent 交互就像写脚本，让**在场**的 AI 自然地共享上下文，极短代码就能跑一个简易版斯坦福小镇。
 - 🧠 **上下文不是变量**：LLM 是智慧体，不是函数。LLM 阅读上下文，自然聊天，非必要不传参。
 - 🧩 **原创 @actor 类型**：智慧体（LLM或人）作为一种新的数据类型，femo语法支持直接引用其属性。
-- 🏷️ **灵魂id**：每个agent角色有唯一灵魂id，这支持他们跨剧本、跨session检索记忆。可塑造Agent的经历连续性。
+- 🏷️ **灵魂id**：每个agent角色有唯一灵魂id，这支持他们跨FEMO脚本、跨session检索记忆。可塑造Agent的经历连续性。
 
 ## 给开发者
 - 🔀 **流程控制**：语法原生支持串行、多分支、while循环，for循环、par并行、join汇入控制、if条件判断。
@@ -352,8 +351,8 @@ Apache-2.0
 - 🤖 **用 femo 回答训练模型**：比如femo流程约束“缺少信息必须先问”……求求你们蒸馏一下这个吧，现在的 LLM 不肯承认自己无法回答，缺信息也要瞎猜。
 
 ## 本人真实案例
-- 写代码debug的时候，我用 femoGen 编辑器 20 分钟搭出的femo剧本「debug神器」（见 femoExamples/debug神器/），找复杂隐蔽 bug 超好用。
-- 有一次网页版 Claude Sonnet 改了三遍都没找到的 bug，用这个femo剧本 + 不开思考的小米 MiMo 给我找出来了……我都惊呆了。这就是harness的力量吗……
+- 写代码debug的时候，我用 femoGen 编辑器 20 分钟搭出的femo脚本「debug神器」（见 femoExamples/debug神器/），找复杂隐蔽 bug 超好用。
+- 有一次网页版 Claude Sonnet 改了三遍都没找到的 bug，用这个femo脚本 + 不开思考的小米 MiMo 给我找出来了……我都惊呆了。这就是harness的力量吗……
 - 然后我突然一拍脑袋想到，在AI跑流程的时候我想随时插话，免得他们跑偏，就用半分钟时间加了一个人类发言节点，接着一键跑通。改流程真是太方便了。
 <img width="1376" height="914" alt="42a91a7174f74a48784262606cba05cd" src="https://github.com/user-attachments/assets/970bde13-de50-4a38-ab57-ee6d27581ab2" />
 （是这么个流程。红圈圈出来的就是我 5 秒加的随时插话……事实上半分钟说多了，真用不了十秒钟。）
@@ -361,23 +360,23 @@ Apache-2.0
 ## 欢迎试用、反馈问题、贡献代码！
 - 欢迎提交 Issue！有bug欢迎提～肯定有 bug 的，这才第一版。
 - 欢迎 Pull Request！多好玩啊来一起搞吧！
-- 欢迎提交你写的femo剧本！这个也是很好的贡献～
-  (我就把自用的debug剧本（femoExamples/debug神器/）放文件夹里当示例了哈哈哈。欢迎你们也试试～不过这个剧本建议只用来找复杂隐蔽的 bug 哦，日常开发可能更适配别的femo流程，欢迎你们分享！)
+- 欢迎提交你写的femo脚本！这个也是很好的贡献～
+  (我就把自用的debugFEMO脚本（femoExamples/debug神器/）放文件夹里当示例了哈哈哈。欢迎你们也试试～不过这个FEMO脚本建议只用来找复杂隐蔽的 bug 哦，日常开发可能更适配别的femo流程，欢迎你们分享！)
 
 ## one more thing...
 - 最后还有一个非常有想象力的特性，或许你们会觉得有意思：
   
   你在数据库里建了很多角色身份，你给它们起名字，并给每个agent分配唯一一个soul id。
   
-  对于每个femo剧本，只要指向同一个Soul ID和同一个数据库地址，agent的记忆其实是可以跨剧本互通的（只要你接的记忆模块允许跨session记忆）。
+  对于每个femo脚本，只要指向同一个Soul ID和同一个数据库地址，agent的记忆其实是可以跨FEMO脚本互通的（只要你接的记忆模块允许跨session记忆）。
   
-  就是说斯坦福小镇的镇民Portia，被你拉进了一个狼人杀剧本，玩了两局，并交到了一个在AI公司剧本里写代码的朋友，之后Portia再回到斯坦福小镇的剧本时，他可以记得这件事，他也可以记得朋友。
+  就是说斯坦福小镇的镇民Portia，被你拉进了一个狼人杀FEMO脚本，玩了两局，并交到了一个在AI公司脚本里写代码的朋友，之后Portia再回到斯坦福小镇的脚本时，他可以记得这件事，他也可以记得朋友。
   
-  如果你允许AI创建femo剧本并运行（←工具调用模块现在已经接上了），AI闲得无聊了，真的可以自己给自己写个剧本，运行了进去玩……
+  如果你允许AI创建femo脚本并运行（←工具调用模块现在已经接上了），AI闲得无聊了，真的可以自己给自己写个FEMO脚本，运行了进去玩……
   
-  如果Portia想念他的朋友，只要他知道朋友的soul id，他也可以创建一个剧本把朋友拉进来一起玩。
+  如果Portia想念他的朋友，只要他知道朋友的soul id，他也可以创建一个FEMO脚本把朋友拉进来一起玩。
   
-  而且，每个灵魂都会在数据库中留下痕迹。就算你删掉了某个soul id，曾经和他对话过的AI也依然可以记得他，只不过再也无法拉着他的soul id去玩新的剧本了。
+  而且，每个灵魂都会在数据库中留下痕迹。就算你删掉了某个soul id，曾经和他对话过的AI也依然可以记得他，只不过再也无法拉着他的soul id去玩新的脚本了。
 
   这个特性看起来没啥用，但是……
   

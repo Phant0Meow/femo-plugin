@@ -9,7 +9,7 @@ femoBridge/llmBridge.py —— FEMO 通用 LLM 桥接器
 import os
 import threading
 import sys
-from femoBridges.llmProviders import stream_chat, detect_provider, get_provider_config
+from femoBridges.llmProviders import stream_chat, detect_provider  # get_provider_config 已退役观察期（2026-09-26），随其注释摘除本引用
 from femoCompiler.FEMO_errors import FEMOConfigError, FEMOTransientError
 
 

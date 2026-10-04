@@ -1,224 +1,147 @@
 /**
- * bridge.ts — Femo bridge client（与 Python 引擎通话的电话线）。
+ * bridge.ts — DSH 侧引擎绑定（常驻引擎直连，2026-09-26 第3步；薄壳）。
  *
- * 管理 femo_bridge.py 子进程：NDJSON over stdio 的请求/响应配对，引擎事件
- * 以 (name='femo-plugin/event', eventType, data) 形式 re-emit——emit 由 index.ts
- * 总装时注入为 ctx.emit（FemoBridge 自身不依赖事件总线）。
- * 从 index.ts 原样迁出（2026-08-23 重构）。
+ * 常驻化第 3 步「适配器直连」：DSH 不再生 Python 桥子进程——直连常驻引擎
+ * femo_daemon.py 的三个 HTTP 面（发令 /cmd、订阅 /engine/events、门铃
+ * /engine/doorbell）。协议机唯一活在 femo2host/host/daemon-client.mjs
+ * （公共层，zcode 同吃），本文件只剩 DSH 特有的接线：
+ *  ① 身份装配：信箱宿主 id（dsh-<port>，2026-09-24 多实例并存）+ 投影自称
+ *     （FEMO_HOST_NAME env / 清单 host 字段）——双词齐传；
+ *  ② 推送户门铃：驿站收件口（mailbox-push 监听器）端口经 pushUrl 交客户端
+ *     心跳续期（旧世界 FEMO_PUSH_PORT spawn env 由门铃注册表取代）；
+ *  ③ 诊断挂钩：事件进诊断流 + emit 插座（index.ts 事后注入）。
+ * 对外接口（FemoBridge/start(ctx,config)/send/stop/alive/pushPort/onExited/
+ * sendActorFailure）与原版完全一致——index.ts/engine-events/routes/tools/
+ * bridge-supervisor 零改动换芯。语义差异（常驻化的本意，见 daemon-client 文件头）：
+ * stop() 只断自己不发 shutdown——引擎常驻站岗，关窗戏演完（金标准①）；引擎
+ * print/stderr 归 daemon 日志文件（<数据根>/projection/logs/femo_daemon.log），
+ * 不再流经本进程。C1 监督（bridge-supervisor）语义保留：daemon 换家（pid 变）
+ * 触发 onExited → 清账 → ping 轮询 → 重建索引（start 重入安全，幂等）。
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { SubprocessHandle } from '@deepseek-ai/dsh-subprocess'
-import { join } from 'node:path'
-import { pushDiag } from './diag-feed'
+import { readFileSync } from 'node:fs'
+import { pushDiag } from './diag/diag-feed'
+import { DaemonClient } from '../../../femo2host/host/daemon-client.mjs'
 
-interface PendingRequest {
-  resolve(value: unknown): void
-  reject(error: Error): void
+/** 宿主自称：读本地能力清单（host.manifest.json）的 `host` 字段——'dsh' / 'zcode'。
+ *  它就是投影中心的**来源标签**（多宿主共演同一次时，行/段键/信任集都按它分
+ *  命名空间，2026-09-19 联机改造）。读不到就空串，hub 退回单来源老行为。 */
+function hostNameOf(manifestFile: string): string {
+  try {
+    const data = JSON.parse(readFileSync(manifestFile, 'utf8')) as { host?: unknown }
+    const h = typeof data.host === 'string' ? data.host.trim() : ''
+    return h
+  } catch {
+    return ''
+  }
 }
+
+/** 信箱宿主 id（驿站 target_host / 归属闸的同一把尺）：检测到 dsh web
+ *  进程的 `--port <N>`（两个版本的启动脚本都带）时派生 `dsh-<N>`，多实例并存
+ *  时各认各的信、互不抢餐（2026-09-24 双桥抢信事故：3081/3083 并存、两桥都用
+ *  默认 'dsh'，台词信被对方桥捞走 → job_not_active 静默吞答案 → 运行卡死）。
+ *  检测不到端口回退 'dsh'（单实例/旧形态零感知）。注意这只管「信箱信」这一张
+ *  身份——投影来源标签（hostNameOf）与名册/绑定面是另外的身份平面，刻意不动。 */
+export function mailboxHostIdOf(argv: string[] = process.argv): string {
+  const i = argv.indexOf('--port')
+  const port = i >= 0 ? argv[i + 1] : undefined
+  return port !== undefined && /^\d+$/.test(port) ? `dsh-${port}` : 'dsh'
+}
+
+/** 宿主执行体最终失败信号（B5）：正身唯一活在公共层 daemon-client.mjs（2026-09-26
+ *  随常驻化迁入；当时 dsh 这份本地逐字副本漏拆，2026-09-29 退役）——一行再导出
+ *  保消费面零改动（dispatch/main/native/mailbox-push 仍从 ../bridge 取）。 */
+export { sendActorFailure } from '../../../femo2host/host/daemon-client.mjs'
 
 export class FemoBridge {
-  private handle: SubprocessHandle | undefined
-  private readonly pending = new Map<number, PendingRequest>()
-  private nextId = 1
-  private lineBuf = ''
+  /** 驿站投递员上门端口（index.ts 起好收件口后注入；undefined=自取模式）。
+   *  直连后换形为门铃 URL 交 daemon 注册表（每 10s 心跳，TTL 30s 过期留柜）。 */
+  pushPort?: number
 
-  /** 进程退出回调（index.ts 接线）：引擎半路死亡时不会有任何终止事件
-   * （flow_done/flow_paused），宿主 runState.running 会卡 true——在这里
-   * 让总装层清理孤儿运行态（2026-08-24）。 */
-  onExited?: (outcome: unknown) => void
+  /** 投影事件插座（index.ts 事后注入 `(bridge as any).emit = ...`）。 */
+  emit?: (name: string, ...args: unknown[]) => void
+
+  /** 引擎半路死亡回调（bridge-supervisor 的 C1 自愈接线点）。 */
+  onExited?: () => void
+
+  private client?: DaemonClient
+
+  constructor() {}
 
   get alive(): boolean {
-    return this.handle !== undefined
+    return this.client?.alive ?? false
   }
 
-  /** Spawn the bridge and wire stdout line parsing. */
-  start(ctx: Context, config: { python: string; femoRoot: string; hostManifest: string }, attempt = 0): void {
-    if (this.handle !== undefined) return
-    const subprocess = ctx.get('subprocess') as {
-      resolveExecutable(command: string, env?: Record<string, string>, signal?: AbortSignal): Promise<string>
-      spawn(spec: unknown): SubprocessHandle
-    } | undefined
-    if (subprocess === undefined) {
-      // 插件树并发装配：本插件 apply 可能先于 base bundle 的 subprocess
-      // provider 完成（rc.2 快照插件更多、apply 更慢，固定 1s 延迟不再够）。
-      // 轮询等待而不是一次性放弃——最多 30s。
-      if (attempt < 30) {
-        setTimeout(() => this.start(ctx, config, attempt + 1), 1000)
-        return
-      }
-      console.log('[femo-plugin] subprocess service unavailable after 30s; bridge not started')
-      return
+  /** 发命令（与原 BridgeClient.send 同形同义：resolve=result、reject=Error）。 */
+  send(cmd: string, args?: Record<string, unknown>, timeoutMs?: number): Promise<unknown> {
+    const client = this.client
+    if (client === undefined) return Promise.reject(new Error('bridge not running'))
+    return client.send(cmd, args, timeoutMs)
+  }
+
+  /** 装配并连上常驻引擎（原签名不变；重入安全——C1 respawn 幂等）。
+   *  旧世界的 subprocess 服务 spawn 退役；dsh 配置的 python 仍经 subprocess
+   *  服务解析成绝对路径（解析不到就回落原词，daemon 侧 spawn 再兜 FEMO_PYTHON/
+   *  'python' 并响亮报错）。 */
+  start(ctx?: Context, config?: { python: string; femoRoot: string; hostManifest: string }): void {
+    if (this.alive) return
+    if (config === undefined) {
+      throw new Error('femo-plugin: bridge.start(config) is required')
     }
-    if (attempt > 0) console.log(`[femo-plugin] subprocess service ready after ${attempt}s wait; starting bridge`)
-    // Bridge lives inside the Femo project itself (self-contained plugin):
-    // <femoRoot>/python/femo_bridge.py
-    const bridgePath = join(config.femoRoot, 'hostAdapter', 'dshAdapter', 'python', 'femo_bridge.py')
-    // 宿主能力清单（A2.1 解耦）：harness 的词汇与环境（thinking 档位/默认用户）
-    // 由接口侧这份文件提供，引擎启动时读取——换 harness 换文件，引擎零改动。
-    // 文件缺失时引擎用内置缺省（standalone 自圆满）。清单随插件根（适配器本地，
-    // 2026-09-13 插件根下沉后由 config.hostManifest 给出）。
-    const hostManifestPath = config.hostManifest
-    void subprocess.resolveExecutable(config.python).then((pythonPath) => {
-      const handle = subprocess.spawn({
-        argv: [pythonPath, bridgePath, '--fe4m', config.femoRoot, '--host-manifest', hostManifestPath],
-        cwd: config.femoRoot,
-        stdio: {
-          stdin: 'pipe',
-          stdout: 'pipe',
-          // 'pipe' (not collect): the caller owns the stream and forwards
-          // tracebacks live; a collect buffer would swallow them silently.
-          stderr: 'pipe',
-        },
-        graceMs: 3000,
-        env: { PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' },
-      })
-      this.handle = handle
-      handle.stdout?.on('data', (chunk: Buffer) => this.onData(chunk))
-      // Bridge stderr (Python tracebacks) must not vanish: forward every line.
-      handle.stderr?.on('data', (chunk: Buffer) => {
-        const text = chunk.toString('utf8')
-        for (const line of text.split(/\r?\n/)) {
-          if (line.trim().length === 0) continue
-          // 【2026-09-11 编译器页补 stderr】引擎 stderr（Python traceback 之类）
-          // 进调试窗『编译器』页，`[stderr] ` 前缀与 stdout 原文区分。
-          pushDiag('engine', `[stderr] ${line}`.slice(0, 400))
-          // 【2026-09-11 Host 页口径】引擎侧透传绕过 console 直写 stdout：
-          // 这是"引擎的话"不是"DSH 接口侧的话"，不进『Host』页；
-          // harness 日志照旧收得到，一个字没少。
-          process.stdout.write(`[femo-engine:stderr] ${line}\n`)
-        }
-      })
-      handle.done.then((outcome) => {
-        console.log(`[femo-plugin] bridge exited: code=${outcome.exitCode} signal=${outcome.signal}`)
-        for (const [, pending] of this.pending) {
-          pending.reject(new Error(`bridge exited (code=${outcome.exitCode})`))
-        }
-        this.pending.clear()
-        this.handle = undefined
-        try { this.onExited?.(outcome) } catch (error: unknown) {
-          console.log(`[femo-plugin] onExited callback failed: ${String(error)}`)
-        }
-      }, (error: unknown) => {
-        console.log(`[femo-plugin] bridge spawn failed: ${String(error)}`)
-        this.handle = undefined
-      })
-      console.log(`[femo-plugin] bridge started (pid=${handle.pid})`)
-    }, (error: unknown) => {
-      console.log(`[femo-plugin] python resolve failed: ${String(error)}`)
-    })
+    // 宿主自称（清单 host 字段）：写进本进程 env，hub-feed 按同一个词报来源。
+    // 【2026-09-24 多实例】config.ts 按端口把 env 定成 dsh-<port>（本进程 TS 侧
+    // 读取方已统一走 env）；env 没有才回落清单 host 字段（单实例老形态）。
+    const hostName = process.env.FEMO_HOST_NAME?.trim() || hostNameOf(config.hostManifest)
+    if (hostName !== '') process.env.FEMO_HOST_NAME = hostName
+    const mailboxHostId = mailboxHostIdOf()
+    console.log(`[femo-plugin] bridge mailbox host id = ${mailboxHostId}`)
+    void this.connect(ctx, config, hostName, mailboxHostId)
   }
 
-  /** Send one command; resolves with the bridge's response result. */
-  send(cmd: string, args: Record<string, unknown> = {}, timeoutMs = 15_000): Promise<unknown> {
-    const handle = this.handle
-    if (handle === undefined) return Promise.reject(new Error('bridge not running'))
-    const id = this.nextId++
-    const payload = `${JSON.stringify({ id, cmd, args })}\n`
-    return new Promise<unknown>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(id)
-        reject(new Error(`bridge command "${cmd}" timed out`))
-      }, timeoutMs)
-      this.pending.set(id, {
-        resolve: (value) => { clearTimeout(timer); resolve(value) },
-        reject: (error) => { clearTimeout(timer); reject(error) },
-      })
-      handle.stdin?.write(payload, (error?: Error | null) => {
-        if (error !== undefined && error !== null) {
-          this.pending.delete(id)
-          clearTimeout(timer)
-          reject(error)
-        }
-      })
-    })
-  }
-
-  /** Terminate the bridge process tree (graceful shutdown command first). */
-  async stop(): Promise<void> {
-    const handle = this.handle
-    if (handle === undefined) return
+  private async connect(
+    ctx: Context | undefined,
+    config: { python: string; femoRoot: string; hostManifest: string },
+    hostName: string,
+    mailboxHostId: string,
+  ): Promise<void> {
+    // python 解析走 dsh subprocess 服务（可用时）；解析不到回落原词。
+    let pythonPath = config.python
     try {
-      await this.send('shutdown', {}, 2000)
-    } catch {
-      // fall through to terminate
+      const subprocess = ctx?.get('subprocess') as {
+        resolveExecutable(command: string, env?: Record<string, string>, signal?: AbortSignal): Promise<string>
+      } | undefined
+      if (subprocess !== undefined) pythonPath = await subprocess.resolveExecutable(config.python)
+    } catch (error) {
+      console.log(`[femo-plugin] python resolve via subprocess failed (${String(error)}); falling back to '${config.python}'`)
     }
-    handle.terminate()
-    await handle.waitForExit()
-    this.handle = undefined
+    const client = new DaemonClient({
+      femoRoot: config.femoRoot,
+      host: mailboxHostId,
+      hostName: hostName !== '' ? hostName : mailboxHostId,
+      hostManifestPath: config.hostManifest,
+      // FEMO_DATA_DIR 刻意不透传 dataDir/--db：数据根共享（多实例连跑同一个
+      // Job 的多宿主本意，2026-09-24 用户拍板）；沙盒场景 env FEMO_DATA_DIR
+      // 由测试/多实例自设，daemon-client 的发现账路径同一口径读 env。
+      python: pythonPath,
+      ...(this.pushPort !== undefined
+        ? { pushUrl: `http://127.0.0.1:${this.pushPort}/femo-plugin/mailbox-push` }
+        : {}),
+      onEvent: (eventType, data) => {
+        pushDiag('bridge', `event ${eventType} job=${String((data as Record<string, unknown> | undefined)?.job_id ?? '-')}`)
+        this.emit?.('femo-plugin/event', eventType, data)
+      },
+      log: msg => console.log(`[femo-plugin] ${msg}`),
+    })
+    client.onExited = () => { this.onExited?.() }
+    this.client = client
+    client.start()
   }
 
-  private onData(chunk: Buffer): void {
-    this.lineBuf += chunk.toString('utf8')
-    let idx: number
-    while ((idx = this.lineBuf.indexOf('\n')) !== -1) {
-      const line = this.lineBuf.slice(0, idx).trim()
-      this.lineBuf = this.lineBuf.slice(idx + 1)
-      if (line.length === 0) continue
-      // Femo's own prints share stdout; only JSON protocol lines parse.
-      // Engine prints (the engine's debugging voice) are forwarded so the
-      // harness log can see what the engine saw — they used to be dropped.
-      if (!line.startsWith('{')) {
-        // 【诊断 2026-09-06】撕裂嫌疑：NDJSON 事件行若被引擎 print 的并发
-        // write 粘包/撕裂，首字符不再是 '{' 且行内必含 JSON 事件字段——
-        // 此类行是"human_wait 事件在管道中丢失"假设的直接证据。
-        if (line.includes('"type"') || line.includes('job_id')) {
-          pushDiag('bridge', `TORN_LINE_SUSPECT: ${line.slice(0, 300)}`)
-        }
-        // 【2026-09-11 调试窗「编译器」页】引擎 print 全量进诊断面（tag 'engine'）：
-        // 此前只放行 [resume-diag]/[resume]/[FORK] 三类探针行，其余 print 仅落
-        // harness console——femoGen 看不到编译器在说什么。现在全部转发。
-        // 截断 400 字符：引擎偶有把整个 payload 打出来的行，不能让一条撑爆面板。
-        pushDiag('engine', line.slice(0, 400))
-        // 【2026-09-11 Host 页口径】引擎 stdout 原文绕过 console 直写
-        // stdout——它的家在『编译器』页（上一条 pushDiag），不进『Host』页。
-        process.stdout.write(`[femo-engine] ${line}\n`)
-        continue
-      }
-      let msg: {
-        type?: string; id?: number; ok?: boolean; result?: unknown; error?: unknown
-        detail?: unknown
-        event?: string; data?: unknown
-      }
-      try {
-        msg = JSON.parse(line) as typeof msg
-      } catch {
-        // 【诊断 2026-09-06】解析失败=行被撕裂的另一半实锤（首字符是 '{'
-        // 但尾部粘了别的 write 或被截断）——原样静默 continue 会丢事件无痕。
-        pushDiag('bridge', `JSON_PARSE_FAIL: ${line.slice(0, 300)}`)
-        continue
-      }
-      if (msg.type === 'response') {
-        const rid = msg.id
-        if (rid === undefined) continue
-        const pending = this.pending.get(rid)
-        if (pending === undefined) continue
-        this.pending.delete(rid)
-        if (msg.ok === true) pending.resolve(msg.result)
-        // 错误形态（Job 模型 §7.2）：{ok:false, error:<code>, detail:<人话>}——
-        // detail 优先（六关裁决原话上浮给 AI/前端，B2），旧形态无 detail 回退
-        // error code。
-        else pending.reject(new Error(String(msg.detail ?? msg.error ?? 'bridge error')))
-      } else if (msg.type === 'event') {
-        // 【诊断 2026-09-06】管道层收到事件=链路第一实证点（对照 engine-events
-        // 入口的 ev-in 记录，两者之间即丢失区间）。
-        pushDiag('bridge', `event ${String(msg.event)} job=${String((msg.data as Record<string, unknown> | undefined)?.job_id ?? '-')}`)
-        ;(this as unknown as { emit(name: string, ...args: unknown[]): void }).emit('femo-plugin/event', msg.event, msg.data)
-      }
-    }
+  /** 只断自己：关 SSE/门铃——**不发 shutdown**，常驻引擎继续站岗（金标准①）。
+   *  引擎面要按宿主停戏请走运行控制（job_pause），引擎死亡由 daemon 看门自愈。 */
+  async stop(): Promise<void> {
+    await this.client?.stop()
+    this.client = undefined
   }
-}
-
-/** 宿主执行体最终失败信号（B5）：执行者死亡/超时/API 预算耗尽——显式上报，
- * 引擎按「沉默收场」裁决（通知作者 + 节点按失败跳过 + 剧本继续）。宿主不再
- * 伪装空台词（output:'' 会让引擎错误体系全程失明：不通知、不留失败痕迹）。 */
-export async function sendActorFailure(
-  bridge: FemoBridge, jobId: number, waitKey: string, kind: string, detail: string,
-): Promise<void> {
-  await bridge.send('actor_failed', {
-    job_id: jobId,
-    wait_key: waitKey,
-    kind,
-    detail: detail.slice(0, 500),
-  }, 10_000)
 }

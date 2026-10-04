@@ -198,7 +198,7 @@ class JoinCoordinator:
         # 「已发生」判定含零活跃分支的空事件（fork 执行器接线约定：零活跃
         # 也 register children=()）——网关已发生却无孩子在等待集 = 其分支
         # 全灭或不上本 join，死亡语义由 required 的 missing ≡ base 覆盖，
-        # 剪除不阻塞（否则上游 fork 出边全 False 的剧本会让 join(all) 死等）。
+        # 剪除不阻塞（否则上游 fork 出边全 False 的脚本会让 join(all) 死等）。
         unseen = {gw for gw in fork_gateways
                   if gw not in seen_gws and not self._forks.has_gateway_event(gw)}
         if not required and not unseen and not pending_nested:

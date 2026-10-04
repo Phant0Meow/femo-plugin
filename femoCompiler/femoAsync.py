@@ -20,17 +20,22 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from typing import Any, Callable, Coroutine, Dict, Optional, Set
 import contextvars
 
+# ━━━ 已退役·观察期（2026-09-26 起）━━━ workflow_ctx / WorkflowContext：
+# 早期"工作流上下文"设计的残留，全仓零引用（双窗口交叉扫描+逐项复核），
+# 连本文件尾部的 __main__ 自测都不用它们；现行簿记走 FEMO_runtime 的 task_ctx/contextvars。
+# 无报错数日后整段删除（含本注）。
 # 每个工作流实例独立的上下文变量
-workflow_ctx = contextvars.ContextVar('workflow_ctx', default=None)
-
-
-class WorkflowContext:
-    """工作流上下文，存储当前状态、取消事件等"""
-    def __init__(self, name: str):
-        self.name = name
-        self.cancelled = asyncio.Event()
-        self.locals: Dict[str, Any] = {}
-        self.current_node_id: str = ""
+# workflow_ctx = contextvars.ContextVar('workflow_ctx', default=None)
+#
+#
+# class WorkflowContext:
+#     """工作流上下文，存储当前状态、取消事件等"""
+#     def __init__(self, name: str):
+#         self.name = name
+#         self.cancelled = asyncio.Event()
+#         self.locals: Dict[str, Any] = {}
+#         self.current_node_id: str = ""
+# ━━━ 观察期退役段结束：workflow_ctx / WorkflowContext ━━━
 
 
 class HumanInputManager:
@@ -82,8 +87,20 @@ class HumanInputManager:
             self._events[key] = event
 
         loop = asyncio.get_running_loop()
+        # [END 收幕不等人（2026-09-22）] 线程无法被 cancel：收幕/停止掐掉的分支若
+        # 正卡在 executor 里 event.wait(3600)，线程会一直挂到超时——asyncio.run
+        # 退出时 shutdown_default_executor 要 join 默认线程池，Python 硬编码
+        # 300s 上限，等满才放弃（RuntimeWarning）——run() 因此整整迟到 5 分钟，
+        # 桥的终局信与 bridge_run_ended 全链推迟（Job 2314 实锤：flow_done
+        # 08:21:54，通知 08:26:55）。修法：给 executor future 挂 done-callback，
+        # 协程被取消（收幕/停止/异常收场）即 event.set()——线程立即退场，
+        # shutdown 秒级 join。用户拍板语义：只要到了 END，有没有等待人类都不
+        # 再管了。正常路径（真等到输入/provide_input 先 set）callback 幂等无害；
+        # _aborted 场景 abort_all 已 set，同样幂等。
+        future = loop.run_in_executor(None, event.wait, timeout)
+        future.add_done_callback(lambda _f, _ev=event: _ev.set())
         try:
-            await loop.run_in_executor(None, event.wait, timeout)
+            await future
             # executor 唤醒后的取数路径：先查 _aborted（abort_all 唤醒的等待者
             # 在此恢复点直接吃 CancelledError 零推进，不会拿着空值继续演）
             with self._lock:
@@ -126,7 +143,11 @@ class AsyncEngine:
         import threading
         print("[AsyncEngine] 初始化引擎...")
         cpu_workers = cpu_workers or os.cpu_count() or 4
-        self.process_pool = ProcessPoolExecutor(max_workers=cpu_workers)
+        # ━━━ 已退役·观察期（2026-09-26 起）━━━ process_pool：唯一执行入口 run_in_process 已退役
+        # （生产链路全部走 run_in_thread，进程池建成之后从未接过任务）。
+        # shutdown() 里对应的关闭行同步注释。文件头"接口说明"里 run_in_process/run_func
+        # 两行描述随观察期一并过期，删段时同步改写。无报错数日后整段删除（含本注）。
+        # self.process_pool = ProcessPoolExecutor(max_workers=cpu_workers)
         self.thread_pool = ThreadPoolExecutor(max_workers=thread_workers)
         self.human_input = HumanInputManager()
         self._active_tasks: Set[asyncio.Task] = set()
@@ -165,19 +186,28 @@ class AsyncEngine:
         """返回当前事件循环，供需要直接操作 loop 的场景使用"""
         return asyncio.get_running_loop()
 
-    def schedule_threadsafe(self, callback, *args):
-        """线程安全地将回调调度到事件循环中执行"""
-        self.get_running_loop().call_soon_threadsafe(callback, *args)
+    # ━━━ 已退役·观察期（2026-09-26 起）━━━ schedule_threadsafe：全仓零调用（双窗口交叉扫描+逐项复核）。
+    # 注意：femoGen 画布文档（document_ch/en.html）把它写成公开 API——观察期通过删除本段时，
+    # 需同步改写画布文档。无报错数日后整段删除（含本注）。
+    # def schedule_threadsafe(self, callback, *args):
+    #     """线程安全地将回调调度到事件循环中执行"""
+    #     self.get_running_loop().call_soon_threadsafe(callback, *args)
+    # ━━━ 观察期退役段结束：schedule_threadsafe ━━━
 
     async def gather(self, *coros, return_exceptions=True):
         """封装 asyncio.gather，方便分支等待"""
         return await asyncio.gather(*coros, return_exceptions=return_exceptions)
 
-    async def run_in_process(self, func: Callable, *args, **kwargs) -> Any:
-        """CPU 密集任务：自动排队到进程池"""
-        print(f"[AsyncEngine] 🧠 分配 CPU 密集任务到进程池 (func={getattr(func, '__name__', func)})")
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(self.process_pool, func, *args, **kwargs)
+    # ━━━ 已退役·观察期（2026-09-26 起）━━━ run_in_process：生产链路零调用（双窗口交叉扫描+逐项复核）——
+    # 唯一生产调用方 run_func 自身也是死代码；仅存的两处引用在文件尾 __main__ 自测里
+    # （观察期内如需跑内嵌自测会在这些行响亮 NameError，属预期）。进程池因此整链退役。
+    # 无报错数日后整段删除（含本注）。
+    # async def run_in_process(self, func: Callable, *args, **kwargs) -> Any:
+    #     """CPU 密集任务：自动排队到进程池"""
+    #     print(f"[AsyncEngine] 🧠 分配 CPU 密集任务到进程池 (func={getattr(func, '__name__', func)})")
+    #     loop = asyncio.get_running_loop()
+    #     return await loop.run_in_executor(self.process_pool, func, *args, **kwargs)
+    # ━━━ 观察期退役段结束：run_in_process ━━━
 
     async def run_in_thread(self, func: Callable, *args, **kwargs) -> Any:
         """
@@ -200,18 +230,22 @@ class AsyncEngine:
         else:
             return await loop.run_in_executor(self.thread_pool, _wrapper, *args)
 
-    async def run_func(self, func: Callable, *args, mode: str = 'process', **kwargs) -> Any:
-        """
-        通用执行入口，支持后续扩展自动判断。
-        目前 mode 默认为 'process'，即所有 @func 先走进程池。
-        未来可根据用户标注或自动检测切换到 'thread'。
-        """
-        if mode == 'process':
-            return await self.run_in_process(func, *args, **kwargs)
-        elif mode == 'thread':
-            return await self.run_in_thread(func, *args, **kwargs)
-        else:
-            raise ValueError(f"Unknown execution mode: {mode}")
+    # ━━━ 已退役·观察期（2026-09-26 起）━━━ run_func：自称"@func 通用执行入口"，
+    # 实际全仓零调用（双窗口交叉扫描+逐项复核）——现行 @func 全部直接走 run_in_thread。
+    # 它是进程池链（run_in_process→process_pool）的最后一环。无报错数日后整段删除（含本注）。
+    # async def run_func(self, func: Callable, *args, mode: str = 'process', **kwargs) -> Any:
+    #     """
+    #     通用执行入口，支持后续扩展自动判断。
+    #     目前 mode 默认为 'process'，即所有 @func 先走进程池。
+    #     未来可根据用户标注或自动检测切换到 'thread'。
+    #     """
+    #     if mode == 'process':
+    #         return await self.run_in_process(func, *args, **kwargs)
+    #     elif mode == 'thread':
+    #         return await self.run_in_thread(func, *args, **kwargs)
+    #     else:
+    #         raise ValueError(f"Unknown execution mode: {mode}")
+    # ━━━ 观察期退役段结束：run_func ━━━
 
     def create_task(self, coro: Coroutine) -> asyncio.Task:
         task = asyncio.create_task(coro)
@@ -282,7 +316,8 @@ class AsyncEngine:
             task.cancel()
         if self._active_tasks:
             await asyncio.gather(*self._active_tasks, return_exceptions=True)
-        self.process_pool.shutdown(wait=True)
+        # ━━━ 已退役·观察期（2026-09-26 起）━━━ 随 process_pool 创建行一并退役（见 __init__ 注）。
+        # self.process_pool.shutdown(wait=True)
         self.thread_pool.shutdown(wait=True)
 
 

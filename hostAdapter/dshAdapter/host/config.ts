@@ -7,22 +7,47 @@
 
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
+import { resolveFemoRoot } from '../../../femo2host/femoRoot.mjs'
 import z from '@deepseek-ai/schemastery'
 
 /** 插件包根目录（2026-09-13 插件根下沉：= hostAdapter/dshAdapter/，package.json 所在）。 */
 export const packageRoot = fileURLToPath(new URL('..', import.meta.url))
 
 /** 引擎根目录 = 仓库根（femoCompiler/femoBridges/femoGen/femo2host/user_data 所在）。
- *  插件根下沉后引擎在插件根外两层——femoRoot 缺省回落到这里（见 resolveConfig）。 */
-export const engineRoot = fileURLToPath(new URL('../../..', import.meta.url))
+ *  插件根下沉后引擎在插件根外两层——femoRoot 缺省回落到这里（见 resolveConfig）。
+ *  找根逻辑唯一活在 femo2host/femoRoot.mjs（zcodeAdapter 同源）；从编译产物 lib/
+ *  所在位置向上找 femo2host，开发态/安装态布局都成立。 */
+export const engineRoot = resolveFemoRoot(fileURLToPath(new URL('..', import.meta.url)))
 
 /** 宿主能力清单（dsh 侧）：随插件根走（与 zcode 侧 zcode.host.manifest.json 同款适配器本地化）。 */
 export const hostManifestFile = join(packageRoot, 'host.manifest.json')
 
+// ── 多实例身份（2026-09-24 双桥抢信事故）────────────────────────────────
+// dsh web 进程的 `--port`（两版启动脚本都带）就是实例身份：信箱 id 与投影自称
+// 都由它派生为 `dsh-<port>`。**数据根不分桶**（2026-09-24 用户拍板推翻当日早些
+// 的分桶尝试）：runs/投影账/草稿/Chronica 共用同一棵 user_data——多实例连起来
+// 跑同一个 Job 正是本架构的多宿主本意，分桶会把能连的实例割裂。身份只用于
+// 「谁写的/谁的信」，不用于「谁的地盘」。检测不到端口全回落 'dsh'；zcode 桥
+// （显式 --host zcode）不受影响。
+const portArg = (() => {
+  const i = process.argv.indexOf('--port')
+  const v = i >= 0 ? process.argv[i + 1] : undefined
+  return v !== undefined && /^\d+$/.test(v) ? v : ''
+})()
+
+/** 信箱/投影共用的实例自称：'dsh-<port>'（多实例）或 'dsh'（单实例回落）。 */
+export const instanceHostId = portArg !== '' ? `dsh-${portArg}` : 'dsh'
+
+if (portArg !== '') {
+  // 写进本进程 env：TS 侧读取方（state-files/hub-feed/roster…）统一走 env 约定；
+  // 桥子进程由 bridge.ts 从同一批值注入。FEMO_DATA_DIR 刻意不设（共享数据根）。
+  process.env.FEMO_HOST_NAME = instanceHostId
+}
+
 export const Config = z.object({
   /** Master switch. */
   enabled: z.boolean().default(true),
-  /** Femo 引擎根目录（femoCompiler/femoBridges 所在；宿主边界层（门面 API + CLI 工具）在 femo2host/，示例剧本与 @func 伴生模块在 femoExamples/）。缺省 = 插件包根（自包含）。 */
+  /** Femo 引擎根目录（femoCompiler/femoBridges 所在；宿主边界层（门面 API + CLI 工具）在 femo2host/，示例FEMO脚本与 @func 伴生模块在 femoExamples/）。缺省 = 插件包根（自包含）。 */
   femoRoot: z.string().default(''),
   /** Python executable used to launch the bridge. */
   python: z.string().default('python'),
@@ -43,7 +68,7 @@ export const Config = z.object({
    *  hostAiBackend 未显式设置时作为回落读取，后续版本移除。 */
   dshAiBackend: z.boolean().default(true),
   /**
-   * Per-Actor tool access default. The 剧本 author decides per actor with
+   * Per-Actor tool access default. The FEMO脚本 author decides per actor with
    * `tools: true/false` (or `tools: [name, ...]` as a whitelist); an actor
    * that declares nothing falls back to this global default. Default TRUE —
    * the plugin also runs coding workflows, so工具能力 must not vanish

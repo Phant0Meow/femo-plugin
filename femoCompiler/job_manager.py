@@ -22,7 +22,10 @@ db_utils.session_exists（六关第⑤关用，只读）。**不 import FEMO_run
                                 |--job_pause----> suspended(user_pause)
                                 |--取消路径-----> suspended(user_pause|cancelled)
                                 |--FEMORunPaused-> suspended(node_pause)
-                                |--节点异常-----> failed
+                                |--节点异常-----> suspended(node_pause)
+                                  （2026-10-01 用户拍板：一切 error 挂起可续，
+                                   续否/改稿重跑都是用户的事；failed 仅存于
+                                   构造期崩溃——无断点可续的场）
   （启动时）running 且无执行体 --> suspended(crash)
   suspended --job_resume(六关)--> running
 
@@ -36,11 +39,31 @@ import os
 import re
 import sys
 import threading
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from femoBridges.getDir.get_dir import get_user_dir
+from femoBridges.getDir.get_dir import get_user_dir, get_data_dir
+
+
+def _os_replace_retry(src: str, dst: str, attempts: int = 4) -> None:
+    """os.replace 带 Windows 共享冲突小重试（2026-09-16 真运行 1609 场实锤加固）。
+
+    原子替换的目标文件恰好被并发读者打开时（3081 网页轮询任务清单/会话状态、
+    杀毒软件扫刚写的临时文件），Windows 报 PermissionError([Errno 13]/WinError 5)
+    ——瞬时态，占用几十毫秒内消失。按 0.05s/0.1s/0.2s 退避重试（合计 ~0.35s），
+    仍败才原样抛出：主档案路径由调用方的节点失败挂起存档兜底，侧写路径本就
+    静默降级。POSIX 上首试即成功，语义不变。"""
+    for attempt in range(attempts):
+        try:
+            os.replace(src, dst)
+            return
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(0.05 * (2 ** attempt))
+
 
 # ── 状态机常量 ────────────────────────────────────────────────────────────
 
@@ -59,7 +82,7 @@ _FINAL_STATES = (STATE_FINISHED, STATE_FAILED)
 
 
 def fingerprint_script(text: str) -> str:
-    """剧本文本指纹：CRLF→LF 归一 + sha256，形如 "sha256:<hex>"。
+    """脚本文本指纹：CRLF→LF 归一 + sha256，形如 "sha256:<hex>"。
 
     镜像宿主旧 state-files.scriptFingerprint 语义（JS: text.replace(/\\r\\n/g,'\\n')
     + sha256(hex)），便于对账调试；引擎自洽使用，不依赖宿主。
@@ -73,7 +96,7 @@ def fingerprint_script(text: str) -> str:
 #
 # 断点由三部分组成（vars/checkpoint.py dump_state）：位置账本（node_id +
 # 模块栈 + 循环合成节点）、per-task 变量世界、场次挂钩。其中**只有位置账本
-# 强依赖流程图结构**——变量世界整包恢复（新剧本装配的世界被丢弃），action
+# 强依赖流程图结构**——变量世界整包恢复（新脚本装配的世界被丢弃），action
 # 的 prompt/in/out 改动由"从断点往后跑新定义"自然消化。故续跑可行性指纹
 # = flow + mainflow 结构：
 #   - 布局（sketch 注释）、台词、vars 增删、注释与空白 → 不触发重跑
@@ -118,7 +141,7 @@ def _flow_scope_groups(region_lines: list) -> list:
 
 
 def extract_flow_scope(text: str) -> str:
-    """提取剧本的 flow/mainflow 区域并规范化（check_fingerprint 的比对域）：
+    """提取FEMO脚本的 flow/mainflow 区域并规范化（check_fingerprint 的比对域）：
     1) 顶层切出 mainflow: 块与各 module 的 flow: 子块；
     2) 每行剥 # 与 // 注释；3) 去除全部空白；4) 语句组排序后拼接。
     返回规范化串（空串=两份文本都无 flow 区，视为相等由调用方裁决）。"""
@@ -157,9 +180,13 @@ def extract_flow_scope(text: str) -> str:
     return '\x00'.join(parts)
 
 
-def flow_scope_hash(text: str) -> str:
-    """flow 域指纹：extract_flow_scope 规范化串的 sha256。"""
-    return hashlib.sha256(extract_flow_scope(text).encode('utf-8')).hexdigest()
+# ━━━ 已退役·观察期（2026-09-26 起）━━━ flow_scope_hash：全仓零引用（双窗口交叉扫描+逐项复核）。
+# 续跑指纹的现行正身是 fingerprint_script（门面在导出、resume_job 第④关在用），
+# 这是被取代的旧指纹口径。无报错数日后整段删除（含本注）。
+# def flow_scope_hash(text: str) -> str:
+#     """flow 域指纹：extract_flow_scope 规范化串的 sha256。"""
+#     return hashlib.sha256(extract_flow_scope(text).encode('utf-8')).hexdigest()
+# ━━━ 观察期退役段结束：flow_scope_hash ━━━
 
 
 # ── Job 档案 ──────────────────────────────────────────────────────────────
@@ -174,12 +201,20 @@ class JobRecord:
     waiting_human: bool = False           # running 的子标记（human_wait 置 / human_done 清 / 挂起清）
     script_fingerprint: str = ''
     script_name: str = ''                 # 诊断可读（list_jobs/日志里人能看懂）
-    script_path: str = ''                 # 开跑时宿主给的剧本文件地址（未保存=''/缺省）
-    script_text: str = ''                 # 开跑那一刻的剧本原文快照（运行快照，resume 六关保证不漂移）
+    script_path: str = ''                 # 开跑时宿主给的脚本文件地址（未保存=''/缺省）
+    script_text: str = ''                 # 开跑那一刻的脚本原文快照（运行快照，resume 六关保证不漂移）
     host_ref: str = ''                   # 宿主塞的不透明标签（如其会话标识），透传存档，引擎不懂
+    # 多宿主归属账（2026-09-21 账本多宿主化）：{host名: 会话标识}，一格一宿主
+    # 互不覆盖（联机共演一次=多格并存）；引擎依旧不透明透传，只存取/合并。
+    host_refs: Dict[str, str] = field(default_factory=dict)
     femo_session_id: Optional[int] = None  # 挂靠场次（on_flow_start 回填；resume 裁决用）
     checkpoints: Dict[str, str] = field(default_factory=dict)        # {task_id: node_id}
     checkpoint_labels: Dict[str, str] = field(default_factory=dict)  # {task_id: label}（D1）
+    # 交付游标（2026-09-28 漏台词定案）：{soul_id: turn}，增量上下文窗口基线。
+    # 只活在 ContextExample 内存会随进程重启丢——丢了回落「自己最近发言 turn」
+    # （收卷一拍后=收卷号），续跑吞掉「收到节点提醒→说完落账」之间别人的发言。
+    # 随 checkpoint 落盘（merge_checkpoint），续跑经 build_resume_state 回填。
+    delivery_cursors: Dict[str, int] = field(default_factory=dict)
     vars_state: Optional[Dict[str, Any]] = None   # dump_state 整包（编解码走 vars/checkpoint.py）
     error: str = ''                       # failed 摘要（诊断）
     created_at: str = ''
@@ -196,9 +231,11 @@ class JobRecord:
             'script_path': self.script_path,
             'script_text': self.script_text,
             'host_ref': self.host_ref,
+            'host_refs': dict(self.host_refs),
             'femo_session_id': self.femo_session_id,
             'checkpoints': dict(self.checkpoints),
             'checkpoint_labels': dict(self.checkpoint_labels),
+            'delivery_cursors': dict(self.delivery_cursors),
             'vars_state': self.vars_state,
             'error': self.error,
             'created_at': self.created_at,
@@ -221,9 +258,15 @@ class JobRecord:
             script_text=str(data.get('script_text', '')),
             # 旧档案键 owner_tag 兼容读（改名前的存档文件）
             host_ref=str(data.get('host_ref', data.get('owner_tag', ''))),
+            # 多宿主归属账缺键容忍（旧档案自然缺省空字典）
+            host_refs={str(k): str(v) for k, v in dict(data.get('host_refs') or {}).items()},
             femo_session_id=data.get('femo_session_id'),
             checkpoints=dict(data.get('checkpoints') or {}),
             checkpoint_labels=dict(data.get('checkpoint_labels') or {}),
+            delivery_cursors={
+                str(k): int(v) for k, v in dict(data.get('delivery_cursors') or {}).items()
+                if isinstance(v, (int, float))
+            },
             vars_state=data.get('vars_state'),
             error=str(data.get('error', '')),
             created_at=str(data.get('created_at', '')),
@@ -268,7 +311,7 @@ class JobManager:
 
     def __init__(self, runs_dir: Optional[str] = None):
         if runs_dir is None:
-            runs_dir = os.path.join(get_user_dir(), 'user_data', 'jobs', 'runs')
+            runs_dir = os.path.join(get_data_dir(), 'jobs', 'runs')
         self.runs_dir = runs_dir
         os.makedirs(self.runs_dir, exist_ok=True)
         # §八.2 防御锁：同 Job 落盘串行化（世界单调推进，后写自然含先写）
@@ -325,13 +368,14 @@ class JobManager:
                 json.dump(rec.to_dict(), f, ensure_ascii=False, default=str)
             # 同目录 replace：Windows/POSIX 上都是原子替换——断电瞬间要么旧
             # 文件要么新文件，绝无半截 JSON（C5 死于结构的结构修复）。
-            os.replace(tmp, path)
+            # Windows 共享冲突小重试（并发读者开着目标文件的瞬时态）。
+            _os_replace_retry(tmp, path)
             # 元数据侧写：写失败不影响主档（读侧回落全量 _load），只大声留痕。
             meta_tmp = os.path.join(self.runs_dir, f'.{rec.job_id}.meta-{os.getpid()}')
             try:
                 with open(meta_tmp, 'w', encoding='utf-8') as f:
                     json.dump(self._meta_fields(rec), f, ensure_ascii=False, default=str)
-                os.replace(meta_tmp, self._meta_path(rec.job_id))
+                _os_replace_retry(meta_tmp, self._meta_path(rec.job_id))
             except OSError as exc:
                 sys.stderr.write(
                     f'[job_manager] ⚠️ Job 元数据侧写失败（list_jobs 将回落全量读取）: {exc}\n')
@@ -401,38 +445,59 @@ class JobManager:
 
     def create_job(self, fingerprint: str, host_ref: str = '',
                    script_name: str = '', script_path: str = '',
-                   script_text: str = '') -> JobRecord:
+                   script_text: str = '',
+                   host_refs: Optional[Dict[str, str]] = None) -> JobRecord:
         """开新 Job。活跃排他裁决（B4）：_bound 非空 → JobBusyError（带归属）。
         → allocate → 建 running 档 → 落盘 → 返回。
-        script_path/script_text = 开跑那一刻的剧本快照（文本+地址，有啥存啥）：
+        script_path/script_text = 开跑那一刻的脚本快照（文本+地址，有啥存啥）：
         resume 六关的 fingerprint_mismatch 保证可续跑 Job 的文本不漂移，
-        故只需在 create 时存一次。"""
+        故只需在 create 时存一次。
+        host_refs = 多宿主归属账开局入账（账本多宿主化 §3.3）；host_ref 单值
+        保留「最新发起方」语义不动，兼容旧宿主/内嵌直调。"""
         with self._lock:
             if self._bound:
                 active = self.active_job()
                 active_id = active.job_id if active is not None else -1
                 active_tag = active.host_ref if active is not None else ''
                 raise JobBusyError(active_id, active_tag)
-            rec = JobRecord(
-                job_id=self.allocate_job_id(),
-                state=STATE_RUNNING,
-                script_fingerprint=fingerprint,
-                script_name=script_name,
-                script_path=script_path,
-                script_text=script_text,
-                host_ref=host_ref,
-                created_at=_now_iso(),
-            )
+            # 【跨进程抢号防线（2026-09-24 多实例并存）】allocate 的 max+1 只在
+            # 单进程内安全——两个引擎进程同瞬间启动运行会同号互覆。档案文件本身当
+            # 锁：独占创建（'x' 模式）写入完整档案，撞号（隔壁桥进程抢先落档）
+            # 跳号重试；重试天然收敛（目录 max 随每次落档单调涨）。
+            rec = None
+            for _ in range(1000):
+                rec = JobRecord(
+                    job_id=self.allocate_job_id(),
+                    state=STATE_RUNNING,
+                    script_fingerprint=fingerprint,
+                    script_name=script_name,
+                    script_path=script_path,
+                    script_text=script_text,
+                    host_ref=host_ref,
+                    host_refs={str(k): str(v) for k, v in dict(host_refs or {}).items()},
+                    created_at=_now_iso(),
+                )
+                try:
+                    with open(self._job_path(rec.job_id), 'x', encoding='utf-8') as f:
+                        json.dump(rec.to_dict(), f, ensure_ascii=False, default=str)
+                    break
+                except FileExistsError:
+                    continue
+                except OSError:
+                    raise
+            else:
+                raise JobError('job_id_exhausted', '启动运行失败：连续 1000 次 Job 号撞号（runs 目录异常？）')
             self._save(rec)
             return rec
 
     def resume_job(self, job_id: int, fingerprint: str,
-                   host_ref: str = '', new_text: str = '') -> JobRecord:
+                   host_ref: str = '', new_text: str = '',
+                   host_refs: Optional[Dict[str, str]] = None) -> JobRecord:
         """续跑六关裁决（§八.18 顺序），任一关失败 raise JobError(code, 人话)。
         全过 → 返回 rec（state 置 running 由调用方在 Runner 构造成功后经
         mark_running 确认——裁决通过到构造成功之间文件仍是 suspended，
         构造失败 worker except 收口 failed，不停僵尸 running）。
-        new_text：本次续跑提交的剧本文本（flow 域比对用，见第④关）。"""
+        new_text：本次续跑提交的脚本文本（flow 域比对用，见第④关）。"""
         with self._lock:
             # ① no_such_job：文件不存在
             rec = self._load(job_id)
@@ -464,8 +529,8 @@ class JobManager:
                                    f'——请 fresh_start 从头跑')
             elif rec.script_fingerprint and rec.script_fingerprint != fingerprint:
                 raise JobError('fingerprint_mismatch',
-                               f'Job {job_id} 的断点属于另一个版本的剧本（指纹不符）。'
-                               f'改了剧本就是新戏——请 fresh_start 从头跑，或先恢复原剧本文本')
+                               f'Job {job_id} 的断点属于另一个版本的脚本（指纹不符）。'
+                               f'改了FEMO脚本就是新戏——请 fresh_start 从头跑，或先恢复原脚本文本')
             # ⑤ session_missing：挂靠场次不存在=拒绝失忆续跑（现状
             #   FEMO_runtime resume 分支同语义平移；None=无场次可校验则跳过）
             if rec.femo_session_id is not None:
@@ -480,27 +545,52 @@ class JobManager:
                                f'Job {job_id} 没有可续跑的断点（档案存在但执行位置为空）')
             # 全过：host_ref 更新为本次续跑发起方（透传存档）
             rec.host_ref = host_ref or rec.host_ref
+            # 多宿主归属账合并（2026-09-21 账本多宿主化）：只更新发起方自己
+            # 的格子，绝不碰别家格（联机共演=多格并存；消灭旧单值「后写顶掉
+            # 先写」的覆盖病灶）。
+            if host_refs:
+                rec.host_refs.update({str(k): str(v) for k, v in host_refs.items()})
             self._save(rec)
             return rec
 
-    def check_fingerprint(self, job_id: int, new_text: str) -> dict:
-        """续跑可行性指纹校验（不 raise——诊断/宿主查询用，裁决仍在
-        resume_job 第④关，同一套判定）。
-        - mode='flow'：新档案有快照文本 → flow/mainflow 结构比对（宽松语义：
-          vars 增删/台词/布局/注释不触发，流程结构变才触发）；
-        - mode='raw'：旧档案只有整文指纹 → 整文 sha256 比对；
-        - mode='no_such_job' / 'none'：档案缺失/无指纹可校验。"""
-        rec = self._load(job_id)
-        if rec is None:
-            return {'match': False, 'mode': 'no_such_job',
-                    'detail': f'Job {job_id} 不存在'}
-        if rec.script_text:
-            return {'match': extract_flow_scope(rec.script_text) == extract_flow_scope(new_text or ''),
-                    'mode': 'flow', 'detail': 'flow/mainflow 结构比对（宽松语义）'}
-        if rec.script_fingerprint:
-            return {'match': rec.script_fingerprint == fingerprint_script(new_text or ''),
-                    'mode': 'raw', 'detail': '整文 sha256 比对（旧档案回退）'}
-        return {'match': False, 'mode': 'none', 'detail': '档案既无快照文本也无指纹'}
+    def attach_host_refs(self, job_id: int, refs: Optional[Dict[str, str]]) -> Dict[str, str]:
+        """中途挂账（联机中途进场，2026-09-21 账本多宿主化 §3.3）：把 refs
+        合并进 host_refs（同 host 重发覆盖=幂等），不动状态机/断点/其他字段。
+        running 态 resume 会被六关第②关 already_running 拦死——本命令是第二台
+        宿主中途进场的唯一入口。返回合并后的完整 host_refs。"""
+        with self._lock:
+            rec = self._load(job_id)
+            if rec is None:
+                raise JobError('no_such_job', f'Job {job_id} 不存在（无该运行的档案文件）')
+            clean = {str(k).strip(): str(v) for k, v in dict(refs or {}).items()
+                     if str(k).strip() and str(v)}
+            if clean:
+                rec.host_refs.update(clean)
+                self._save(rec)
+            return dict(rec.host_refs)
+
+    # ━━━ 已退役·观察期（2026-09-26 起）━━━ check_fingerprint：全仓零调用（双窗口交叉扫描+逐项复核）。
+    # 自述"诊断/宿主查询用"，但门面与各宿主都没接它；同一套判定活在 resume_job 第④关里。
+    # 无报错数日后整段删除（含本注）。
+    # def check_fingerprint(self, job_id: int, new_text: str) -> dict:
+    #     """续跑可行性指纹校验（不 raise——诊断/宿主查询用，裁决仍在
+    #     resume_job 第④关，同一套判定）。
+    #     - mode='flow'：新档案有快照文本 → flow/mainflow 结构比对（宽松语义：
+    #       vars 增删/台词/布局/注释不触发，流程结构变才触发）；
+    #     - mode='raw'：旧档案只有整文指纹 → 整文 sha256 比对；
+    #     - mode='no_such_job' / 'none'：档案缺失/无指纹可校验。"""
+    #     rec = self._load(job_id)
+    #     if rec is None:
+    #         return {'match': False, 'mode': 'no_such_job',
+    #                 'detail': f'Job {job_id} 不存在'}
+    #     if rec.script_text:
+    #         return {'match': extract_flow_scope(rec.script_text) == extract_flow_scope(new_text or ''),
+    #                 'mode': 'flow', 'detail': 'flow/mainflow 结构比对（宽松语义）'}
+    #     if rec.script_fingerprint:
+    #         return {'match': rec.script_fingerprint == fingerprint_script(new_text or ''),
+    #                 'mode': 'raw', 'detail': '整文 sha256 比对（旧档案回退）'}
+    #     return {'match': False, 'mode': 'none', 'detail': '档案既无快照文本也无指纹'}
+    # ━━━ 观察期退役段结束：check_fingerprint ━━━
 
     def mark_running(self, job_id: int) -> None:
         """resume 的 Runner 构造成功后调用：state=running, reason='' 落盘。"""
@@ -541,12 +631,33 @@ class JobManager:
         """人类/AI 回传投递。活跃+_bound 校验（B6/孤儿信投递侧防线：不盲投信箱）。
         不活跃/无挂靠 → {delivered:False, error:...}，不假成功（B5 死于结构）。"""
         rec = self._load(job_id)
-        if rec is None:
-            return {'delivered': False, 'error': 'no_such_job'}
         runner = self._bound.get(job_id)
+        # 【2026-09-24 抢信验尸日志（用户令「先多加点 log」）】直接落盘、不走
+        # stdout 管道——管道会吞行（✗ 失败行从未在 diag 出现过）。双桥同 inbox
+        # 时凭 pid 区分是哪座桥在投喂、各自看到的世界（state/runner）是什么。
+        try:
+            import os as _os
+            import time as _t
+            with open(_os.path.join(_os.environ.get('FEMO_DATA_DIR') or _os.path.join(get_user_dir(), 'user_data'), 'debug-mailbox-poll.log'), 'a', encoding='utf-8') as _f:
+                _f.write(f"{_t.strftime('%Y-%m-%d %H:%M:%S')} pid={_os.getpid()} "
+                         f"deliver-enter job={job_id} ref={wait_key} "
+                         f"state={getattr(rec, 'state', 'NO_REC')} "
+                         f"runner={'bound' if runner is not None else 'NONE'} "
+                         f"bound_n={len(self._bound)}\n")
+        except Exception:
+            pass
+        if rec is None:
+            print(f"[deliver] ✗ job={job_id} ref={wait_key} no_such_job")
+            return {'delivered': False, 'error': 'no_such_job'}
         if rec.state != STATE_RUNNING or runner is None:
+            # 【2026-09-23 观测】把「为什么投不进」一次说全：state 与 runner
+            # 各是什么。此前这条失败只以返回值表达，调用方不读 → 静默丢信。
+            print(f"[deliver] ✗ job={job_id} ref={wait_key} job_not_active "
+                  f"(state={rec.state} / 期望={STATE_RUNNING}, "
+                  f"runner={'已挂靠' if runner is not None else '未挂靠'})")
             return {'delivered': False, 'error': 'job_not_active'}
         runner.engine.human_input.provide_input(wait_key, body)
+        print(f"[deliver] ✓ job={job_id} ref={wait_key} → 已塞进引擎信箱")
         return {'delivered': True}
 
     # ── 查询 ──
@@ -568,6 +679,7 @@ class JobManager:
             'waiting_human': rec.waiting_human,
             'femo_session_id': rec.femo_session_id,
             'host_ref': rec.host_ref,
+            'host_refs': dict(rec.host_refs),
             'script_name': rec.script_name,
             'created_at': rec.created_at,
             'updated_at': rec.updated_at,
@@ -595,7 +707,7 @@ class JobManager:
             meta_tmp = os.path.join(self.runs_dir, f'.{job_id}.meta-{os.getpid()}')
             with open(meta_tmp, 'w', encoding='utf-8') as f:
                 json.dump(row, f, ensure_ascii=False, default=str)
-            os.replace(meta_tmp, self._meta_path(job_id))
+            _os_replace_retry(meta_tmp, self._meta_path(job_id))
         except OSError:
             pass
         return row
@@ -685,6 +797,10 @@ class JobManager:
             labels = payload.get('checkpoint_labels')
             if isinstance(labels, dict):
                 rec.checkpoint_labels = {str(k): str(v) for k, v in labels.items()}
+            dc = payload.get('delivery_cursors')
+            if isinstance(dc, dict):
+                rec.delivery_cursors = {str(k): int(v) for k, v in dc.items()
+                                        if isinstance(v, (int, float))}
             if payload.get('state') is not None and isinstance(payload.get('state'), dict):
                 rec.vars_state = payload['state']
             sid = payload.get('session_id')
@@ -715,9 +831,11 @@ class JobManager:
             rec.femo_session_id = session_id
             self._save(rec)
 
-    def suspend(self, job_id: int, reason: str) -> None:
+    def suspend(self, job_id: int, reason: str, error: str = '') -> None:
         """挂起落盘（on_state_change('suspended', ...) 落点）：
-        state=suspended, reason=..., waiting_human=False。"""
+        state=suspended, reason=..., waiting_human=False。error=挂起时的错误
+        摘要（2026-10-01 起一切运行期 error 落 suspended——「为什么停」必须
+        进档案，续跑界面与诊断都靠它；空串不覆写既有摘要）。"""
         with self._lock:
             rec = self._load(job_id)
             if rec is None:
@@ -725,7 +843,15 @@ class JobManager:
             rec.state = STATE_SUSPENDED
             rec.reason = reason
             rec.waiting_human = False
+            rec.error = error or rec.error
             self._save(rec)
+
+    def has_checkpoints(self, job_id: int) -> bool:
+        """该场是否已拍过断点（walk 起步的判据——worker 收尾分流用：
+        有断点的场异常落 suspended 可续，无断点的构造期崩溃保持 failed）。"""
+        with self._lock:
+            rec = self._load(job_id)
+            return bool(rec and rec.checkpoints)
 
     def finalize(self, job_id: int, final_state: str, error: str = '') -> None:
         """幂等终态化：**仅 rec.state==running 时生效**（§八.10 三面收口的
@@ -746,6 +872,7 @@ class JobManager:
             rec.waiting_human = False
             rec.checkpoints = {}
             rec.checkpoint_labels = {}
+            rec.delivery_cursors = {}
             rec.vars_state = None
             self._save(rec)
 
@@ -753,9 +880,9 @@ class JobManager:
 
     def build_resume_state(self, rec: JobRecord) -> dict:
         """构造 FEMORunner 的 resume_state 载荷：{checkpoints, session_id,
-        state: vars_state}。vars_state None 且 checkpoints 非空 = 异常态
-        （防御：raise JobError('job_file_inconsistent')，诚实不半失忆——
-        半失忆续跑=位置在变量丢，比 fresh 更危险）。"""
+        state: vars_state, delivery_cursors}。vars_state None 且 checkpoints
+        非空 = 异常态（防御：raise JobError('job_file_inconsistent')，诚实
+        不半失忆——半失忆续跑=位置在变量丢，比 fresh 更危险）。"""
         if rec.vars_state is None and rec.checkpoints:
             raise JobError('job_file_inconsistent',
                            f'Job {rec.job_id} 档案不一致：有断点位置但没有变量世界快照，'
@@ -764,4 +891,5 @@ class JobManager:
             'checkpoints': dict(rec.checkpoints),
             **({'session_id': int(rec.femo_session_id)} if rec.femo_session_id is not None else {}),
             **({'state': rec.vars_state} if rec.vars_state is not None else {}),
+            **({'delivery_cursors': dict(rec.delivery_cursors)} if rec.delivery_cursors else {}),
         }

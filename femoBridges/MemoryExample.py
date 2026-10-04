@@ -131,33 +131,36 @@ def _format_memory_records(records: List[Dict[str, Any]]) -> str:
     return "\n\n".join(lines)
 
 
-def retrieve_example(
-    prompt: str = "",
-    session_id: int = 0,
-    turn_id: int = 0,
-    actor_info: dict = None,
-    memory_limit: int = 30,
-    **kwargs,
-) -> str:
-    """Memory 检索入口"""
-    actor_info = actor_info or {}
-    print(f"[Memory] 🧠 检索跨 session 记忆 (limit={memory_limit})")
-    print(f"[Memory]    actor_info = {actor_info}")
-
-    user_ids = []
-    soul_ids = []
-    if "user" in actor_info:
-        user_ids.append(str(actor_info["user"]))
-    if "soul" in actor_info:
-        soul_ids.append(str(actor_info["soul"]))
-
-    records = _get_memory_records(
-        user_ids=user_ids if user_ids else None,
-        soul_ids=soul_ids if soul_ids else None,
-        exclude_session_id=session_id,
-        limit=memory_limit,
-    )
-
-    memory_text = _format_memory_records(records)
-    print(f"[Memory] ✅ 检索完成，获得 {len(records)} 条记录")
-    return memory_text
+# ━━━ 已退役·观察期（2026-09-26 起）━━━ retrieve_example：全仓零引用（双窗口交叉扫描+逐项复核），
+# 记忆检索旧入口，现行链路不走这里。无报错数日后整段删除（含本注）。
+# def retrieve_example(
+#     prompt: str = "",
+#     session_id: int = 0,
+#     turn_id: int = 0,
+#     actor_info: dict = None,
+#     memory_limit: int = 30,
+#     **kwargs,
+# ) -> str:
+#     """Memory 检索入口"""
+#     actor_info = actor_info or {}
+#     print(f"[Memory] 🧠 检索跨 session 记忆 (limit={memory_limit})")
+#     print(f"[Memory]    actor_info = {actor_info}")
+#
+#     user_ids = []
+#     soul_ids = []
+#     if "user" in actor_info:
+#         user_ids.append(str(actor_info["user"]))
+#     if "soul" in actor_info:
+#         soul_ids.append(str(actor_info["soul"]))
+#
+#     records = _get_memory_records(
+#         user_ids=user_ids if user_ids else None,
+#         soul_ids=soul_ids if soul_ids else None,
+#         exclude_session_id=session_id,
+#         limit=memory_limit,
+#     )
+#
+#     memory_text = _format_memory_records(records)
+#     print(f"[Memory] ✅ 检索完成，获得 {len(records)} 条记录")
+#     return memory_text
+# ━━━ 观察期退役段结束：retrieve_example ━━━

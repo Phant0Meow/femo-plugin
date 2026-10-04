@@ -477,11 +477,11 @@ a:hover { text-decoration: underline; }
         <span class="section-badge badge-core">Core</span>
       </div>
 
-      <p><strong>Femo（Flow Engine for Minds · Work Automata）</strong> 是一套用于编排多 Agent 工作流的 DSL（领域特定语言）+ 编译器。它的核心理念是：<em>用写剧本的方式描述 AI 协作流程</em>。</p>
+      <p><strong>Femo（Flow Engine for Minds · Work Automata）</strong> 是一套用于编排多 Agent 工作流的 DSL（领域特定语言）+ 编译器。它的核心理念是：<em>用写脚本的方式描述 AI 协作流程</em>。</p>
 
       <div class="callout tip">
         <span class="callout-icon">🖱️</span>
-        <div class="callout-body">新手推荐先从可视化前端开始！<a href="http://femo.net" target="_blank">femo.net</a> 支持拖拽一键生成流程，<code>for</code>、<code>par</code> 等高级语法也有对应的可视化操作，零代码非常方便，比手写剧本更容易上手。熟悉之后再来看本文档了解语法细节。</div>
+        <div class="callout-body">新手推荐先从可视化前端开始！<a href="http://femo.net" target="_blank">femo.net</a> 支持拖拽一键生成流程，<code>for</code>、<code>par</code> 等高级语法也有对应的可视化操作，零代码非常方便，比手写脚本更容易上手。熟悉之后再来看本文档了解语法细节。</div>
       </div>
 
 
@@ -493,7 +493,7 @@ a:hover { text-decoration: underline; }
         ③ <strong>上下文不是变量</strong>：LLM 之间的沟通靠共享上下文，非必要不传参。</div>
       </div>
 
-      <p>Femo 文件扩展名为 <span class="hl">.femo</span>（script 的 s）。编译器读入 .femo 文件，解析剧本，按照规则驱动 Agent 协作。</p>
+      <p>Femo 文件扩展名为 <span class="hl">.femo</span>（script 的 s）。编译器读入 .femo 文件，解析FEMO脚本，按照规则驱动 Agent 协作。</p>
 
       <div class="callout info">
         <span class="callout-icon">📖</span>
@@ -509,11 +509,11 @@ a:hover { text-decoration: underline; }
         <h2 class="section-title">文件结构</h2>
         <span class="section-badge badge-core">Core</span>
       </div>
-      <p>一个 .femo 剧本按以下顺序组织，各块均可选（除 <span class="hl">mainflow</span> 必须存在）：</p>
+      <p>一个 .femo 脚本按以下顺序组织，各块均可选（除 <span class="hl">mainflow</span> 必须存在）：</p>
 
       <div class="code-block">
         <div class="code-header"><span class="code-lang">femo · 整体结构</span><button class="code-copy">copy</button></div>
-        <pre><span class="k">meta</span>:       <span class="c"># 剧本元信息</span>
+        <pre><span class="k">meta</span>:       <span class="c"># FEMO脚本元信息</span>
 <span class="k">vars</span>:       <span class="c"># 可选 · 全局状态变量池 · 如有变量，须先声明再使用</span>
 <span class="k">code</span>:       <span class="c"># 可选 · 外部 Python 模块引入 · 如果需要@func 功能</span>
 <span class="k">actors</span>:     <span class="c"># 应有 · 角色定义 · 如无就调用无角色信息的AI</span>
@@ -586,7 +586,7 @@ a:hover { text-decoration: underline; }
         <h2 class="section-title">meta 元信息</h2>
         <span class="section-badge badge-core">Core</span>
       </div>
-      <p>定义剧本的基础属性与运行环境。</p>
+      <p>定义FEMO脚本的基础属性与运行环境。</p>
       <div class="code-block">
         <div class="code-header"><span class="code-lang">femo</span><button class="code-copy">copy</button></div>
         <pre><span class="k">meta</span>:
@@ -603,7 +603,7 @@ a:hover { text-decoration: underline; }
       <div class="table-wrap">
         <table>
           <tr><th>字段</th><th>类型</th><th>说明</th></tr>
-          <tr><td><code>name</code></td><td>文本</td><td>剧本名称，新建 session 时写入数据库</td></tr>
+          <tr><td><code>name</code></td><td>文本</td><td>FEMO脚本名称，新建 session 时写入数据库</td></tr>
           <tr><td><code>owner</code></td><td>整数数组</td><td>所有者的 user_id，编译器自动注入用户信息到上下文</td></tr>
           <tr><td><code>database</code></td><td>文件路径</td><td>SQLite 数据库路径，未指定默认 <code>./chronica.wor</code></td></tr>
           <tr><td><code>session</code></td><td>整数 / <code>new</code></td><td><code>new</code> 自动新建；写数字则加载指定 session；也可写 <code>17/new</code></td></tr>
@@ -849,7 +849,7 @@ def resolve_target(@KILL=None, alive_players=None, SET_VARIABLE=None, **kwargs):
     <span class="f">out</span>: vote_target(dropdown, choices=alive_players, label=<span class="s">"投票"</span>)
     <span class="f">resolve</span>: game_logic.resolve_human_vote
 
-<span class="c"># 让人类扮演特定 AI 角色，继承该角色的 scope：</span>
+<span class="c"># 让人类出演特定 AI 角色，继承该角色的 scope：</span>
 <span class="k">action</span> seer_act <span class="at">@human</span>(<span class="at">@player</span>) as (<span class="at">@seer</span>):
     <span class="f">prompt</span>: <span class="s">你现在是预言家，你要查验谁？</span>
     <span class="f">scope</span>: [<span class="at">@seer</span>, <span class="at">@hostgod</span>]</pre>
@@ -1421,9 +1421,9 @@ SET VARIABLE: &lt;&lt;<span class="at">@wolf</span>.hp -= 30&gt;&gt;</pre>
 
       <h3 class="sub">Debug 技巧</h3>
       <ul>
-        <li><strong>缩小范围</strong>：先用简单剧本验证单个 action 行为，再组合进复杂流程</li>
+        <li><strong>缩小范围</strong>：先用简单FEMO脚本验证单个 action 行为，再组合进复杂流程</li>
         <li><strong>加 @hostgod scope</strong>：让一个"上帝"角色进入所有 scope，方便从全局视角审查对话记录</li>
-        <li><strong>用 super_debug.femo 模板</strong>：项目自带的调试剧本，两处并发 + 多轮讨论，适合找隐蔽 bug</li>
+        <li><strong>用 super_debug.femo 模板</strong>：项目自带的调试FEMO脚本，两处并发 + 多轮讨论，适合找隐蔽 bug</li>
         <li><strong>随时加人类节点</strong>：在关键 action 前后加 <code>@human</code> 节点，随时插话、查看当前状态</li>
         <li><strong>检查数据库</strong>：所有对话记录都存在数据库中，直接查 soul_scope 字段确认视角隔离是否生效</li>
       </ul>
@@ -1437,7 +1437,7 @@ SET VARIABLE: &lt;&lt;<span class="at">@wolf</span>.hp -= 30&gt;&gt;</pre>
         <h2 class="section-title">完整示例</h2>
         <span class="section-badge badge-core">Core</span>
       </div>
-      <p>一个包含 AI 角色、记忆、上下文、并发投票的完整可运行剧本示例：</p>
+      <p>一个包含 AI 角色、记忆、上下文、并发投票的完整可运行FEMO脚本示例：</p>
 
       <div class="code-block">
         <div class="code-header"><span class="code-lang">femo · complete_example.femo</span><button class="code-copy">copy</button></div>

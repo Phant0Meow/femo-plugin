@@ -2,7 +2,7 @@
 // ═══ libPanel.jsx ═══
 // ═══════════════════════════════════════════════════════════════
 import React, { useState } from 'react';
-import { TYPES, ti, inp, btnP, btnS, NW, NH, MW, MH } from './common';
+import { ti } from './common'; // 已注释死导入（观察期 2026-09-26）：TYPES, inp, btnP, btnS, NW, NH, MW, MH（未使用）
 
 
 function LibPanel({

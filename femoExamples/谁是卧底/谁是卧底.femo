@@ -1,6 +1,6 @@
 meta:
   name = 谁是卧底2
-  version = 6.0
+  version = 7.0
   session = new
   output_style = |
     这是一局「谁是卧底」游戏！3 人以上即可开局：平民们拿同一个词，卧底拿一个跟它相近的词（7 人及以下 1 名卧底、8 人及以上 2 名卧底，两名卧底同词），另外还有一个白板什么词都没有。
@@ -13,10 +13,11 @@ meta:
     你没有调用任何工具的能力，严禁使用工具，直接根据你看到的聊天记录发言。
 
 actors:
-  ai @小猫咪 = soul:littlecat, source:openrouter/openrouter/free
-  ai @Eve = soul:the1stlittlesoul, source:deepseek-official/deepseek-v4-flash
-  ai @小机 = soul:debugcoder1, source:openrouter/openrouter/free
-  ai @看图梗 = soul:vision_terrier, source:local/gemma-3-4b-it
+  ai @小猫咪 = soul:littlecat
+  ai @Eve = soul:the1stlittlesoul
+  ai @小机 = soul:debugcoder1
+  ai @看图梗 = soul:vision_terrier
+  ai @出题官 = soul:uc_quizmaster
   ai @铲屎官 = source:main
   human @猫猫 = soul:human, source:0
 
@@ -27,6 +28,14 @@ vars:
   roles = {}
   words = {}
   words_text = {}
+  quiz_seed_text = ""
+  civilian_word = ""
+  undercover_word = ""
+  quiz_ok = false
+  quiz_problem = ""
+  quiz_note = ""
+  quiz_try = 0
+  quiz_max = 4
   $alive = [@小猫咪, @Eve, @小机, @看图梗, @铲屎官, @猫猫]
   @卧底 = ""
   @白板 = ""
@@ -53,15 +62,85 @@ action 结束判定 @func(u.next_round_stage):
   out:
     game_over, winner
 
+module 出题:
+  action 记一次 @assign:
+    out:
+      quiz_try += 1
+
+  action 出题种子 @func(u.quiz_seed):
+    out:
+      quiz_seed_text
+
+  action 抽题 @mind(@出题官):
+    prompt: |
+      {quiz_seed_text}
+      你是本局的出题官。请按上面这张题签，出一组《谁是卧底》的词：
+      · 平民词：所有平民共用的那个词；
+      · 卧底词：跟平民词【相近但不同】的词——像「拖鞋／凉鞋」那样，
+      同一类、都眼熟，但谁也不能一眼看出是两样东西。
+      硬要求：
+      1. 两个词必须是同一类里两个相近的东西／说法，日常可感知，不能是抽象概念；
+      2. 不能是同一个词，不能一个包含另一个，不能「苹果／苹果汁」这种一眼分明；
+      3. 上面的禁用表、最近用过的词、老题库里的题，一律不许再用；
+      4. 必须照上面的【本次指定方向】【本次指定关系】【本次指定角度】来出，
+      【这一次必须换一套完全不同的东西，别又出你上一把想的那对】；
+      5. 词长按题签要求，普通常用词，别生僻。
+      输出格式 —— 必须逐字照写下面两行（词换成你出的词），不要写别的解释：
+      SET VARIABLE: <<civilian_word = 平民词>>
+      SET VARIABLE: <<undercover_word = 卧底词>>
+      可以在两行之后补一句你自己的阴阳话（一句话，别多）。
+    showprompt: |
+      【出题】@出题官 把袖子一撸，从围裙兜里摸出记题的小本子。
+    scope: self
+    out:
+      civilian_word, undercover_word
+
+  action 审题 @func(u.check_quiz):
+    in:
+      civilian_word = civilian_word
+      undercover_word = undercover_word
+      attempt = quiz_try
+      max_attempt = quiz_max
+    out:
+      quiz_ok, quiz_problem, civilian_word, undercover_word, quiz_note
+
+  action 打回 @notice:
+    prompt: |
+      出题官翻了个白眼，把这一稿划掉，重新想。
+
+  flow:
+    [记一次]: 记一次
+    [出题种子]: 出题种子
+    [抽题]: 抽题
+    [审题]: 审题
+    [打回]: 打回
+
+    [IN] -> [记一次]
+    [记一次] -> [出题种子]
+    [出题种子] -> [抽题]
+    [抽题] -> [审题]
+    [审题] -> fork:
+      -> if (quiz_ok == false and quiz_try < quiz_max) -> [打回]
+      -> if (quiz_ok == true) -> [OUT]
+    [打回] -> [记一次]
+
+#  sketch:
+#    [OUT] = 600, 280
+#    [记一次] = 180, 120
+#    [出题种子] = 420, 120
+#    [抽题] = 660, 120
+#    [审题] = 180, 260
+#    [打回] = 420, 260
+
 module 发牌:
   action 发牌 @func(u.deal_cards):
     in:
       players = $alive
+      civilian_word = civilian_word
+      undercover_word = undercover_word
     out:
       roles, words, @卧底, @白板, deck_word
 
-  # 白板的牌面不能只显示"？？？"——演员会当成渲染故障。牌面文案由 Python 现算：
-  # 平民/卧底="你拿到的词是【X】"，白板="你手里没有词（白板）…"。
   action 牌面文案 @func(u.card_texts):
     in:
       words = words
@@ -71,6 +150,7 @@ module 发牌:
   action 开局公告 @notice:
     prompt: |
       {u.board_notice(roles)}
+      {quiz_note}
       规则：每轮每人说一句描述自己的牌（不能直接说出来），然后全体投票，得票最多的人出局。
       如果投票出现平票，本轮无人出局：平票的几位当场申辩一句、其余人重投一次决出谁走；
       若重投再次平票，僵局不再空转——由平票的几人中随机送走一人。
@@ -109,17 +189,15 @@ module 发牌:
     [本轮顺序] -> [OUT]
 
 #  sketch:
-#    [FOR] = 145, 201
-#    [OUT] = 600, 380
-#    [发牌] = 180, 120
-#    [开局公告] = 420, 120
-#    [看牌] = -4, 165
-#    [轮次推进] = 188, 261
-#    [本轮顺序] = 420, 260
+#    [FOR] = 316, 0
+#    [OUT] = 153, 93
+#    [发牌] = -5, -102
+#    [牌面文案] = 148, -102
+#    [开局公告] = 311, -103
+#    [看牌] = 148, -10
+#    [本轮顺序] = 311, 83
 
 module 发言:
-  # 轮次号必须在这里自增：发牌模块只跑一次，主循环回到 &发言 时不会再进发牌，
-  # 旧写法（自增放在发牌）导致公告永远显示"第 1 轮"（2026-09-12 实测）。
   action 轮次推进 @assign:
     out:
       round_no += 1
@@ -133,7 +211,8 @@ module 发言:
 
   action 回合公告 @notice:
     prompt: |
-      "{announce_text}\n{round_task}"
+      "{announce_text}
+      {round_task}"
     scope: all
 
   action 陈述 @mind(@speaker):
@@ -167,12 +246,13 @@ module 发言:
     [设定常规投票人] -> [OUT]
 
 #  sketch:
-#    [FOR] = 200, 200
-#    [OUT] = 600, 380
-#    [生成轮次公告] = 180, 120
-#    [回合公告] = 420, 120
-#    [陈述] = 393, 212
-#    [设定常规投票人] = 180, 260
+#    [FOR] = 133, 97
+#    [OUT] = 270, 195
+#    [轮次推进] = 128, -10
+#    [生成轮次公告] = 265, -10
+#    [回合公告] = 265, 87
+#    [陈述] = -5, 87
+#    [设定常规投票人] = 128, 185
 
 module 投票:
   action 票箱清空 @assign:
@@ -212,12 +292,12 @@ module 投票:
     -> [OUT]
 
 #  sketch:
-#    [PAR] = 140, -5
-#    [PAR_出] = 145, 279
-#    [OUT] = 3, 200
-#    [票箱清空] = -5, 91
-#    [投票] = 141, 91
-#    [收票] = 143, 177
+#    [PAR] = 162, 101
+#    [PAR_出] = 162, 200
+#    [OUT] = 0, 200
+#    [票箱清空] = 157, -10
+#    [投票] = 302, 91
+#    [收票] = 302, 190
 
 module 结算:
   action 计票结算 @func(u.process_votes):
@@ -243,9 +323,9 @@ module 结算:
     [投票结果公告] -> [OUT]
 
 #  sketch:
-#    [OUT] = 600, 280
-#    [计票结算] = 180, 120
-#    [投票结果公告] = 420, 120
+#    [OUT] = 0, 263
+#    [计票结算] = -5, 77
+#    [投票结果公告] = -5, 169
 
 module 平票PK:
   action 生成PK提示 @func(u.pk_prompt):
@@ -269,7 +349,8 @@ module 平票PK:
       用一句话为自己申辩：说说为什么自己不像最可疑的那个，或者指出别人的破绽。
       · 不要把你的词直接说出来，也不要自报身份；
       · 一句话就够，不要长篇大论；
-      · 本节点只输出这一句申辩，不要写 SET VARIABLE，也不要写任何赋值语句。
+      · 本节点只输出这一句申辩，不要写 SET VARIABLE，也不要写任何赋值语句；
+      · 申辩就是申辩——本节点没有要你填的变量，票已经在上一轮投完了，不要在这里投任何人。
     scope: all
 
   action 设定PK投票人 @assign:
@@ -361,6 +442,7 @@ module 赛后讨论:
 #    [散场闲聊] = 495, 120
 
 mainflow:
+  [出题]: &出题
   [发牌]: &发牌
   [发言]: &发言
   [投票]: &投票
@@ -369,7 +451,8 @@ mainflow:
   [赛后讨论]: &赛后讨论
   [结束判定]: 结束判定
 
-  [START] -> [发牌]
+  [START] -> [出题]
+  [出题] -> [发牌]
   [发牌] -> [发言]
   [发言] -> [投票]
   [投票] -> [结算]
@@ -383,11 +466,12 @@ mainflow:
   [平票PK] -> [结束判定]
 
 #sketch:
-#  [END] = -1, 174
-#  [发牌] = 153, -15
-#  [发言] = 313, -15
-#  [投票] = 490, -15
-#  [结算] = 491, 117
-#  [平票PK] = 491, 246
-#  [赛后讨论] = 149, 159
-#  [结束判定] = 317, 166
+#  [END] = 0, 174
+#  [出题] = -10, 81
+#  [发牌] = 154, -15
+#  [发言] = 314, -15
+#  [投票] = 474, -15
+#  [结算] = 474, 117
+#  [平票PK] = 474, 246
+#  [赛后讨论] = 154, 159
+#  [结束判定] = 319, 164

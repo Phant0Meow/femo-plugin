@@ -1,10 +1,10 @@
 /**
- * run-control.ts — 开演流程。
+ * run-control.ts — 启动运行流程。
  *
- * 真正让一场戏跑起来的完整动作：读剧本（inline 文本或文件地址）、写会话剧本
+ * 真正让一次运行跑起来的完整动作：读FEMO脚本（inline 文本或文件地址）、写会话FEMO脚本
  * 记录（地址/原文一致性判定）、清/带断点、解析 API key、命令引擎开跑。
  * 前端的运行按钮（/run、/create-session 路由）和 AI 的 femo-run/femo-mount
- * 工具最终都走到 startRunOnSession。另含剧本文件的保存/读取 handler 和
+ * 工具最终都走到 startRunOnSession。另含脚本文件的保存/读取 handler 和
  * LLM 模型目录聚合（前端下拉 + 引擎编译校验白名单共用）。
  * 从 index.ts 原样迁出（2026-08-23 重构）。
  */
@@ -12,21 +12,26 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { SessionId, type Session } from '@deepseek-ai/dsh-session'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { join } from 'node:path'
 import type { FemoBridge } from './bridge'
 import type { ResolvedConfig } from './config'
 import { readBody, writeJson, broadcastSse, type SaveScriptBody } from './http'
 import { FEMO_PRESET, presetOf, injectFemoRoot, femoRootSections } from './persona'
-import { abortAllSubagents } from './subagent'
-import { pushDiag } from './diag-feed'
-import type { RunState } from './engine-events'
-import { jobMirrorPrearm, broadcastProjectionState } from './engine-events'
-import { mainSessionIdOf, type ProjectionRegistry } from './projection'
-import { broadcastCompat } from './windowing-native'
+import { abortAllSubagents } from '../../../femo2host/host/subagent-core.mjs'
+import { dataRootOf } from '../../../femo2host/femoRoot.mjs'   // 数据根单源（含 FEMO_DATA_DIR 分支）
+import { pushDiag } from './diag/diag-feed'
+import type { RunState } from './events/engine-events'
+import { jobMirrorPrearm, broadcastProjectionState, activeJobOfSession } from './events/engine-events'
+import { resolveAndPauseJob } from '../../../femo2host/host/run-control-core.mjs'
+import { mainSessionIdOf, type ProjectionRegistry } from './projection/projection'
+import { broadcastCompat } from './projection/windowing-native'
 import {
   setSessionCurrentJob, readSessionCurrentJob, appendSessionJob,
   readSessionScript, writeSessionScript, readSessionScriptText,
 } from './state-files'
+import { snapshotJobCast } from '../../../femo2host/host/cast-core.mjs'
 import { rememberFemoFile } from './femo-files'
+import { hostAddr } from './hub/hub-feed'   // 宿主自称（host_refs 归属键，与喂/读侧同一词）
 
 // ── 凭证与模型目录 ────────────────────────────────────────────────────────
 
@@ -40,7 +45,7 @@ async function resolveApiKey(ctx: Context, resolved: ResolvedConfig): Promise<st
 
 interface LlmModelEntry { id: string; name?: string }
 interface LlmProviderEntry { id: string; name?: string; models: LlmModelEntry[] }
-/** 剧本 source 白名单 payload：引擎编译期校验 + 前端下拉的数据源。 */
+/** FEMO脚本 source 白名单 payload：引擎编译期校验 + 前端下拉的数据源。 */
 interface LlmModelsPayload {
   /** 裸 id source 归属的默认 provider（插件配置 dshProvider）。 */
   defaultProvider: string
@@ -104,13 +109,13 @@ export async function startJobOnSession(
   reset = false,
   jobId?: number,
   projections?: ProjectionRegistry,
-): Promise<void> {
+): Promise<Array<{ where?: string; message?: string }>> {
   console.log(`[femo-run-diag ${diagTs()}] startJob begin sid=${String(sessionId)} reset=${reset}${jobId !== undefined ? ` jobId=${jobId}` : ''}`)
   const apiKey = await resolveApiKey(ctx, resolved)
   if (apiKey === undefined) {
     console.log(`[femo-plugin] credential ${resolved.apiKeyRef} not resolved; AI nodes will fail`)
   }
-  // 会话剧本记录 + 运行时一致性检测：引擎永远跑「前端文本」；记录形态取决于
+  // 会话FEMO脚本记录 + 运行时一致性检测：引擎永远跑「前端文本」；记录形态取决于
   // 地址文件与前端文本是否一致——一致 → 只存地址（不保留原文）；不一致 →
   // 地址与原文并存（text=浏览器端实际运行版本）。读历史时 text 优先。
   const sid = String(sessionId)
@@ -138,19 +143,22 @@ export async function startJobOnSession(
   // 记录随运行版本更新（rev 已变）：广播各端静默同步 rev/内容，
   // 避免各页面下次快照写因 rev 滞后而误触 409 冲突弹窗。
   broadcastSse('script_changed', { sessionId })
-  // 【2026-08-30 串台修复①→Job 化（§8.1）】开跑前清理上一场残留的在飞子代理。
+  // 【2026-08-30 串台修复①→Job 化（§8.1）】开跑前清理上一次残留的在飞子代理。
   // 仅当引擎无活跃 Job（activeJobId undefined）才执行——有活跃 Job 的调用方
-  // 本身在越轨开跑（引擎 another_job_active 会拒），此时绝不能误杀在跑剧本的
-  // 合法演员；空闲槽上的在飞子代理必然是残留物（bridge 死亡等异常漏网，
+  // 本身在越轨开跑（引擎 another_job_active 会拒），此时绝不能误杀在跑FEMO脚本的
+  // 合法角色；空闲槽上的在飞子代理必然是残留物（bridge 死亡等异常漏网，
   // flow_paused/flow_error 收口覆盖不到的），全场掐断防其污染新场次的窗口
-  // 直播（「演员串台」）。
+  // 直播（「角色串台」）。
   if (runState.activeJobId === undefined) {
-    const killed = abortAllSubagents('新剧本开跑：清理上一场残留子代理')
+    const killed = abortAllSubagents('新脚本开跑：清理上一次残留子代理')
     if (killed > 0) console.log(`[femo-plugin] new run: cleaned ${killed} leftover subagent(s)`)
   }
+  // 编译警告上浮调用方（femo-run 工具返回值；主模型汇总通道另走驿站滞留件）。
+  // 声明在 try 外：return 在收尾（try/catch 之后），块内赋值。
+  let startedWarnings: Array<{ where?: string; message?: string }> = []
   try {
-    // base_dir = 剧本文件所在目录（todo #2）：code/memory/context 的相对
-    // file: 地址基于它解析。有地址（已保存/导入）→ 剧本文件所在目录；
+    // base_dir = 脚本文件所在目录（todo #2）：code/memory/context 的相对
+    // file: 地址基于它解析。有地址（已保存/导入）→ 脚本文件所在目录；
     // 未保存（纯文本）→ 传空字符串，引擎对相对路径直接报错（只支持绝对地址）。
     const baseDir = effectivePath !== undefined
       ? effectivePath.replace(/[\\/][^\\/]*$/, '')
@@ -174,9 +182,12 @@ export async function startJobOnSession(
         // source 编译期校验白名单：引擎 parse_script 时校验 actors 的 source 字段
         models: await collectLlmModels(ctx, resolved),
         host_ref: sid,
+        // 多宿主归属账（2026-09-21 账本多宿主化）：{宿主名: 会话id} 一格一
+        // 宿主；host_ref 单值保留（兼容回退读法）。
+        host_refs: { [hostAddr()]: sid },
         script_name: scriptName,
-        // 剧本快照随 Job 档案落盘（引擎侧 get_job_state 带出——femoGen 凭
-        // job_id 渲染/续跑的数据源）。未保存=''（引擎缺省，纯文本场无地址可存）。
+        // FEMO脚本快照随 Job 档案落盘（引擎侧 get_job_state 带出——femoGen 凭
+        // job_id 渲染/续跑的数据源）。未保存=''（引擎缺省，纯文本次无地址可存）。
         script_path: effectivePath ?? '',
       }, 30_000) as { job_id?: number; warnings?: Array<{ where?: string; message?: string }> } | undefined
       const newJobId = res?.job_id
@@ -187,13 +198,25 @@ export async function startJobOnSession(
       // SSE compile_warnings 事件专供 femoGen 调试窗等前端面板（聊天广播到不了
       // 调试窗——它只吃引擎事件流）；信封带 sid 供前端按会话过滤。
       const compileWarnings = Array.isArray(res?.warnings) ? res.warnings : []
+      startedWarnings = compileWarnings
       if (compileWarnings.length > 0) {
         console.log(`[femo-plugin] job_start warnings: ${compileWarnings.length} item(s)`)
         broadcastSse('compile_warnings', { sid, job_id: newJobId, warnings: compileWarnings })
       }
       await setSessionCurrentJob(resolved.femoRoot, sid, newJobId)
       await appendSessionJob(resolved.femoRoot, sid, newJobId)
+      // 预绑定定格（绑定账正身住 hub）：偏好账全量誊写进本 Job 绑定账
+      // （cast/<jobId>.json）。此刻定格——运行中改绑定无效，账随 Job 存档、
+      // 续跑恢复。失败只留痕不阻断启动运行（绑定账缺页=该 Job 退回全子代理运行，
+      // 不影响正确性）。
+      void snapshotJobCast(resolved.femoRoot, newJobId).catch((error: unknown) => {
+        console.log(`[femo-plugin] cast snapshot failed (job=${newJobId}): ${String(error)}`)
+      })
       jobMirrorPrearm(runState, newJobId, sid)
+      // 编译警告的主模型通道=桥产滞留件（job_start 时已进驿站，subkind=
+      // warning），随本 Job 下一个停下时刻代取打包 steer（2026-09-16 起宿主
+      // 不再自建警告桶）。此处只保留两个显示面：SSE compile_warnings（femoGen
+      // 调试窗）与聊天窗逐条广播。
       pushDiag('run', `job_start OK prearm job=${newJobId} sid=${sid.slice(-12)}（activeJobId 已指向本 Job）`)
       broadcastProjectionState(runState, sid)
       // 【2026-09-06 猫猫拍板】开跑/续跑的用户通知在执行体统一广播（主会话+
@@ -202,7 +225,7 @@ export async function startJobOnSession(
       if (projections !== undefined) {
         const session = (ctx.get('sessions') as { get(id: SessionId): Session | undefined } | undefined)?.get(SessionId(sid))
         if (session !== undefined) {
-          broadcastCompat(ctx, session, projections, '🎬 剧本已开始（在上帝视角窗口查看）')
+          broadcastCompat(ctx, session, projections, '🎬 FEMO 已开始（在上帝视角窗口查看）')
           // 编译警告逐条广播（编译没被阻断，但作者应当知情）。
           for (const w of compileWarnings) {
             broadcastCompat(ctx, session, projections,
@@ -231,12 +254,15 @@ export async function startJobOnSession(
         user_api_model: resolved.model,
         host_ai_backend: resolved.hostAiBackend,
         // source 编译期校验白名单（与 job_start 同款；resume 也要校验——
-        // 改了 source 的剧本续跑同样该在编译期报错）
+        // 改了 source 的脚本续跑同样该在编译期报错）
         models: await collectLlmModels(ctx, resolved),
         host_ref: sid,
+        // 多宿主归属账（同 fresh 分支；resume 合并语义——只动自己格）。
+        host_refs: { [hostAddr()]: sid },
       }, 30_000) as { resumed?: boolean; warnings?: Array<{ where?: string; message?: string }> } | undefined
       // 编译期警告上浮（2026-09-07 warning 桶，同 fresh 分支）。
       const resumeWarnings = Array.isArray(res?.warnings) ? res.warnings : []
+      startedWarnings = resumeWarnings
       if (resumeWarnings.length > 0) {
         console.log(`[femo-plugin] job_resume warnings: ${resumeWarnings.length} item(s)`)
         broadcastSse('compile_warnings', { sid, job_id: targetJobId, warnings: resumeWarnings })
@@ -246,14 +272,20 @@ export async function startJobOnSession(
       // （fresh 时已记则不动）+ prearm。
       await setSessionCurrentJob(resolved.femoRoot, sid, targetJobId)
       await appendSessionJob(resolved.femoRoot, sid, targetJobId)
+      // 续跑同样重放预绑定定格：Job 账已有账则幂等覆盖同值；换宿主/换机续跑
+      // 时本宿主的预绑定借此落进账（hub 全局账，只动自己格）。
+      void snapshotJobCast(resolved.femoRoot, targetJobId).catch((error: unknown) => {
+        console.log(`[femo-plugin] cast snapshot failed (job=${targetJobId}): ${String(error)}`)
+      })
       jobMirrorPrearm(runState, targetJobId, sid)
+      // 编译警告通道同 fresh 分支：桥产滞留件随停打包，宿主不自建桶。
       pushDiag('run', `job_resume OK prearm job=${targetJobId} sid=${sid.slice(-12)}`)
       broadcastProjectionState(runState, sid)
       if (projections !== undefined) {
         const session = (ctx.get('sessions') as { get(id: SessionId): Session | undefined } | undefined)?.get(SessionId(sid))
         if (session !== undefined) {
-          broadcastCompat(ctx, session, projections, '▶️ 剧本已继续（在上帝视角窗口查看）')
-          // 编译警告逐条广播（同 fresh 分支；续跑改了剧本同样该知情）。
+          broadcastCompat(ctx, session, projections, '▶️ FEMO 已继续（在上帝视角窗口查看）')
+          // 编译警告逐条广播（同 fresh 分支；续跑改了FEMO脚本同样该知情）。
           for (const w of resumeWarnings) {
             broadcastCompat(ctx, session, projections,
               `ℹ️ 编译警告${w.where ? `（${w.where}）` : ''}：${w.message}`)
@@ -267,22 +299,56 @@ export async function startJobOnSession(
     throw error
   }
   console.log(`[femo-plugin] started script on ${sessionId}${scriptPath !== undefined ? ` (${scriptPath})` : ''}`)
+  // 编译警告上浮调用方（femo-run 工具返回值——与 zcode 版对齐；主模型汇总
+  // 通道另走驿站滞留件，两不误）。
+  return startedWarnings
 }
 
-/** 运行守卫（GUARD 同款判定，§8.3：handleRunOnSession 与 handleCreateSession
- * 共用）：引擎有活跃 Job 即拒，409/错误文案带活跃 Job 归属（信息化——跨会话
- * 语义：可先暂停或等它挂起）。他 session 活跃由引擎 another_job_active 二次
- * 拒绝兜底（原话上浮）。 */
-export function assertRunAllowed(runState: RunState, sessionId: string): void {
-  const activeId = runState.activeJobId
-  if (activeId === undefined) return
-  const mirror = runState.jobs.get(activeId)
-  const owner = mirror?.ownerSid ?? '?'
-  const where = owner === sessionId ? '本会话' : `另一会话（${owner}）`
-  throw new Error(`${where}的 Job ${activeId} 活跃中，可先暂停或等它挂起`)
+/** 运行守卫（GUARD 同款判定）：2026-09-24 B1 收公共层——语义唯一活在
+ *  run-state-core.assertRunAllowed，此处引入+再导出（index/routes 零改动）。 */
+import { assertRunAllowed } from '../../../femo2host/host/run-state-core.mjs'
+export { assertRunAllowed }
+
+// ── 暂停/强停裁决（唯一语义份，2026-09-24 B3 收公共层）──────────────────
+
+export type PauseOutcome =
+  | { kind: 'paused'; jobId: number; paused: boolean; state?: string }
+  | { kind: 'no-such-job'; jobId?: number }
+  | { kind: 'not-owner'; ownerShow: string }
+  | { kind: 'idle'; state: string; jobId: number }
+  | { kind: 'none'; mirrorJobId?: number; activeJobId?: number | null }
+
+/** 解析并执行「暂停本会话的一个 Job」，femo-run 工具路径（index.pauseScript）
+ *  与 HTTP /pause 路由（routes.ts）的共用入口。裁决语义 2026-09-24 B3 收编
+ *  公共层 run-control-core.resolveAndPauseJob（显式=引擎档案归属+状态预检、
+ *  缺省=镜像快路径→list_jobs 档案兜底、始终不裸发 job_pause；zcode/autoclaw
+ *  的 tools-core pause 同吃这一份）——本壳只补 dsh 特有：①内存镜像双判定
+ *  作快路径注入 ②'none' 案附带镜像诊断字段。呈现形态（工具 ❌ 抛错 / HTTP
+ *  错误面板+诊断流留痕）留各自调用方。桥不通时 send 抛错原样上浮。 */
+export async function pauseJobResolved(
+  bridge: Pick<FemoBridge, 'send'>,
+  runState: RunState,
+  sessionId: string,
+  jobId?: number,
+): Promise<PauseOutcome> {
+  const job = activeJobOfSession(runState, sessionId)
+  const mirrorTarget = job?.state === 'running' && runState.activeJobId === job.jobId
+    ? job.jobId
+    : undefined
+  const out = await resolveAndPauseJob({
+    send: (cmd, args, timeoutMs) => bridge.send(cmd, args as Record<string, unknown>, timeoutMs),
+    hostKey: hostAddr(),
+    ownerRef: sessionId,
+    jobId,
+    findMirrorTarget: () => mirrorTarget,
+  })
+  if (out.kind === 'none') {
+    return { kind: 'none', mirrorJobId: job?.jobId, activeJobId: runState.activeJobId ?? null }
+  }
+  return out
 }
 
-// ── 剧本文件读写 handler ──────────────────────────────────────────────────
+// ── 脚本文件读写 handler ──────────────────────────────────────────────────
 
 /** Read one run's script text from an inline body or a script path. */
 async function readScriptText(femo: string | undefined, scriptPath: string | undefined): Promise<string> {
@@ -349,7 +415,9 @@ export async function handleSaveScript(
   }
   // Sanitize the file name: keep safe chars, force .femo.
   const safe = name.replace(/[\\/:*?"<>|]/g, '_').replace(/\.femo$/i, '')
-  const projectsDir = `${resolved.femoRoot}\\user_data\\projects`
+  // 数据根走公共层单源（2026-09-29）：曾自拼 femoRoot\user_data 漏 FEMO_DATA_DIR
+  // 分支——沙盒/多实例部署下读侧走分桶根、这里写落主根，读写分家。
+  const projectsDir = join(dataRootOf(resolved.femoRoot), 'projects')
   mkdirSync(projectsDir, { recursive: true })
   const path = `${projectsDir}\\${safe}.femo`
   writeFileSync(path, content, 'utf8')
@@ -377,13 +445,13 @@ export async function handleReadScript(req: IncomingMessage, res: ServerResponse
   }
 }
 
-// ── HTTP handler：在既有会话上开演 / 新建会话即开演 ────────────────────────
+// ── HTTP handler：在既有会话上启动运行 / 新建会话即启动运行 ────────────────────────
 
 /** 【原生 0.1.3+ 兜底】store 未命中时把持久化会话拉活。0.1.3 的侧边栏打开
  *  不进内存 store（历史走持久化句柄直读），run/pause/resume 的 store 查找会
  *  未命中；meow fork 上打开即进 store，此兜底永不触发。走官方 agents.resume
  *  （与 web 打开会话同一路径），setup 挂 FEMO_PRESET（与 create-session 同款），
- *  导演人设与 femo:root 在拉活后仍在。返回 store 里的活会话；失败返回
+ *  主Agent人设与 femo:root 在拉活后仍在。返回 store 里的活会话；失败返回
  *  undefined（调用方维持原 404 行为）。
  *  【2026-09-11 导出】投影窗路径也要用它：宿主重启后主会话不在 store ⇒
  *  子代理目录/描述符都不在 ⇒ 客户端 openSubagent 必被拒（descriptor
@@ -456,8 +524,9 @@ export async function ensureSessionLive(
 /**
  * POST /femo-plugin/run — play a script on an EXISTING Femo session (the script
  * panel's "save and run" lands here; create-session stays for the sidebar's
- * new-session flow). The session must already be Femo mode: a standard session
- * has a main model and this plugin must not start an engine run behind it.
+ * new-session flow). 【2026-09-19 取消限制】非 FEMO 会话也可以启动运行：运行期的
+ * 对话接管由运行态门卫（runState 活跃 Job / pre-step gate）保证，与 preset 无关，
+ * 事件钩子已按「有活跃 Job」放开（engine-events.ts）。
  */
 export async function handleRunOnSession(
   req: IncomingMessage,
@@ -498,7 +567,7 @@ export async function handleRunOnSession(
     // 持久化句柄直读），run 的 store 查找会未命中 → femoGen 点运行"没反应"
     // （2026-09-08 实测）。meow fork 上打开即进 store，此兜底永不触发。
     // 走官方 agents.resume 把持久化会话拉活（与 web 打开会话同一路径），
-    // setup 挂 FEMO_PRESET（与 create-session 同款），导演人设/femo:root 不丢。
+    // setup 挂 FEMO_PRESET（与 create-session 同款），主Agent人设/femo:root 不丢。
     session = await ensureSessionLive(ctx, sessionId, tag, sessionsStore)
   }
   if (session === undefined) {
@@ -506,10 +575,9 @@ export async function handleRunOnSession(
     writeJson(res, 404, { ok: false, error: `session ${sessionId} not found` })
     return
   }
+  // 【2026-09-19 取消限制】非 FEMO 会话也可启动运行——只留一条信息化日志备查。
   if (presetOf(session) !== FEMO_PRESET) {
-    console.log(`[femo-run-diag ${diagTs()}] ${tag} REJECT-400 (not femo preset)`)
-    writeJson(res, 400, { ok: false, error: '当前会话不是 FEMO模式：请先在会话上方的模式菜单选择「FEMO模式」' })
-    return
+    console.log(`[femo-run-diag ${diagTs()}] ${tag} NOTE (non-femo preset='${presetOf(session) ?? '-'}' allowed to run)`)
   }
   // GUARD（§8.2 镜像读）：引擎有活跃 Job 即 409，文案带活跃 Job 归属
   // （信息化——跨会话语义：可先暂停或等它挂起）。
@@ -534,7 +602,7 @@ export async function handleRunOnSession(
     const scriptText = await readScriptText(femo, scriptPath)
     // 后端编译检查（各自闭环：compiler 纯后端也有自己的语法检查）。
     // 配合 parse_script 的变量声明校验，编译期就能拦住 @speaker 未声明等错误，
-    // 不启动引擎、无状态残留。base_dir = 剧本文件所在目录（相对 file: 解析用）。
+    // 不启动引擎、无状态残留。base_dir = 脚本文件所在目录（相对 file: 解析用）。
     const baseDir = scriptPath !== undefined
       ? scriptPath.replace(/[\\/][^\\/]*$/, '')
       : ''
@@ -549,7 +617,7 @@ export async function handleRunOnSession(
       console.log(`[femo-run-diag ${diagTs()}] ${tag} check OK`)
     } catch (error: unknown) {
       console.log(`[femo-run-diag ${diagTs()}] ${tag} check FAILED: ${String(error instanceof Error ? error.message : error)}`)
-      writeJson(res, 400, { ok: false, error: `剧本编译失败：${String(error instanceof Error ? error.message : error)}` })
+      writeJson(res, 400, { ok: false, error: `FEMO脚本编译失败：${String(error instanceof Error ? error.message : error)}` })
       return
     }
     // jobId：前端显式指定的续跑目标（femoGen 续跑旧 Job——"以该场次快照继续"）。
@@ -584,7 +652,7 @@ export async function handleCreateSession(
   // 模型来源（2026-08-24 用户拍板「不要写provider」）：不写配置默认（deepseek
   // 系在 meow 等部署无 adapter → NO_ADAPTER），跟随用户保存的默认模型选择
   // （与 dsh web 建会话的 selectionFor 语义一致）。未保存过默认 → 不传，
-  // 首个导演轮次会响亮报错提示去选模型，绝不静默落到部署隐式默认。
+  // 首个主Agent轮次会响亮报错提示去选模型，绝不静默落到部署隐式默认。
   const defaultModel = ctx.get('agentDefaultModel') as { currentSelection?(): unknown } | undefined
   const sel = defaultModel?.currentSelection?.() as { provider?: unknown; model?: unknown } | undefined
   const agentOptions = typeof sel?.provider === 'string' && sel.provider.length > 0

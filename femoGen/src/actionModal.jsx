@@ -71,7 +71,7 @@ function ActionModal({
     >
       <div
         style={{
-          background: 'var(--femo-surface)',
+          background: 'var(--femo-modal-bg)',
           borderRadius: 'var(--femo-radius-xl)',
           width: 510,
           maxHeight: '88vh',
@@ -89,7 +89,7 @@ function ActionModal({
             alignItems: 'center',
             position: 'sticky',
             top: 0,
-            background: 'var(--femo-surface)',
+            background: 'var(--femo-modal-bg)',
             zIndex: 1,
           }}
         >

@@ -1,22 +1,25 @@
 /**
  * client-ui/proj2/frame-router.ts — 直播帧 → 轮桶（显示层 v9 的路由器）。
  *
- * 与旧 stream-store 的关键差别：**桶按轮，不按演员**。
- *   旧：`sid → actorKey → entry`（同一演员的两轮共享一个桶 → 甲1/甲2 同位置同时长字）
+ * 与旧 stream-store 的关键差别：**桶按轮，不按角色**。
+ *   旧：`sid → actorKey → entry`（同一角色的两轮共享一个桶 → 甲1/甲2 同位置同时长字）
  *   新：`sid → turn → entry`（帧自带 turn，直接落进它自己那一轮）
  *
- * 于是"归属"不再需要任何推断（谁最新/桶空不空），也不存在"两组文字画到同一个块"。
- * 渲染位用自己的 turn 读自己的桶；`femo_stream` 帧若不带 turn（导演流等旧通路）
- * 一律不进本台账——那些位仍归旧 stream-store 管（步3 一并收编）。
+ * 【2026-09-20 旧直播链退役】【刀⑧-3 裁至诊断入口】宿主侧 femo_stream 帧已
+ * 全部停发（投影窗内容由 hub 供给），生产路径无帧可喂；直播渲染半边
+ * （useFemo2Live 与 femo-stream-live.tsx）随之退役。本文件只剩诊断入口：
+ *  - femo2FeedFrame：离线重放面（window.__femo2Feed 同源）；
+ *  - femo2DumpBuckets：桶快照（window.__femo2Buckets，见 proj2/index）；
+ *  - run_state{running} 的场次清桶（防御性，桶本就不再增长）。
  *
  * 【场次边界】轮号按 Job 重置（TURN_BASE_EPOCH + 100n），所以任何"跨轮记忆"
  * 都必须按场清零：run_state{running} 到达即清空本会话全部轮桶（v8.2 的
- * femoMaxTurnSeen 跨场残留坑，不再重犯——新链路干脆不存跨轮状态）。
+ * femoMaxTurnSeen 跨场残留坑，不再重演——新链路干脆不存跨轮状态）。
  */
 
-import { useEffect, useState } from 'react'
-import { femoStreamAcquire, subscribeControlEvents } from '../stream-store'
+import { subscribeControlEvents } from '../stream-store'
 
+/** 直播块（toolcall 块带 result=官方工具行的结果文本）。 */
 export interface Femo2LiveBlock {
   readonly kind: 'text' | 'reasoning' | 'toolcall'
   readonly text: string
@@ -40,16 +43,6 @@ const EMPTY_BLOCKS: readonly Femo2LiveBlock[] = []
 
 /** 主会话 id → 轮号 → 该轮直播态（全内存；不落盘）。 */
 const buckets = new Map<string, Map<number, Femo2LiveState>>()
-const listeners = new Set<() => void>()
-let notifyRaf = 0
-
-function notify(): void {
-  if (notifyRaf !== 0) return
-  notifyRaf = requestAnimationFrame(() => {
-    notifyRaf = 0
-    for (const listener of [...listeners]) listener()
-  })
-}
 
 function bucketOf(sid: string): Map<number, Femo2LiveState> {
   let byTurn = buckets.get(sid)
@@ -67,17 +60,15 @@ function entryOf(sid: string, turn: number): Femo2LiveState {
 function patch(sid: string, turn: number, next: Partial<Femo2LiveState>): void {
   const byTurn = bucketOf(sid)
   byTurn.set(turn, { ...entryOf(sid, turn), ...next })
-  notify()
 }
 
-/** 全场清空（run_state{running}=新一场开演；轮号纪元复位，旧桶全部作废）。 */
+/** 全场清空（run_state{running}=新一次启动运行；轮号纪元复位，旧桶全部作废）。 */
 export function femo2ResetAll(sid?: string): void {
   if (sid === undefined) {
     buckets.clear()
   } else {
     buckets.delete(sid)
   }
-  notify()
 }
 
 /** 帧的消费面（与宿主 broadcastSse('femo_stream', …) 同词汇）。 */
@@ -120,7 +111,7 @@ function findBlockAt(blocks: readonly Femo2LiveBlock[], index: number, step: num
 }
 
 /** 应用一条 femo_stream 帧；无轮号的帧（旧通路）不属于本台账，直接忽略。
- *  导出供诊断/离线重放（window.__femo2Feed 同源），生产路径只有 SSE 转发。 */
+ *  【刀⑧-3 后唯一入口=诊断/离线重放】（window.__femo2Feed 同源），生产无帧。 */
 export function femo2FeedFrame(raw: Femo2Frame): void {
   const sid = typeof raw.sid === 'string' ? raw.sid : ''
   const turn = typeof raw.turn === 'number' ? raw.turn : undefined
@@ -212,7 +203,7 @@ export function femo2FeedFrame(raw: Femo2Frame): void {
     return
   }
   if (kind === 'block_end') {
-    // 演员路径的 retain 帧：块保留在桶里（等段落落盘 + 闭轮帧接管）；
+    // 角色路径的 retain 帧：块保留在桶里（等段落落盘 + 闭轮帧接管）；
     // 无 retain（旧通路）维持"落地即移除"。
     if (raw.retain === true) return
     const at = findBlockAt(prev.blocks, index, step, blockKind)
@@ -224,15 +215,12 @@ export function femo2FeedFrame(raw: Femo2Frame): void {
 }
 
 let wired = false
-/** 挂上全局 SSE 转发（模块级一次；连接本身仍由渲染位的 acquire 计数门控）。 */
+/** 挂上全局事件转发（模块级一次）。【刀⑧-3】femo_stream 帧接线已随旧直播链
+ *  摘除；只保留 run_state{running} 的场次清桶（防御性，桶本就不再增长）。 */
 function ensureWired(): void {
   if (wired) return
   wired = true
   subscribeControlEvents((msg) => {
-    if (msg.type === 'femo_stream') {
-      femo2FeedFrame((msg.data ?? {}) as Femo2Frame)
-      return
-    }
     if (msg.type === 'run_state') {
       const data = msg.data ?? {}
       if (data.state === 'running') {
@@ -241,27 +229,6 @@ function ensureWired(): void {
       }
     }
   })
-}
-
-/** 读某会话某一轮的直播态（渲染位唯一读法：自己的 turn 读自己的桶）。 */
-export function useFemo2Live(mainSid: string | undefined, turn: number | undefined): Femo2LiveState {
-  const [state, setState] = useState<Femo2LiveState>(IDLE)
-  useEffect(() => {
-    ensureWired()
-    if (mainSid === undefined || turn === undefined) {
-      setState(IDLE)
-      return
-    }
-    const read = (): void => { setState(entryOf(mainSid, turn)) }
-    read()
-    const release = femoStreamAcquire()
-    listeners.add(read)
-    return () => {
-      listeners.delete(read)
-      release()
-    }
-  }, [mainSid, turn])
-  return state
 }
 
 /** 诊断用：某会话当前桶快照（含块文本预览；window.__femo2Buckets 见 proj2/index）。 */
@@ -276,7 +243,5 @@ export function femo2DumpBuckets(sid: string): Array<{ turn: number; blocks: num
   }))
 }
 
-// 模块加载即挂上 SSE 帧入口：帧总是先于渲染位挂载到达（宿主写完开轮锚点就开跑，
-// 会话事件走 mux、直播帧走 SSE 是两条通道），若等节点挂载才注册就会丢头几百毫秒
-// 的字。连接本身仍由渲染位的 acquire 计数门控（无窗不开长连接）。
+// 模块加载即挂上事件入口（帧总是先于渲染位挂载到达；现仅剩场次清桶一路）。
 ensureWired()

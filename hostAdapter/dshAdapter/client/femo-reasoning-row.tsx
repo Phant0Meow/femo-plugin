@@ -1,7 +1,7 @@
 /**
  * femo-reasoning-row.tsx — 官方 ReasoningRow 的 fork（2026-08-24 投影窗流式
  * 方案B）。官方组件是 ui-conversation 内部实现、无公共导出；本 fork 复用其
- * 观感与行为，底层件 DisclosureRow / IconThinkOutline14 全部来自基线库
+ * 观感与行为，底层件 DisclosureRow/IconThink（经 primitives-compat 跨版本取用）全部来自基线库
  * ui-primitives（shell 同一实例），文字渲染同款。差异只有两处：
  *  ①样式不走 css module（构建链不注入），由 client.tsx 注入的同名规则表
  *    （.femo-rr-* 前缀）承载——rc 升级时需对照官方 ReasoningRow.module.css
@@ -10,7 +10,8 @@
  */
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { DisclosureRow, IconThinkOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { DisclosureRow } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconThink } from './client-ui/primitives-compat'
 
 /** Frame-throttled scheduling for non-essential visual alignment.
  * （官方 use-throttled-visual-update.ts 原样拷贝。） */
@@ -83,7 +84,7 @@ export function FemoReasoningRow({ text, running, runningLabel }: {
         leadingClassName="femo-rr-leading"
         titleClassName="femo-rr-title"
         chevronClassName="femo-rr-chevron"
-        icon={<IconThinkOutline14 size={14} />}
+        icon={<IconThink size={14} />}
         title="Think"
         open={expanded}
         expandable

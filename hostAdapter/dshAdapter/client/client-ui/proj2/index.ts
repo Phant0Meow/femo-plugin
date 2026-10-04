@@ -5,7 +5,7 @@
  *   URL 参数 `?proj2=0` / localStorage `femo.proj2='0'` → 回退旧链路（v5/v6/v7）
  *   缺省 = 新链路（v9）。iOS PWA 上改不了 localStorage，故用 URL 参数做回退闸门。
  *
- * 步1 只接管 AI 演员轮（头 + 直播尾）；主模型轮过渡期仍由旧 director 定义渲染，
+ * 步1 只接管 AI 角色轮（头 + 直播尾）；主模型轮过渡期仍由旧 director 定义渲染，
  * 人类轮可输入见步3。
  */
 

@@ -34,8 +34,8 @@ export interface EditorPageInjected {
   runScript(sessionId: string, scriptPath?: string): Promise<void>
   /** 暂停本会话的活跃 Job（§8.4 B3：pause 归属解析——sessionId 必填，
    *  只认本会话绑定，不再"停别家的戏"）。jobId 可选显式指定（宿主按引擎
-   *  档案 host_ref 裁决）。resolve 值带回执：paused:false=该会话无活跃
-   *  剧本（前端据此复位运行按钮，2026-09-06 反馈断链修复）；state=引擎侧
+   *  档案 host_refs 字典裁决——旧档回退 host_ref）。resolve 值带回执：paused:false=该会话无活跃
+   *  FEMO脚本（前端据此复位运行按钮，2026-09-06 反馈断链修复）；state=引擎侧
    *  Job 现态（paused:true 但 state 非 running=幂等无操作，前端知情提示）。
    *  失败原样 throw（2026-09-07：不再吞成 undefined——femoGen 可见报错）。 */
   pauseScript(sessionId: string, jobId?: number): Promise<{ paused?: boolean; state?: string } | undefined>
@@ -70,7 +70,7 @@ export interface FemoFileEntry {
  *
  * 2026-09-11 实测踩坑：dsh 的 webServer 对**未注册的路由**回 `405 Method Not
  * Allowed`，而且响应体是 0 字节——插件改了宿主侧代码但没重启 dsh 时，点导入
- * 就是这个下场。裸 `resp.json()` 会抛 `Failed to execute 'json' on 'Response':
+ * 就是这个参与运行。裸 `resp.json()` 会抛 `Failed to execute 'json' on 'Response':
  * Unexpected end of JSON input`，一句和导入八竿子打不着的 JS 报错，用户拿到
  * 完全无从下手（连是网络问题还是代码问题都看不出来）。
  * 这里统一改成「哪个动作 + HTTP 状态 + 最可能的原因」的口径。
@@ -113,13 +113,14 @@ function pageSetTarget(sid: string | null): void {
   pageNotify()
 }
 
-/** view-button 上报：某 femo 主会话的窗口打开了（主会话/投影窗都算）。 */
+/** view-button 上报：某会话的窗口打开了（2026-09-28 起全会话上报——「FEMO」
+ *  标签页全员显示，内容跟随所有会话；投影窗记母会话）。 */
 export function editorPageOpenSession(sid: string): void {
   sessionRefs.set(sid, (sessionRefs.get(sid) ?? 0) + 1)
   pageSetTarget(sid)
 }
 
-/** view-button 上报：某 femo 主会话的窗口关掉了；最后一个关掉的清空目标。 */
+/** view-button 上报：某会话的窗口关掉了；最后一个关掉的清空目标。 */
 export function editorPageCloseSession(sid: string): void {
   const n = (sessionRefs.get(sid) ?? 0) - 1
   if (n > 0) {
@@ -312,7 +313,7 @@ function FemoEditorPage({ sessionId, injected }: { sessionId: string; injected: 
   const [editorNotice, setEditorNotice] = useState<string | null>(null)
   /** 已上报过的 restore 错误（消息级去重）：同一条错误只报一次，避免多路
    *  触发（挂载/script_changed/remount）累积 N 条相同 POST。新记录载入时
-   *  重置（剧本修复后再犯同错仍能重新上报）。 */
+   *  重置（FEMO脚本修复后再犯同错仍能重新上报）。 */
   const lastRestoreErrorRef = useRef<string | null>(null)
 
   const onRestoreError = useCallback((message: string): void => {
@@ -342,16 +343,16 @@ function FemoEditorPage({ sessionId, injected }: { sessionId: string; injected: 
     const response = await fetch(`/femo-plugin/session-state?sessionId=${encodeURIComponent(sessionId)}`)
     const data = await response.json() as { ok?: boolean; script?: string; scriptPath?: string; rev?: number; checkpoint?: Record<string, string>; running?: boolean; pending?: boolean; jobId?: number; jobIds?: number[]; lastError?: string; waitingHuman?: { waitKey: string; nodeName?: string; context?: string; memory?: string; showprompt?: string; prompt?: string; outVars?: string[] } }
     if (data.ok === true) {
-      // 剧本载入新记录：上次的「恢复失败」横幅自动收起（若新剧本仍解析失败，
+      // FEMO脚本载入新记录：上次的「恢复失败」横幅自动收起（若新脚本仍解析失败，
       // restore effect 会再次 onRestoreError 重新上报弹出——时序上在本次 setState
       // 之后，所以这里先清是安全的）。
       setEditorNotice(null)
-      // 新记录载入=新的恢复上下文：清掉去重标记，剧本修复后再犯同错仍可上报。
+      // 新记录载入=新的恢复上下文：清掉去重标记，FEMO脚本修复后再犯同错仍可上报。
       lastRestoreErrorRef.current = null
       setState(prev => {
         // 引用复用：script/checkpoint 内容未变则沿用旧引用，避免 initialScript/
         // initialCheckpoint prop 换新对象触发 restore effect 无谓重跑
-        // （每重跑一次坏剧本就多上报一次，是重复 editor_errors 的温床）。
+        // （每重跑一次坏FEMO脚本就多上报一次，是重复 editor_errors 的温床）。
         const sameScript = prev !== null && data.script !== undefined && prev.script === data.script
         const sameCheckpoint = prev !== null && prev.checkpoint !== undefined
           && JSON.stringify(prev.checkpoint) === JSON.stringify(data.checkpoint ?? {})
@@ -384,6 +385,24 @@ function FemoEditorPage({ sessionId, injected }: { sessionId: string; injected: 
     pageReloadRef = loadSessionState
     return () => { pageReloadRef = null }
   }, [sessionId, loadSessionState])
+
+  // 【2026-09-19 冷启动补拉】挂载落在桥冷启动窗口（宿主重启后 1-3s）时，
+  // 首拉只拿得到 pending:true + 空 checkpoint——此前无人补拉，断点永远空、
+  // 「继续」按钮永不出现，只能 F5 手动救（重启后没法继续的主根因）。
+  // pending 期间每 2s 重拉一次，拿到引擎真实断点/状态（pending 翻 false）
+  // 即自动停；unmount / 切会话由 effect 清理兜底。
+  const enginePendingNow = state?.pending === true
+  /** 引擎冷启动探针（「引擎启动中…」芯片可点版）：立即重拉一次 session-state，
+   *  引擎已就绪时这一拉就带回真实断点/状态，芯片即被换回运行/继续键。 */
+  const retryEngineProbe = loadSessionState
+  useEffect(() => {
+    if (!enginePendingNow) return
+    console.log('[femo-page] engine pending — polling every 2s until bridge ready')
+    const timer = setInterval(() => {
+      void loadSessionState().catch(() => { /* 引擎还没起：下一轮再试 */ })
+    }, 2000)
+    return () => { clearInterval(timer) }
+  }, [enginePendingNow, loadSessionState])
 
   // 断点位置：主流程分支优先，其次任一分支（画布按节点 label 匹配）。
   const checkpointNode = state === null
@@ -437,7 +456,7 @@ function FemoEditorPage({ sessionId, injected }: { sessionId: string; injected: 
       .catch((error: unknown) => { console.warn('[femo-plugin] conflict override failed:', error) })
   }
 
-  /** 预检：未保存（无剧本地址）时，剧本里的相对 file: 引用非法——只支持绝对地址。 */
+  /** 预检：未保存（无FEMO脚本地址）时，脚本里的相对 file: 引用非法——只支持绝对地址。 */
   const preflightCheck = (femo: string): string | null => {
     if (state?.scriptPath !== undefined && state.scriptPath.length > 0) return null
     const refs: string[] = []
@@ -447,7 +466,7 @@ function FemoEditorPage({ sessionId, injected }: { sessionId: string; injected: 
     const isAbs = (p: string): boolean => /^[a-zA-Z]:[\\/]/.test(p) || p.startsWith('/') || p.startsWith('\\\\')
     const relative = refs.filter(p => !isAbs(p))
     if (relative.length === 0) return null
-    return `剧本未保存：依赖文件只支持绝对地址。以下引用是相对路径：${relative.join('、')}。请先「导出 .FEMO」保存剧本（相对路径将基于剧本文件位置解析），或改用绝对路径。`
+    return `脚本未保存：依赖文件只支持绝对地址。以下引用是相对路径：${relative.join('、')}。请先「导出 .FEMO」保存FEMO脚本（相对路径将基于脚本文件位置解析），或改用绝对路径。`
   }
 
   const onRun = async (femo: string, opts?: { reset?: boolean; jobId?: number }): Promise<void> => {
@@ -476,7 +495,7 @@ function FemoEditorPage({ sessionId, injected }: { sessionId: string; injected: 
     throw new Error(message)
   }
   const onPause = async (jobId?: number): Promise<{ paused?: boolean; state?: string } | undefined> => {
-    // 回执透传（paused:false=无活跃剧本）——femoGen 据此复位运行按钮
+    // 回执透传（paused:false=无活跃FEMO脚本）——femoGen 据此复位运行按钮
     // （2026-09-06 反馈断链修复：此前该结果被静默吞掉，按钮卡死在"暂停"态）。
     // 【2026-09-07 214 事故收尾】失败不再吞成本函数 undefined（femoGen 零感知
     // 的静默链终点）——原样上抛，由画布的暂停反馈条可见报错。
@@ -548,7 +567,7 @@ function FemoEditorPage({ sessionId, injected }: { sessionId: string; injected: 
     return saved
   }
 
-  /** 打开一条剧本的收尾（引用式，2026-08-30 语义不变）：写会话记录 {path, text}
+  /** 打开一条FEMO脚本的收尾（引用式，2026-08-30 语义不变）：写会话记录 {path, text}
    *  + 更新本地状态。**两条入口共用这一段**——系统对话框选中的、清单里挑的，
    *  落点必须一模一样（画布、editor 文本、后台 scriptPath 全部跟上），否则
    *  「从清单打开」会变成一种与「直接打开」不同的半吊子状态。
@@ -621,6 +640,7 @@ function FemoEditorPage({ sessionId, injected }: { sessionId: string; injected: 
         plugin
         sessionId={sessionId}
         enginePending={state?.pending === true}
+        onEngineRetry={retryEngineProbe}
         onRun={onRun}
         onPause={onPause}
         onPersistScript={persistScript}
@@ -633,6 +653,7 @@ function FemoEditorPage({ sessionId, injected }: { sessionId: string; injected: 
         onBackToShell={injected.toggleSidebar}
         savedPath={state?.scriptPath}
         initialScript={state?.script}
+        sessionStateLoaded={state !== null}
         initialCheckpoint={checkpointNode}
         initialRunning={state?.running === true}
         initialJobId={state?.jobId}
@@ -652,7 +673,7 @@ function FemoEditorPage({ sessionId, injected }: { sessionId: string; injected: 
             border: '1px solid var(--dsw-alias-border-l2, #e0e0e0)', boxShadow: '0 8px 28px rgba(0,0,0,0.22)',
             fontSize: 13, lineHeight: 1.6,
           }}>
-            <div style={{ fontWeight: 700, marginBottom: 6 }}>⚔️ 剧本冲突</div>
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>⚔️ FEMO脚本冲突</div>
             <div style={{ color: 'var(--dsw-alias-label-secondary, #666)', marginBottom: 14 }}>
               本窗口的编辑和其他窗口/设备的保存冲突了（对方先写入）。以哪个为准？
             </div>
@@ -710,7 +731,7 @@ function FemoEditorPage({ sessionId, injected }: { sessionId: string; injected: 
           fontSize: 12.5, lineHeight: 1.55,
         }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, marginBottom: 2 }}>⚠️ 剧本恢复失败（已上报主模型）</div>
+            <div style={{ fontWeight: 700, marginBottom: 2 }}>⚠️ FEMO脚本恢复失败（已上报主模型）</div>
             <div style={{ color: 'var(--dsw-alias-label-secondary, #666)', whiteSpace: 'pre-wrap' }}>{editorNotice}</div>
           </div>
           <button

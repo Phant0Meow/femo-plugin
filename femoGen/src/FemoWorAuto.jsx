@@ -5,30 +5,35 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import {
-  ErrorBoundary, FontStyle, TYPES, ti, SPECIAL_COLORS, SINK_ONLY,
-  nid, eid, mid, NW, NH, MW, MH, SPW, SPH, PSW, PSH,
-  getNodeSize, getSmartPorts, smartBezier, getControlPoints, bezierMidpoint,
+  ErrorBoundary, FontStyle, SINK_ONLY,
+  nid, eid, mid, SPW, SPH,
+  getNodeSize, getSmartPorts, smartBezier,
   computeEdgeGeometry,
-  findBackEdges, findAllCycleEdges, inp, btnP, btnS, Field,
-  PortCircle, PR, makeDefaultNodes, getAllNames, applyForLinkage,
+  findBackEdges, findAllCycleEdges, inp, btnS, Field,
+  PR, makeDefaultNodes, applyForLinkage,
+  SNAP_PX, snapAndLink,
+  // 已注释死导入（观察期 2026-09-26 死代码排查，全仓零引用）：TYPES, ti, SPECIAL_COLORS,
+  // NW, NH, MW, MH, PSW, PSH, PortCircle, btnP, getControlPoints, bezierMidpoint, getAllNames
 } from './common';
 import { parseFEMO } from './femoParser';
 import { warningsFromThrowable } from './femoDiagnostics';
 import { buildFEMO } from './femoGenerator';
 import { parsedToGraph } from './graphBuilder';
-import { ActionNodeView, PositionNodeView, SpecialNodeView, ForOutNodeView, ParOutNodeView } from './canvasNodes';
+import { ActionNodeView, PositionNodeView, SpecialNodeView, ForOutNodeView, ParOutNodeView, SnapGuides } from './canvasNodes';
 import { LibPanel } from './libPanel';
 import { ProjPanel } from './projectPanel';
 import { ActionModal } from './actionModal';
 import { SoulModal } from './soulModal';
 import { FemoFileList } from './femoFileList';
+import { FemoDirBrowse } from './femoDirBrowse';
+import { FemoSaveReminder } from './femoSaveReminder';
 import { BubbleOverlay } from './bubbleOverlay';
 import { DebugPanel } from './debugPanel';
 import { installFemoLogCapture, subscribeFemoLog, femoLogTail, clearFemoLog } from './femoLog';
 import { FemoPreview } from './femoPreview';
 import { MobileLayout, useMobile } from './mobileView';
 import { FEMO_THEMES } from './themes';
-import { FaPalette, FaUserPlus, FaTerminal, FaPlay, FaPause, FaForward, FaFolderOpen, FaFloppyDisk, FaSpinner } from './faIcons';
+import { FaPalette, FaUserPlus, FaTerminal, FaPlay, FaStop, FaForward, FaFolderOpen, FaFloppyDisk, FaSpinner } from './faIcons';
 
 // 前端日志采集（2026-09-11）：模块加载即装钩子——femoGen 两种入口（插件内嵌经
 // editor-page 引入本模块 / 独立 vite 经 main.jsx）都会走到这里，等于"页面一加载
@@ -39,13 +44,22 @@ installFemoLogCapture();
 // 桌面右上角（运行控制 + 文件读写）一组成员的唯一施工图：同一高度/内边距/圆角/
 // 字号/图标尺寸 + 短文案，**每枚都带 FA 图标**，只靠色调分语义——
 //   绿=从头跑 / 红=暂停 / 琥珀=续跑 / 中性=文件读写（导入·导出）。
+//   三个运行控制语义色（success/danger/warning）一律实心彩底 + on-accent 白字
+//   （2026-09-21：warning 原为浅底描边幽灵款，与实心的运行/暂停同排不同款——
+//   归一；neutral 浅底描边只留给文件读写族）。
 // 配方与底部三键（.femo-setting-btn 家族）同源：minHeight 30 芯片家族高度、
 // gap 6、FA 图标 size 12、按压回缩反馈（hover 规则会被内联底色盖掉，同底部三键）。
 // 与手机端 32×32 图标芯片同族（同图标、同语义色），桌面端多带文字标签。
 const TOOL_CHIP_TONES = {
-  success: { bg: 'var(--femo-success)', fg: 'var(--femo-on-accent)', border: 'var(--femo-success)' },
-  danger: { bg: 'var(--femo-danger, #d24b4b)', fg: 'var(--femo-on-accent)', border: 'var(--femo-danger, #d24b4b)' },
-  warning: { bg: 'var(--femo-surface)', fg: 'var(--femo-warning-strong, #dd8629)', border: 'var(--femo-warning-border, #f7ad31)' },
+  // 底色走 --femo-btn-* 按钮专用口（2026-09-21）：浅色=主语义色原值；
+  // 深色主题下由 themes.js 覆盖为「更深更灰」版（主语义色留给状态点/文字保持亮）。
+  // 字色走 --femo-btn-fg-* 专用口（2026-09-28）：默认同 on-accent；
+  // 按钮底改中性深芯片的主题（web）覆盖为亮字——实心彩底主题零变化。
+  success: { bg: 'var(--femo-btn-success)', fg: 'var(--femo-btn-fg-success)', border: 'var(--femo-btn-success)' },
+  // danger/warning 边框走带回退的专用口：主题给 --femo-btn-*-border 就用（翡翠=绿描边），
+  // 没给回退同底色 token（DSH 深/浅=边框同色无描边观感，零变化）
+  danger: { bg: 'var(--femo-btn-danger)', fg: 'var(--femo-btn-fg-danger)', border: 'var(--femo-btn-danger-border, var(--femo-btn-danger))' },
+  warning: { bg: 'var(--femo-btn-warning)', fg: 'var(--femo-btn-fg-warning)', border: 'var(--femo-btn-warning-border, var(--femo-btn-warning))' },
   neutral: { bg: 'var(--femo-surface)', fg: 'var(--femo-text-2)', border: 'var(--femo-border-strong)' },
 };
 function ToolChip({ icon: Icon, children, onClick, tone = 'neutral', title, disabled = false }) {
@@ -128,6 +142,21 @@ function getBackendBaseUrl() {
   return `${host}:${port}`;
 }
 
+// ── 独立模式的文件面调用约定（2026-09-30）──
+// 与 /api/run 同一姿势：fetch 对非 2xx 不抛错，错误无人看就被静默吞——统一
+// 翻成 throw（!ok、ok:false、error 三种失败形状都接住）。插件模式不走这里，
+// 导入导出归宿主回调（editor-page 的五回调）。
+async function apiPost(pathname, body) {
+  const resp = await fetch(getBackendBaseUrl() + pathname, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body ?? {}),
+  });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok || data.ok === false || data.error) throw new Error(data.error || `HTTP ${resp.status}`);
+  return data;
+}
+
 // ── 零 token 调试干跑（2026-09-08）：DebugLogBus 记录 → 调试窗一行文本 ──
 // Print 效果的格式化层：每条结构化记录渲染成一条可读流水；返回 null 的
 // kind 不上屏（edge 高频噪音、flow_outcome 与 run_end 重复、正常收尾哨兵）。
@@ -200,7 +229,7 @@ function debugRecToLine(rec) {
 
 // 结构签名：只取拓扑相关字段做比较，忽略坐标 (x/y) 与瞬时态 (selected/dragging)——
 // 用于判定「图是否被结构性修改」；拖动节点只改坐标不算修改。
-function structuralSignature(nodes, edges) {
+function structuralSignature(nodes, edges, actions) {
   const ns = (nodes || []).map((n) => {
     const c = { ...n };
     delete c.x; delete c.y; delete c.selected; delete c.dragging; delete c.width; delete c.height;
@@ -211,20 +240,23 @@ function structuralSignature(nodes, edges) {
     delete c.selected; delete c.dragging;
     return JSON.stringify(c);
   }).sort();
-  return JSON.stringify({ ns, es });
+  // 动作内容（prompt/showprompt 等，住 actionStore）也是图数据的一半：
+  // 内联编辑/编辑弹窗改了文本而结构没动，run 守卫同样要能看见（2026-09-30）
+  const as = (actions || []).map((a) => JSON.stringify(a)).sort();
+  return JSON.stringify({ ns, es, as });
 }
 
 // ── SSE 事件 → 调试窗口日志条目摘要（模块级纯函数）──
-// 级别：error=剧本/引擎报错；warn=重试、警告等值得知情；info=常规运行信息。
+// 级别：error=FEMO脚本/引擎报错；warn=重试、警告等值得知情；info=常规运行信息。
 // 返回单条 { level, text }、多条数组（compile_warnings 逐条一条目），
 // 或 null（内部同步信号不喂日志，见尾部 skip 名单）。
 function summarizeDebugEvent(type, data) {
   const d = data || {};
   const node = d.node_name ? `[${d.node_name}] ` : '';
   switch (type) {
-    case 'flow_start':        return { level: 'info',  text: `${node}剧本开始运行` };
-    case 'flow_done':         return { level: 'info',  text: '剧本运行完成' };
-    case 'flow_paused':      return { level: 'info',  text: '剧本已暂停' };
+    case 'flow_start':        return { level: 'info',  text: `${node}FEMO脚本开始运行` };
+    case 'flow_done':         return { level: 'info',  text: 'FEMO 运行完成' };
+    case 'flow_paused':      return { level: 'info',  text: 'FEMO 已暂停' };
     case 'flow_error':        return { level: 'error', text: `${node}${d.error || '未知错误'}` };
     case 'notify_author': {
       // 后端字段=severity（'fatal' | 'agent_error' | 'agent_giveup' | 'warning'）。
@@ -281,10 +313,16 @@ function summarizeDebugEvent(type, data) {
     // 引擎内部信号/状态同步帧：高频且无叙事价值，喂进日志只会刷屏淹没报错
     // （checkpoint 每节点一帧全量变量世界、projection_state 每次状态变化、
     // node_settled 停靠经纪人信号、script_changed 存稿同步）——不喂。
+    // 2026-09-24 追加两处画布假 warn 源（用户点名「到底是标错了还是真错误」
+    // ——是标错了）：ai_request 料包自 mailbox 化后走宿主 mailbox-push 单通
+    // 道、事件只剩记账价值；femo_actor_usage=宿主角色占用圆环的旁路帧。
+    // 画布对两者零消费者，喂日志也只是 JSON 刷屏——一并静音。
     case 'checkpoint':
     case 'node_settled':
     case 'projection_state':
     case 'script_changed':
+    case 'ai_request':
+    case 'femo_actor_usage':
       return null;
     default:
       return {
@@ -311,10 +349,12 @@ const mainCheckpointLabel = (checkpoint) => {
   return typeof first === 'string' && first.length > 0 ? first : null;
 };
 
-const FEMOEditor = forwardRef(function FEMOEditor({ plugin = false, onRun, onPause, initialScript, initialCheckpoint, initialRunning = false, onExport, onImport, onListFemoFiles, onPickFemoFile, onForgetFemoFile, savedPath, onBackToShell, onRestoreError, onPersistScript, getRecordScript, sessionId = '', enginePending = false, initialJobId, jobIds, initialWaitingHuman, initialLastError } = {}, ref) {
+const FEMOEditor = forwardRef(function FEMOEditor({ plugin = false, onRun, onPause, initialScript, initialCheckpoint, initialRunning = false, sessionStateLoaded = false, onExport, onImport, onListFemoFiles, onPickFemoFile, onForgetFemoFile, savedPath, onBackToShell, onRestoreError, onPersistScript, getRecordScript, sessionId = '', enginePending = false, onEngineRetry, initialJobId, jobIds, initialWaitingHuman, initialLastError } = {}, ref) {
 // 插件模式：由 femo-plugin 注入（plugin=true）——运行/暂停走插件回调，
 // SSE 连插件广播路由；独立模式保留原后端调用（getBackendBaseUrl）。
 // initialScript/initialCheckpoint/initialRunning：会话恢复（刷新/重启/运行中打开）。
+// sessionStateLoaded：宿主会话态（session-state）是否已取回——未取回前恢复
+// effect 不裁决有/无FEMO脚本（2026-09-24 补帧撞空画布修复，见恢复 effect 处注释）。
 // initialJobId/jobIds：宿主会话记录的 currentJobId + 激活过的全部 Job（2026-09-06
 // job 快照改造）——暂停/继续显式带号（镜像滞后也能停），jobIds 供历史场次 UI。
 // initialLastError：上一个 failed Job 的存档错误（2026-09-10）——只进调试窗
@@ -324,12 +364,13 @@ const FEMOEditor = forwardRef(function FEMOEditor({ plugin = false, onRun, onPau
 // 原话上浮——比对职责不再经过宿主。
 // onPersistScript(femo)：定稿按钮（图生文本/文本生图）显式落盘会话记录；
 // 2026-08-22 起不再有画布防抖自动回写，原文以用户输入为准。
-// savedPath：会话剧本文件地址（导出/导入产生）——空=未保存（提示+绝对寻址）。
+// savedPath：会话脚本文件地址（导出/导入产生）——空=未保存（提示+绝对寻址）。
 // onExport(femo, name)：导出（三态行为在 host 侧 editor-page 实现，返回 undefined=用户选了返回画布）；
 // onImport()：导入=host 弹系统文件选择器→{path, content}（引用原始位置，2026-08-30），null=用户取消。
 // onBackToShell：插件模式手机端返回键回调（femo-plugin 传 ctx.layout.toggleSidebar）。
 // sessionId：本编辑器所属会话（Job 模型 §11.1：SSE 信封按 sid 过滤）。
-// enginePending：引擎冷启动（bridge 未就绪）——按钮禁用+「引擎启动中」。
+// enginePending：引擎冷启动（bridge 未就绪）——运行键换「引擎启动中…」；
+//   2026-09-19 起不再死等：宿主侧自动轮询补拉 + 芯片可点立即重探（onEngineRetry）。
 //console.log('✅ FEMOEditor 已进入渲染');
   // ── 主题：auto=跟随 dsh 本体（body[data-ds-dark-theme] 白天→dsh / 黑夜→dsh-dark），
   //    或手动固定 dsh / dsh-dark。localStorage 'femo_theme' 持久化，默认 auto。──
@@ -426,6 +467,9 @@ const FEMOEditor = forwardRef(function FEMOEditor({ plugin = false, onRun, onPau
 
   useEffect(() => {
     const handler = (e) => {
+      // buttons===0 的 mousedown 不是真实按键按下（触控/远程桌面等合成事件），
+      // 放过它避免误清在途手势；真实点击取消手势的语义保持不变。2026-09-20
+      if (e.buttons === 0) return;
       if (dragRef.current || connRef.current || isPanningRef.current) {
         setDrag(null);
         setConn(null);
@@ -482,7 +526,7 @@ const FEMOEditor = forwardRef(function FEMOEditor({ plugin = false, onRun, onPau
   // 后端编译器/引擎运行时 print 的原文。数据源：宿主 bridge 把引擎 stdout 的
   // 非 JSON 行逐行 pushDiag('engine', ...) 进 diag-feed → SSE femo_diag 实时
   // 广播；开面板时另拉 /femo-plugin/diag-tail 补历史（页面刷新后也有内容）。
-  // 与『剧本』页完全分账：那边是画布事件/干跑流水（level 三态），这边是原样
+  // 与『FEMO脚本』页完全分账：那边是画布事件/干跑流水（level 三态），这边是原样
   // 打印文本（无级别，故不上色）。
   const [compilerLog, setCompilerLog] = useState([]);   // [{ id, ts, text }]，新在前
   const compilerSeqRef = useRef(0);
@@ -577,7 +621,7 @@ const FEMOEditor = forwardRef(function FEMOEditor({ plugin = false, onRun, onPau
   // AI 实例的 node_start/ai_token 会把人类实例的 human_wait 状态整个冲掉，
   // 输入框「闪一下就被 AI 气泡取代」。humanWaits 是 AI 事件碰不到的独立账本
   // （nodeId → {wait_key,context,memory,showprompt,prompt,outVars,inputError}），
-  // 人类输入面板由它驱动，常驻气泡顶端直到提交/本场结束。
+  // 人类输入面板由它驱动，常驻气泡顶端直到提交/本次结束。
   const [humanWaits, setHumanWaits] = useState({});
   const humanWaitsRef = useRef({});
   const setHumanWaitsBoth = useCallback((updater) => {
@@ -599,7 +643,7 @@ const FEMOEditor = forwardRef(function FEMOEditor({ plugin = false, onRun, onPau
     if (exportToastTimerRef.current) clearTimeout(exportToastTimerRef.current);
     setExportToast({ text, id: Date.now() });
     // 调试窗口留档：toast 4s 就消失，日志里常驻可查
-    pushDebug('info', '导出', text);
+    pushDebug('info', '保存', text);
     exportToastTimerRef.current = setTimeout(() => {
       setExportToast(null);
       exportToastTimerRef.current = null;
@@ -728,7 +772,111 @@ const [userApiModel, setUserApiModel] = useState(() => {
   /** 正在移出清单（2026-09-13）：移除请求在途时全表 ⊖ 键防连点。 */
   const [femoFileForgetBusy, setFemoFileForgetBusy] = useState(false);
 
+  // ── 独立模式的文档锚与文件面（2026-09-30）──
+  // 插件模式 savedPath 归宿主会话账（props，dsh 的 scriptPath）；独立模式没有
+  // 会话账，「当前文件」记在服务端数据根 femogen_canvas.json（公共层
+  // femogen-canvas-state），开页拉来播种。undefined=还没拉到（不当未保存亮
+  // 警示条），null=确认没保存过，string=当前文件的绝对路径。
+  const [standaloneSavedPath, setStandaloneSavedPath] = useState(undefined);
+  const effectiveSavedPath = plugin ? savedPath : standaloneSavedPath;
+
+  // 开页播种（独立模式专属）：读服务端 path 槽。拉不到（纯 vite dev 无服务）
+  // 按 null 落定——回到「未保存」状态，警示条与首存流程照常工作。
+  useEffect(() => {
+    if (plugin) return undefined;
+    let gone = false;
+    fetch(`${getBackendBaseUrl()}/api/canvas/path`)
+      .then((r) => r.json())
+      .then((d) => { if (!gone) setStandaloneSavedPath(typeof d?.path === 'string' ? d.path : null); })
+      .catch(() => { if (!gone) setStandaloneSavedPath(null); });
+    return () => { gone = true; };
+  }, [plugin]);
+
+  // 工程目录浮层（手机端选路径的一腿，组件=femoDirBrowse；数据面=/api/projects/*，
+  // 服务端有 projects/ 围栏）+「未改动」提醒挂起（导出三态的中拍）。
+  const [dirBrowseOpen, setDirBrowseOpen] = useState(false);
+  const [dirBrowseMode, setDirBrowseMode] = useState('save');
+  const [dirBrowseDir, setDirBrowseDir] = useState('');
+  const [dirBrowseDirs, setDirBrowseDirs] = useState([]);
+  const [dirBrowseFiles, setDirBrowseFiles] = useState([]);
+  const [dirBrowseLoading, setDirBrowseLoading] = useState(false);
+  const [dirBrowseError, setDirBrowseError] = useState('');
+  const [dirBrowseBusy, setDirBrowseBusy] = useState(false);
+  const [saveReminder, setSaveReminder] = useState(null); // {path, resolve}
+
   const cvRef = useRef(null);
+
+  // ── window 级 mouseup/mousemove 兜底（2026-09-20，修"松手后节点粘鼠标"）──
+  // 手势收尾此前完全依赖画布 div 的 onMouseUp，三种情形收不到 mouseup：
+  // ① 松手点在选中节点自己的端口圈上（PortCircle 对合成事件 stopPropagation，
+  //    canvas onMU 被跳过）；② 鼠标已滑出画布（弹窗/侧栏/画布外）；③ 在浏览器
+  // 窗口外松手（浏览器不派发 mouseup）。收不到 → drag/conn 清不掉 → 节点粘鼠标。
+  // 方案：window 上兜底补送 onMU/onMM。拖拽/平移的收尾放捕获阶段（先于
+  // React——端口圈对合成事件 stopPropagation 会拦断冒泡链，bubble 阶段的
+  // window 监听收不到 mouseup）；连线的收尾留在 bubble 阶段（React 端口/
+  // 节点体的落点建边要先跑完，捕获阶段清 conn 会吞掉建边）。onMU 幂等：
+  // 入口归零有一次性闩 entryRezeroDoneRef，其余清态天然幂等；画布内
+  // mousemove 兜底不干预，只补画布外的跟手。
+  const onMURef = useRef(null);
+  const onMMRef = useRef(null);
+  // （onMU/onMM 的同步 effect 移至下方两声明之后——2026-09-21 TDZ 修复：
+  //   依赖数组 [onMU]/[onMM] 在渲染期立即求值，写在声明前会
+  //   ReferenceError: Cannot access 'onMU' before initialization，
+  //   FEMOEditor 整树崩、femogen 不渲染。）
+
+  useEffect(() => {
+    const active = () => !!(dragRef.current || connRef.current || isPanningRef.current);
+    const finish = () => { if (active()) onMURef.current?.(); };
+    const follow = (e) => {
+      if (!active()) return;
+      if (e.buttons === 0) { finish(); return; } // 按键已全松 = 漏掉的 mouseup，补收尾
+      // 画布内的移动 canvas onMM 已处理，兜底只负责画布外（弹窗/侧栏/页面其它区域）
+      if (cvRef.current && e.target instanceof Node && cvRef.current.contains(e.target)) return;
+      onMMRef.current?.(e);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') finish(); };
+    // 捕获阶段收尾：只管 drag/pan（conn 必须留给 bubble——端口/节点体的
+    // 落点建边在 React 里要先跑完，捕获阶段清 conn 会吞掉建边）。
+    const finishCapture = () => {
+      if (!connRef.current && (dragRef.current || isPanningRef.current)) onMURef.current?.();
+    };
+    window.addEventListener('mouseup', finishCapture, true);
+    window.addEventListener('mouseup', finish);
+    window.addEventListener('mousemove', follow);
+    window.addEventListener('dragend', finish); // HTML5 拖拽抢占鼠标的异常出口
+    window.addEventListener('blur', finish);    // Alt+Tab / 切窗丢 mouseup 的出口
+    window.addEventListener('keydown', onKey);  // Esc 手动收尾
+    return () => {
+      window.removeEventListener('mouseup', finishCapture, true);
+      window.removeEventListener('mouseup', finish);
+      window.removeEventListener('mousemove', follow);
+      window.removeEventListener('dragend', finish);
+      window.removeEventListener('blur', finish);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, []);
+
+  // START/IN 入口归零的"每次手势只跑一次"闩：window 兜底会对同一次松手补一次
+  // onMU，而归零的 dx/dy 取自 nodesRef 快照 + 函数式 setNodes——不设闩双跑会把
+  // 其余节点平移两次。drag 清空后闩自动复位（下一次拖拽重新可用）。
+  const entryRezeroDoneRef = useRef(false);
+  useEffect(() => { if (!drag) entryRezeroDoneRef.current = false; }, [drag]);
+  // 拖拽吸附的"中心连线"（{x1,y1,x2,y2} 画布坐标，null=无吸附）：桌面端 onMM 与
+  // 手机端 nodeDrag 算完吸附后写这里，两端各自在画布坐标系里渲染。松手时清空。
+  const [snapGuides, setSnapGuides] = useState(null);
+  // 连线未变就不 setState——避免拖拽中每帧触发整树重渲染
+  const updateGuides = useCallback((d) => {
+    const n = d || null;
+    setSnapGuides((prev) => {
+      if (prev === n) return prev;
+      if (!prev || !n) return n;
+      return (
+        prev.x1 === n.x1 && prev.y1 === n.y1 && prev.x2 === n.x2 && prev.y2 === n.y2
+          ? prev
+          : n
+      );
+    });
+  }, []);
   // 编辑器根容器（桌面分支外层 div）：内嵌 dsh tab 时「编辑器以为的屏幕」
   // 以它为准（2026-08-26 容器感知，右面板 resize 等）。
   const editorRootRef = useRef(null);
@@ -738,9 +886,10 @@ const [userApiModel, setUserApiModel] = useState(() => {
   const moduleStoreRef = useRef(moduleStore);   // 绕闭包，持有最新 moduleStore
   const locationPathRef = useRef(locationPath); // 绕闭包，持有最新 locationPath
   // 【刷新恢复（2026-09-06）】restoreDoneRef=画布已从会话快照恢复完（applyFEMOText
-  // 跑过/无需跑）；恢复完成前 SSE 重放的节点事件在空画布上全部匹配不上会被
+  // 跑过/确认无FEMO脚本）；恢复完成前 SSE 重放的节点事件在空画布上全部匹配不上会被
   // 丢弃——先入 pendingReplayRef 缓冲，恢复完成后按序补放，运行中小气泡才
-  // 能在刷新后重建。
+  // 能在刷新后重建。2026-09-24 起「恢复完」还要求宿主会话态已取回
+  // （sessionStateLoaded）——否则挂载首拍就误开闸，补发帧撞空画布报错。
   const restoreDoneRef = useRef(false);
   const pendingReplayRef = useRef([]);
   const [canvasOpacity, setCanvasOpacity] = useState(1); // 淡入动效
@@ -1070,8 +1219,9 @@ const parOutNodeMap = useMemo(() => {
       const s = nm.get(e.src), t = nm.get(e.tgt);
       if (!s || !t) return;
       if (e.src === e.tgt) return; // 自环不参与
-      const isCycle = allCycleEdges.has(e.id);
-      const { srcDir, tgtDir } = getSmartPorts(s, t, isCycle);
+      // 2026-09-19：与 computeEdgeGeometry 同口径——环边也选最优端口（不再
+      // preferDifferent），分组偏移才能作用在真实渲染端口上，对向同廊道边形成平行双车道。
+      const { srcDir, tgtDir } = getSmartPorts(s, t);
       // 排除 for_out 节点
       const srcKey = (s.type === 'for_out' || s.type === 'par_out') ? null : `${e.src}:${srcDir}`;
       const tgtKey = (t.type === 'for_out' || t.type === 'par_out') ? null : `${e.tgt}:${tgtDir}`;
@@ -1233,11 +1383,13 @@ const parOutNodeMap = useMemo(() => {
   // 文本生图（handleApplyFemo）/ 图生文本（handleGraphToTextCommit）。
 
   // 图修改检测：与上次统一点的结构基线比较（忽略坐标），漂移即置脏。
+  // 基线含动作内容（actionStore）——节点名说明框的内联编辑、编辑弹窗改
+  // prompt 而不改名，都算「图被修改」（2026-09-30 起）。
   useEffect(() => {
     if (!plugin) return;
     if (!lastSyncedGraphRef.current) return; // 尚未 restore，无基线
-    setGraphDirty(structuralSignature(nodes, edges) !== lastSyncedGraphRef.current);
-  }, [plugin, nodes, edges]);
+    setGraphDirty(structuralSignature(nodes, edges, actionStore) !== lastSyncedGraphRef.current);
+  }, [plugin, nodes, edges, actionStore]);
 
   // 初始化时加载状态（插件模式跳过：画布状态按会话快照恢复，不读 localStorage）
   useEffect(() => {
@@ -1264,12 +1416,22 @@ const parOutNodeMap = useMemo(() => {
     }
   }, []); // 仅挂载时运行一次
 
-  // 插件模式会话恢复：剧本快照 → 文本到图加载画布 + 代码框；断点 → 「继续」+ 高亮。
+  // 插件模式会话恢复：FEMO脚本快照 → 文本到图加载画布 + 代码框；断点 → 「继续」+ 高亮。
   // 依赖 props（session-state 异步返回后才会触发），且 props 稳定后只执行一次。
   useEffect(() => {
     if (!plugin) return;
-    // [femo-diag] 恢复触发器：undefined=会话无剧本记录；空串=记录异常
-    try { console.log('[femo-diag] restore-effect script=' + (initialScript === undefined ? 'undefined' : String(initialScript.length)) + 'ch running=' + String(initialRunning) + ' ckpt=' + String(initialCheckpoint ?? 'none')); } catch {}
+    // [femo-diag] 恢复触发器：undefined=会话无FEMO脚本记录；空串=记录异常；loaded=false=session-state 未回（本轮跳过）
+    try { console.log('[femo-diag] restore-effect loaded=' + String(sessionStateLoaded) + ' script=' + (initialScript === undefined ? 'undefined' : String(initialScript.length)) + 'ch running=' + String(initialRunning) + ' ckpt=' + String(initialCheckpoint ?? 'none')); } catch {}
+    // 【2026-09-24 补帧撞空画布修复】session-state 没回来前不开闸：挂载首拍
+    // initialScript 必然 undefined（editor-page 无挂载守卫，state 异步后到），
+    // 旧代码在此时点就进「无FEMO脚本=恢复完成」分支把 restoreDoneRef 置真——而
+    // SSE 连接 effect（声明在后、同批提交）已把宿主 /events 接上，宿主连接
+    // 即补发重放环（replay:true），这几帧比 session-state 先到、穿过提前打开
+    // 的闸撞上空画布：node_settled/ai_done 全数「无法匹配节点」报错丢弃
+    // （j2476 散场闲聊收尾帧实锤）。现在等 sessionStateLoaded=true 才裁决
+    // 有/无FEMO脚本；期间的节点事件照常入 pendingReplayRef，真恢复完成后由补放
+    // effect 按序回放。
+    if (!sessionStateLoaded) return;
     if (initialScript && initialScript.trim().length > 0) {
       try {
         applyFEMOText(initialScript);
@@ -1278,9 +1440,9 @@ const parOutNodeMap = useMemo(() => {
       } catch (e) {
         console.warn('[FEMOEditor] 会话快照恢复失败:', e);
         // 不再静默：画布面板可见 + 上抛给插件层（回传主模型）。
-        // 2026-08-26：解析失败的坏剧本也把【原文】载入输入框（画布留空）——
+        // 2026-08-26：解析失败的坏FEMO脚本也把【原文】载入输入框（画布留空）——
         //  ①人类能就地改文本修复；②AI 触发 run 时 handleRunWorkflow 的
-        //  parseFEMO 会拿真实错误回传（而不是「请先编写或导入 FEMO 脚本」）。
+        //  parseFEMO 会拿真实错误回传（而不是「请先编写或打开 FEMO脚本」）。
         const msg = e instanceof Error ? e.message : String(e);
         setFemoText(initialScript);
         setFemoError(`会话快照恢复失败：${msg}`);
@@ -1292,7 +1454,7 @@ const parOutNodeMap = useMemo(() => {
         restoreDoneRef.current = true;
       }
     } else {
-      // 无剧本：无可恢复画布，恢复视为完成（缓冲事件直接放行）。
+      // 无FEMO脚本：无可恢复画布，恢复视为完成（缓冲事件直接放行）。
       restoreDoneRef.current = true;
     }
     if (initialCheckpoint) {
@@ -1306,7 +1468,7 @@ const parOutNodeMap = useMemo(() => {
       connectSse();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plugin, initialScript, initialCheckpoint, initialRunning]);
+  }, [plugin, sessionStateLoaded, initialScript, initialCheckpoint, initialRunning]);
 
   // 【上次运行报错留档（2026-09-10）】存档里的 failed 错误只进调试窗日志：
   // 画布恢复不再被报错拦路（宿主侧已修），错误以一行日志形态可查——刷新/
@@ -1360,6 +1522,9 @@ const parOutNodeMap = useMemo(() => {
     const handleGlobalWheel = (e) => {
       // 画布内的所有 wheel 事件：全面阻止浏览器默认行为（横向滑动、返回手势、缩放等）
       if (cvRef.current?.contains(e.target)) {
+        // 节点名说明框例外（2026-09-30）：框体自身要滚——放行默认滚动；
+        // 画布缩放由说明框自己的 onWheel stopPropagation 挡住
+        if (e.target.closest?.('[data-femo-info-popup]')) return;
         e.preventDefault();
         return;
       }
@@ -1659,6 +1824,7 @@ if (specialType === 'FOR') {
   }, []);
 
 
+/* ═══ 已退役（观察期起 2026-09-26 死代码排查，全仓零引用；观察无误后连块删除）：handleCreateSoul（死回调：两处 <SoulModal> 传的都是内联 lambda，创建逻辑在 SoulModal 内部自包含） ═══
   // ── 新建 SOUL ID ──
   const handleCreateSoul = useCallback(async () => {
     setSoulFormError('');
@@ -1695,6 +1861,7 @@ if (specialType === 'FOR') {
       setSoulFormSubmitting(false);
     }
   }, [soulForm]);
+═══ 已退役块结束 ═══ */
 
   // ── 工作流运行：启动运行 ──
   // 【run_request/run-result 链退役（§11.4）】isAi 特判与 onRunResult 回传整体
@@ -1736,7 +1903,7 @@ if (specialType === 'FOR') {
     // femOverride 供「放弃修改直接跑」传入 record 原文。
     const femo = typeof femOverride === 'string' && femOverride.trim() ? femOverride : femoText;
     if (!femo || !femo.trim()) {
-      alert('请先编写或导入 FEMO 脚本');
+      alert('请先编写或打开 FEMO脚本');
       return;
     }
     // ★ 前端语法检查（各自闭环：femogen 不依赖后端也能检查语法）。
@@ -1784,10 +1951,10 @@ if (specialType === 'FOR') {
 
     try {
       if (plugin) {
-        // 插件模式：交给 femo-plugin 运行（保存剧本 + 启动引擎，同一 run
+        // 插件模式：交给 femo-plugin 运行（保存FEMO脚本 + 启动引擎，同一 run
         // 也驱动聊天窗角色气泡）；SSE 连插件广播路由（相对路径，同源）。
         // 按钮恒定（2026-09-11 定型）：三枚键各钉死一个动作，调用不再随状态漂移——
-        // 绿「▶ 运行」= reset:true（fresh_start 从头开演，未开跑/挂起态同一句调用）；
+        // 绿「▶ 运行」= reset:true（fresh_start 从头运行，未开跑/挂起态同一句调用）；
         // 琥珀「继续」= handleResumeWorkflow（resume：reset:false + jobId 指名续跑）。
         // 显式 reset 优先；未显式给的调用方（AI 话术/人类触发/换稿重跑）沿用原判定
         // （paused 外=从头、paused=续跑）。resumeJobId：显式续跑目标 Job 号
@@ -1805,7 +1972,7 @@ if (specialType === 'FOR') {
         connectSse();
         return;
       }
-      // 1. 发送 FEMO 脚本到后端，启动运行（独立模式）
+      // 1. 发送 FEMO脚本到后端，启动运行（独立模式）
       const resp = await fetch(getBackendBaseUrl() + '/api/run', {
         method: 'POST',
         headers: {
@@ -1818,6 +1985,9 @@ if (specialType === 'FOR') {
         body: JSON.stringify({ femo: femo }),
       });
       const data = await resp.json();
+      // 启动失败要让弹窗说话（2026-09-28 web 接入补）：fetch 对 500 不抛错，
+      // data.error 无人看就静默回闲、错误全吞。
+      if (data.error) throw new Error(data.error);
       const newRunId = data.run_id;
       setRunId(newRunId);
 
@@ -1896,8 +2066,9 @@ const handlePauseWorkflow = useCallback(async () => {
     try {
       let data;
       if (plugin) {
-        // 显式带当前 Job 号（宿主按引擎档案 host_ref 裁决归属——镜像滞后
-        // 也能暂停）。onPause 失败会 throw（不再吞成 undefined）。
+        // 显式带当前 Job 号（宿主按引擎档案 host_refs 字典裁决归属——旧档
+        // 回退 host_ref；镜像滞后也能暂停）。onPause 失败会 throw（不再吞成
+        // undefined）。
         if (typeof onPause === 'function') {
           data = await onPause(pluginJobId ?? undefined);
         } else {
@@ -1913,8 +2084,17 @@ const handlePauseWorkflow = useCallback(async () => {
         if (!resp.ok) throw new Error(data?.error ?? `pause HTTP ${resp.status}`);
       }
       if (data && data.paused === false) {
-        // 宿主说该会话无活跃剧本（页面状态残留）：按钮回空闲。
+        // 宿主说没有可暂停的活跃执行体：按引擎回执校准按钮（2026-09-20 挂起态
+        // 暂停键常驻后，幂等按压的落点）——引擎说 suspended=保持挂起态（继续键
+        // 还在，附知情提示）；其他态/没带态=回空闲（页面状态残留）。
+        if (data.state === 'suspended') {
+          setFlowStatus('paused');
+          showPauseNotice('info', '该 Job 已处于挂起状态（断点保留，可点「继续」续跑）');
+          return;
+        }
         setFlowStatus('idle');
+        // 2026-09-24 暂停键全状态常驻后的空闲按压落点：明确知情，不留「按了没反应」。
+        showPauseNotice('info', '当前没有可暂停的运行（引擎侧无活跃执行体）');
         return;
       }
       const st = data && data.state;
@@ -1971,7 +2151,7 @@ const handlePauseWorkflow = useCallback(async () => {
   }, [runId, plugin, handleRunWorkflow, pluginJobId]);
 
   // ── 零 token 调试干跑（2026-09-08）：「🐞 调试」按钮 ──
-  // femo_debugger FakeHost 替 AI/human 发言，引擎真实链路干跑剧本；
+  // femo_debugger FakeHost 替 AI/human 发言，引擎真实链路干跑FEMO脚本；
   // /femo-plugin/debug-run 以 NDJSON 流式回传 DebugLogBus 记录，这里逐行
   // 渲染进调试窗（Print 效果）。与正式运行状态机完全独立——任何 flowStatus
   // 下都可用，不碰 job/SSE 链路；仅插件模式提供（独立后端无此路由）。
@@ -1988,11 +2168,11 @@ const handlePauseWorkflow = useCallback(async () => {
     }
     const femo = femoText;
     if (!femo || !femo.trim()) {
-      alert('请先编写或导入 FEMO 脚本');
+      alert('请先编写或打开 FEMO脚本');
       return;
     }
     // 调试范围跟画布走（2026-09-12）：在哪个画布按「调试」就调试哪个范围——
-    // 主画布=整剧本；模块子画布（含嵌套层级）=只跑该模块。locationPath 形如
+    // 主画布=整个FEMO脚本；模块子画布（含嵌套层级）=只跑该模块。locationPath 形如
     // ['mainflow','外层','内层']，去掉首段拼点路径即调试器的模块参数。
     // 读 ref（locationPathRef）不进依赖：按下瞬间的画布位置即权威，且不重建回调。
     const lp = locationPathRef.current || ['mainflow'];
@@ -2001,19 +2181,20 @@ const handlePauseWorkflow = useCallback(async () => {
     setDebugOpen(true);   // 按了就开调试窗，日志实时流入
     pushDebug('info', '调试', debugModule
       ? `零 token 干跑启动——只跑模块 ${debugModule}（当前在它的子画布；AI/人类节点由调试器替答）…`
-      : '零 token 干跑启动——整剧本（当前在主画布；AI/人类节点由调试器替答）…');
+      : '零 token 干跑启动——整个FEMO脚本（当前在主画布；AI/人类节点由调试器替答）…');
     const controller = new AbortController();
     debugRunAbortRef.current = controller;
     try {
       const resp = await fetch('/femo-plugin/debug-run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // scriptPath=savedPath：code: file:"xxx.py" 相对引用按原剧本目录解析
-        // （与正式运行同语义；未保存过的剧本回退沙盒目录）。
-        // module：主画布=整剧本；模块子画布=只跑该模块（嵌套点路径）。
+        // scriptPath=effectiveSavedPath（插件=会话账的 savedPath；独立=服务端
+        // path 槽）：code: file:"xxx.py" 相对引用按原FEMO脚本目录解析（与正式
+        // 运行同语义；未保存过的脚本回退沙盒目录）。
+        // module：主画布=整个FEMO脚本；模块子画布=只跑该模块（嵌套点路径）。
         body: JSON.stringify({
           femo: femo,
-          scriptPath: savedPath || undefined,
+          scriptPath: effectiveSavedPath || undefined,
           module: debugModule,
         }),
         signal: controller.signal,
@@ -2063,7 +2244,7 @@ const handlePauseWorkflow = useCallback(async () => {
   // 【2026-08-30 状态实时化】只关 run-scoped 的独立模式流（/api/run/<id>/stream，
   // 运行结束=流终，不关会被 EventSource 当 404 反复重连）；插件模式
   // /femo-plugin/events 是页面级常驻广播——连接必须保留才能收到后续场次事件
-  // （flow_start/flow_paused 等），关了就退回「外部开演看不见」的老坑。
+  // （flow_start/flow_paused 等），关了就退回「外部启动运行看不见」的老坑。
   const closeRunScopedSse = useCallback(() => {
     const es = eventSourceRef.current;
     if (es && !String(es.url ?? '').includes('/femo-plugin/events')) {
@@ -2077,7 +2258,7 @@ const handlePauseWorkflow = useCallback(async () => {
   // 把整场弹过的输入浮层"走马灯"一遍）；②运行态刷页面=只弹"当前在跑的节点"，
   // 有人类输入则优先人类输入。三个门（缺一不可）：
   //  - 门一（帧源）：只有"活帧"能弹——replay/_replayed 追平帧一律只恢复状态；
-  //  - 门二（场态）：只有本场真在跑才弹（挂起/空闲=零浮层，不再依赖宿主是否
+  //  - 门二（场态）：只有本次真在跑才弹（挂起/空闲=零浮层，不再依赖宿主是否
   //    清了 waitingHuman）；
   //  - 门三（目标）：接通时的浮层由 /session-state 权威快照指定——人类等待
   //    快照优先，否则引擎 checkpoint（=进入节点前记录的位置，运行中即当前节点）。
@@ -2197,7 +2378,31 @@ const handleWorkflowEvent = useCallback((evt) => {
     console.log('[SSE event]', evt);
     console.log('[handleWorkflowEvent] 收到事件', evt);
   }
-  const { type, data } = evt;
+  // 【变量世界记录（2026-09-24）】宿主 Variable API 定向供给（引擎 func_result/
+  // assign_result/checkpoint 在宿主侧改走 variable-api.mjs 归一分发、不再进
+  // 通用代播，dsh engine-events 以 variable_record 补回画布供给）。翻译回引擎
+  // 事件形状，复用下方既有分支（调试窗摘要、节点匹配、In/Out 气泡全部照旧）；
+  // 独立模式直连引擎仍收原生 func_result/assign_result，两路并存。
+  // 【checkpoint 活供给（2026-09-23 补全，用户令「画布上会显示断点」）】宿主
+  // 以 brief 档上线 checkpoint（位置+label，变量世界整包 state 不外发）——
+  // 画布此前对 checkpoint 事件零消费（断点显示只靠 /session-state 拉），现
+  // 由 variable_record 实时驱动断点/当前节点高亮：运行中=当前节点、挂起后
+  // 留在原地=断点标记。
+  let { type, data } = evt;
+  if (type === 'variable_record') {
+    const r = (data && typeof data === 'object') ? data : {};
+    if (r.kind === 'checkpoint') {
+      const label = mainCheckpointLabel(r.checkpoints);
+      if (label) {
+        const node = findNodeByLabel(label);
+        if (node) setActiveNodeIds(new Set([node.id]));
+      }
+      return;
+    }
+    if (r.kind !== 'func_result' && r.kind !== 'assign_result') return;
+    type = r.kind;
+    data = { ...r, node_name: r.node, job_id: r.job_id ?? r.jobId };
+  }
     console.log('[SSE event]', evt);
 
     // 无需节点匹配的事件：直接处理或忽略
@@ -2226,6 +2431,12 @@ const handleWorkflowEvent = useCallback((evt) => {
       if (Array.isArray(sum)) sum.forEach((s) => pushDebug(s.level, type, s.text));
       else if (sum) pushDebug(sum.level, type, sum.text);
     }
+    // 【2026-09-24 假 warn 消音（用户点名）】ai_request（料包走 mailbox 后只剩
+    // 记账价值）与 femo_actor_usage（宿主角色占用圆环旁路帧）画布均无消费者
+    // ——原本一个坠进「收到未知事件类型」、一个坠进「事件缺少 node_name」
+    // 两处 console.warn，每场必响、淹没真错误。在节点匹配关卡前显式忽略
+    // （调试窗一侧已由 summarize 的 skip 名单静音）。
+    if (type === 'ai_request' || type === 'femo_actor_usage') return;
     if (type === 'run_state') {
       // 【flowStatus 快照驱动（§11.2）】状态判定以宿主广播的快照为准
       // （B7 死于结构：不再有本地兜底覆盖）。
@@ -2244,6 +2455,8 @@ const handleWorkflowEvent = useCallback((evt) => {
     if (plugin && !restoreDoneRef.current) {
       const nodeScoped = !['flow_start', 'flow_done', 'flow_paused', 'done', 'module_enter', 'module_exit', 'flow_error', 'notify_author'].includes(type);
       if (nodeScoped) {
+        // 缓冲上限对齐宿主重放环（sse-core cap400）：恢复面长期不可得时缓冲不无界涨。
+        if (pendingReplayRef.current.length >= 400) pendingReplayRef.current.shift();
         pendingReplayRef.current.push({ ...evt, _replayed: true });
         return;
       }
@@ -2426,7 +2639,7 @@ case 'human_wait':
       inputError: null, // 新一轮等待：清掉上一轮的拒绝/失败红条
     },
   }));
-  // 【浮层门卫（2026-09-11 v9）】活帧才弹、且本场在跑才弹——追平帧（宿主重放/
+  // 【浮层门卫（2026-09-11 v9）】活帧才弹、且本次在跑才弹——追平帧（宿主重放/
   // 前端补放）只恢复状态；挂起/空闲态零浮层（用户点名）。
   if (!isCatchUpFrame(evt) && canPopOverlay()) setBubbleOverlay({ nodeId });
   // 独立账本：par 并发时 AI 实例事件会覆盖 nodeStates[nodeId]（同 node_id），
@@ -2487,7 +2700,7 @@ case 'node_retry': {
               ...existing,
               context: data.context || '',
               showprompt: data.showprompt || null,
-              ai_name: data.ai_name || 'AI',
+              actor_name: data.actor_name || 'AI',
             },
           };
         });
@@ -2624,16 +2837,16 @@ case 'node_retry': {
 
 
       case 'flow_start': {
-        // 【2026-08-30 状态实时化】任何来源的开演（本页/电脑端/AI/断点续跑）
-        // 都把按钮切进运行态——SSE 常驻后本页靠它跟上外部开演。
+        // 【2026-08-30 状态实时化】任何来源的启动运行（本页/电脑端/AI/断点续跑）
+        // 都把按钮切进运行态——SSE 常驻后本页靠它跟上外部启动运行。
         // 【2026-09-11 v9】但**追平帧不驱动运行态**：历史 flow_start（挂起前
-        // 那一场留下的重放帧）不代表"现在在跑"，旧写法会把挂起态的刷新页点成
+        // 那一次留下的重放帧）不代表"现在在跑"，旧写法会把挂起态的刷新页点成
         // 运行态（浮层门卫失守、按钮也跟着错）。运行态由权威源裁决：
         // /session-state 的 running、run_state 广播、本页的运行时回调。
         if (!isCatchUpFrame(evt)) setFlowStatus('running');
         setNodeStates({});
         setActiveNodeIds(new Set());
-        // 新场次开演：上一场残留的人类等待一并清账（等待随引擎重启作废）
+        // 新场次启动运行：上一次残留的人类等待一并清账（等待随引擎重启作废）
         setHumanWaitsBoth({});
         break;
       }
@@ -2668,7 +2881,7 @@ case 'node_retry': {
         // 终态：不再有活着的引擎等待，撤下常驻人类输入面板
         setHumanWaitsBoth({});
         break;
-        break;
+        // break; // 已退役（观察期 2026-09-26 死代码排查）：不可达的第二个 break（笔误）
 
       case 'flow_error':
         // 工作流出错（Job failed 终态路径）：nodeId 匹配得到就标红节点
@@ -2685,7 +2898,7 @@ case 'node_retry': {
           // 确保该节点仍在活跃集合中（可能有并发分支还在跑）
           setActiveNodeIds(prev => new Set([...prev, nodeId]));
         }
-        alert('❌ 剧本运行出错: ' + (data.error || '未知错误'));
+        alert('❌ FEMO 运行出错: ' + (data.error || '未知错误'));
         // ★ 出错时清空模块栈（不切画布，让用户看错误）
         moduleStackRef.current = [];
         break;
@@ -2718,7 +2931,7 @@ case 'node_retry': {
         setFlowStatus('idle');
         // 清空所有活跃节点（done 事件不携带具体节点信息）
         setActiveNodeIds(new Set());
-        // 流终了=本场收尾，等待账本不会还有活口（flow_done/bridge_run_ended
+        // 流终了=本次收尾，等待账本不会还有活口（flow_done/bridge_run_ended
         // 已清）；再兜一次防鬼影输入框
         setHumanWaitsBoth({});
         if (eventSourceRef.current) {
@@ -2734,7 +2947,7 @@ case 'node_retry': {
         console.warn('[FEMO] 收到未知事件类型:', type, data);
         break;
     }
-  }, [closeRunScopedSse, clearPauseConfirmTimer, pushDebug]);
+  }, [closeRunScopedSse, clearPauseConfirmTimer, pushDebug, findNodeByLabel]);
 
   // 连接插件 SSE 广播（运行中打开标签页也实时接入；已连接则先关闭重连）。
   const connectSse = useCallback(() => {
@@ -2746,7 +2959,7 @@ case 'node_retry': {
     eventSourceRef.current = es;
     es.onopen = () => {
       // 【2026-09-06 多端状态统一】接通/重连即拉权威快照校准 flowStatus：
-      // host /events 的重放缓冲只有 100 条，长跑剧本一开跑就把 run_state
+      // host /events 的重放缓冲只有 100 条，长跑FEMO脚本一开跑就把 run_state
       // 快照挤出去——手机/睡眠唤醒等后连设备靠重放学不到状态切换，按钮会
       // 卡在旧态（桌面端点了暂停→挂起，手机端不知道，右上角没有「从头」）。
       // 判定与恢复 effect 同源：running→运行；有断点→继续+从头；否则运行。
@@ -2990,13 +3203,17 @@ const submitHumanInput = useCallback(
       // 节点拖拽、连线时，无需检查 isMouseDownRef
       if (drag) {
         const z = effectiveZoom(cvRef.current);
+        // 缩放折算吸附阈值：屏幕上始终是 SNAP_PX 像素的手感
+        const th = SNAP_PX / Math.max(0.05, scale * z);
         setNodes((p) => {
           const draggedNode = p.find(n => n.id === drag.id);
           if (!draggedNode) return p;
           const newX = drag.ox + (e.clientX - drag.sx) / (scale * z);
           const newY = drag.oy + (e.clientY - drag.sy) / (scale * z);
-          // FOR↔for_out 联动已抽到 common.applyForLinkage（与手机端 nodeDrag 共用一份定义）
-          return applyForLinkage(p, draggedNode, newX, newY);
+          // 先吸附对齐，再走 FOR↔for_out 联动（两件事都在 common/snap 里）
+          const r = snapAndLink(p, draggedNode, newX, newY, th, applyForLinkage);
+          updateGuides(r.guides);
+          return r.nodes;
         });
         return;
       }
@@ -3065,7 +3282,8 @@ const submitHumanInput = useCallback(
   const onMU = useCallback(() => {
     if (drag) {
       const draggedNode = nodesRef.current.find(n => n.id === drag.id);
-      if (draggedNode && (draggedNode.specialType === 'START' || draggedNode.specialType === 'IN')) {
+      if (draggedNode && (draggedNode.specialType === 'START' || draggedNode.specialType === 'IN') && !entryRezeroDoneRef.current) {
+        entryRezeroDoneRef.current = true; // 本次手势只归零一次（window 兜底会补跑 onMU）
         const dx = draggedNode.x;
         const dy = draggedNode.y;
         //console.log('[DEBUG] 入口归零前坐标:', draggedNode.x, draggedNode.y);
@@ -3098,9 +3316,18 @@ const submitHumanInput = useCallback(
     setDrag(null);
     setConn(null);
     setIsPanning(false);
+    // 松手清吸附连线（手机端在 finishGesture 里清，这里覆盖桌面端）
+    setSnapGuides(null);
     isDraggingRef.current = false;
     isMouseDownRef.current = false;
   }, [drag, nodesRef]);
+
+  // onMU/onMM 的 ref 同步 effect（自上方 window 兜底块移来，必须在声明后，
+  // 否则依赖数组渲染期求值触发 TDZ——2026-09-21 修复，见上）。
+  // 注意：必须用无 deps 形式——deps 数组在 render 期求值，而 onMU/onMM 声明
+  // 在组件体更后面，写 [onMU] 会在挂载时 TDZ ReferenceError 直接白屏。
+  useEffect(() => { onMURef.current = onMU; });
+  useEffect(() => { onMMRef.current = onMM; });
 
   // Canvas mouse down (for panning)
   const onCanvasDown = useCallback(
@@ -3133,10 +3360,15 @@ const submitHumanInput = useCallback(
     // 如果提供了实际端口坐标（FOR 出圆圈），使用它；否则从节点坐标计算
     let srcX = portX, srcY = portY;
     if (srcX === undefined || srcY === undefined) {
-      // 默认从节点中心计算
+      // 没拿到端口坐标：按方向从节点矩形推算，别退回中心（中心会让连线起点错位）
       const size = getNodeSize(node);
-      srcX = node.x + size.w / 2;
-      srcY = node.y + size.h / 2;
+      switch (portDir) {
+        case 'top':    srcX = node.x + size.w / 2; srcY = node.y; break;
+        case 'bottom': srcX = node.x + size.w / 2; srcY = node.y + size.h; break;
+        case 'left':   srcX = node.x;              srcY = node.y + size.h / 2; break;
+        case 'right':  srcX = node.x + size.w;     srcY = node.y + size.h / 2; break;
+        default:       srcX = node.x + size.w / 2; srcY = node.y + size.h / 2;
+      }
     }
     setConn({ srcId: nodeId, srcDir: portDir, mx: cx, my: cy, srcX, srcY });
   }
@@ -3180,6 +3412,12 @@ const submitHumanInput = useCallback(
       }
       setConn(null);
     }
+  }
+
+  // 节点名说明框的内联编辑落账口：改 actionStore（画布图的动作数据本体）。
+  // 图守卫基线含 actionStore，落账后 run 守卫立刻能看见未同步的图修改。
+  function patchAction(actionId, patch) {
+    setActionStore((prev) => prev.map((a) => (a.id === actionId ? { ...a, ...patch } : a)));
   }
 
   // Drag from library
@@ -3244,24 +3482,29 @@ const submitHumanInput = useCallback(
   }
 
   // 导入（2026-09-11 改两级）：一级=导入清单（导入过/导出过的 .femo 历史，
-  // 权威在 host 侧 src/femo-files.ts），二级=系统文件对话框。
-  // 手机端只有一级：对话框开在电脑屏幕上，手机上够不着，给了也是死路。
-  // 独立模式（无 host，无账本）直接退回原来的浏览器 file input 行为。
+  // 权威=公共层 femogen-files 账本），二级=系统文件对话框（电脑端）。
+  // 手机端只有一级+目录浮层：系统对话框开在电脑屏幕上，手机上够不着。
+  // 2026-09-30 起独立模式也进两级流程——账本是公共层单源，web 服务
+  // /api/femo-files 直接喂同一本（插件模式仍走宿主回调，行为零变化）。
   function handleToolbarImport() {
-    if (plugin && typeof onListFemoFiles === 'function') {
-      setFemoFileOpen(true);
-      setFemoFileError('');
-      loadFemoFileList();
+    if (plugin && typeof onListFemoFiles !== 'function') {
+      handleBrowseImport();   // 插件模式却没接清单回调：维持旧直通（理论外形态）
       return;
     }
-    handleBrowseImport();
+    setFemoFileOpen(true);
+    setFemoFileError('');
+    loadFemoFileList();
   }
 
-  /** 拉清单数据（不动弹窗开关，也不清错误位——错误位由打开弹窗/成功动作管）。 */
+  /** 拉清单数据（不动弹窗开关，也不清错误位——错误位由打开弹窗/成功动作管）。
+   *  插件模式走宿主回调；独立模式打 web 服务（同一条公共层账本）。 */
   function loadFemoFileList() {
     setFemoFileLoading(true);
+    const fetchList = (plugin && typeof onListFemoFiles === 'function')
+      ? onListFemoFiles()
+      : apiPost('/api/femo-files', {}).then((d) => d.files ?? []);
     return Promise.resolve()
-      .then(() => onListFemoFiles())
+      .then(() => fetchList)
       .then(
         (list) => { setFemoFileList(Array.isArray(list) ? list : []); },
         (err) => {
@@ -3273,11 +3516,11 @@ const submitHumanInput = useCallback(
       .finally(() => { setFemoFileLoading(false); });
   }
 
-  /** 二级：系统文件选择器（电脑端专属）。这条就是本次改动之前的原逻辑，行为未动；
-   *  独立模式仍是浏览器 file input + FileReader。 */
+  /** 二级：系统文件选择器（电脑端专属）。插件模式走宿主 onImport；独立模式打
+   *  服务端系统对话框（真路径入账本+path 槽）——2026-09-30 起不再用浏览器
+   *  file input（FileReader 拿不到路径，引用式导入必须由 host 侧选；浏览器
+   *  input 如今只剩 web 宿主自动挂载 ?mount=1 在用）。 */
   function handleBrowseImport() {
-    // 插件模式：host 弹系统文件选择器（引用原始位置，2026-08-30）→ 画布载入；
-    // 独立模式：浏览器 file input + FileReader。
     if (plugin && typeof onImport === 'function') {
       onImport().then((picked) => {
         if (picked === null) return; // 用户取消
@@ -3289,15 +3532,33 @@ const submitHumanInput = useCallback(
       });
       return;
     }
-    fileInputRef.current?.click();
+    apiPost('/api/pick-script', {})
+      .then((d) => {
+        if (d.path === null || d.path === undefined) return; // 用户取消
+        setFemoFileOpen(false);
+        setStandaloneSavedPath(d.path);
+        applyFEMOText(d.content);
+      })
+      .catch((err) => {
+        console.warn('[导入 .femo] 失败:', err);
+        alert(String(err?.message ?? err));
+      });
   }
 
-  /** 从清单里挑一条：host 读盘取正文 → 载入画布。收尾（会话记录 {path, text}
-   *  + 后台 scriptPath）与「浏览选中」共用 host 侧同一段，两条入口落点一致。 */
+  /** 从清单里挑一条：读盘取正文 → 载入画布。插件模式=宿主回调（宿主侧记账
+   *  +会话记录）；独立模式=web 服务读盘（账本门禁+path 槽都在服务端完成）。
+   *  两条入口落点一致：画布、editor 文本全部跟上。 */
   function handlePickFromList(path) {
-    if (typeof onPickFemoFile !== 'function') return;
+    if (plugin && typeof onPickFemoFile !== 'function') return;
     setFemoFileBusyPath(path);
-    onPickFemoFile(path)
+    Promise.resolve()
+      .then(() => {
+        if (plugin && typeof onPickFemoFile === 'function') return onPickFemoFile(path);
+        return apiPost('/api/femo-files/open', { path }).then((d) => {
+          setStandaloneSavedPath(d.path);
+          return { path: d.path, content: d.content };
+        });
+      })
       .then((picked) => {
         setFemoFileOpen(false);
         setFemoFileError('');
@@ -3313,14 +3574,17 @@ const submitHumanInput = useCallback(
   }
 
   // ── 移出清单（2026-09-13）──
-  // 只把这条记录从清单里划掉，**源文件零接触**（host forget-femo-file 只删
-  // 账本条目）。成功后本地同步剔除，不等重拉——清单是纯账本，本地删了 host
-  // 必然也删了；失败则亮错误条并重拉对账。
+  // 只把这条记录从清单里划掉，**源文件零接触**（账本只删条目）。成功后本地
+  // 同步剔除，不等重拉——清单是纯账本，本地删了服务端必然也删了；失败则亮
+  // 错误条并重拉对账。插件/独立两模式同一个账本，只是走宿主回调还是直打服务。
   function handleForgetFromList(path) {
-    if (typeof onForgetFemoFile !== 'function' || femoFileForgetBusy) return;
+    if (typeof onForgetFemoFile !== 'function' && plugin) return;
+    if (femoFileForgetBusy) return;
     setFemoFileForgetBusy(true);
-    Promise.resolve()
-      .then(() => onForgetFemoFile(path))
+    const forget = (plugin && typeof onForgetFemoFile === 'function')
+      ? Promise.resolve(onForgetFemoFile(path))
+      : apiPost('/api/femo-files/forget', { path });
+    forget
       .then(() => {
         setFemoFileError('');
         setFemoFileList((list) => list.filter((f) => f.path !== path));
@@ -3333,13 +3597,82 @@ const submitHumanInput = useCallback(
       .finally(() => { setFemoFileForgetBusy(false); });
   }
 
+  // ── 工程目录浮层的动作面（2026-09-30，手机端选路径的一腿；桌面导出走系统
+  //    对话框）。数据面=/api/projects/*，服务端有 projects/ 围栏；save 键直接
+  //    落盘（三态/账本/path 槽都在服务端一处管齐），open 模式=读盘入账。──
+  function loadDirBrowse(dir) {
+    setDirBrowseLoading(true);
+    setDirBrowseError('');
+    return apiPost('/api/projects/browser', { dir })
+      .then((d) => {
+        setDirBrowseDir(d.dir ?? '');
+        setDirBrowseDirs(d.dirs ?? []);
+        setDirBrowseFiles(d.files ?? []);
+      })
+      .catch((err) => {
+        setDirBrowseError(String(err?.message ?? err));
+        setDirBrowseDirs([]);
+        setDirBrowseFiles([]);
+      })
+      .finally(() => setDirBrowseLoading(false));
+  }
+  function openDirBrowse(mode) {
+    setDirBrowseMode(mode);
+    setDirBrowseOpen(true);
+    loadDirBrowse('');
+  }
+  function handleDirEnter(name) {
+    loadDirBrowse(dirBrowseDir ? `${dirBrowseDir}/${name}` : name);
+  }
+  function handleDirUp() {
+    const segs = dirBrowseDir.split('/').filter(Boolean);
+    segs.pop();
+    loadDirBrowse(segs.join('/'));
+  }
+  function handleDirMkdir(name) {
+    setDirBrowseBusy(true);
+    apiPost('/api/projects/mkdir', { dir: dirBrowseDir, name })
+      .then((d) => loadDirBrowse(d.dir ?? dirBrowseDir))
+      .catch((err) => setDirBrowseError(String(err?.message ?? err)))
+      .finally(() => setDirBrowseBusy(false));
+  }
+  function handleDirOpenFile(name) {
+    setDirBrowseBusy(true);
+    apiPost('/api/projects/open', { dir: dirBrowseDir, name })
+      .then((d) => {
+        setDirBrowseOpen(false);
+        setStandaloneSavedPath(d.path);
+        applyFEMOText(d.content);
+      })
+      .catch((err) => setDirBrowseError(String(err?.message ?? err)))
+      .finally(() => setDirBrowseBusy(false));
+  }
+  function handleDirSave(name) {
+    setDirBrowseBusy(true);
+    // 保存时现取画布文本（浮层开着时画布被遮住改不了，取当下总没错）
+    apiPost('/api/save-script', { dir: dirBrowseDir, name, femo: handleGraphToFemo() })
+      .then((d) => {
+        setDirBrowseOpen(false);
+        setStandaloneSavedPath(d.path);
+        showExportToast(`✓ 已保存到 ${d.path}${d.changed === false ? '（内容与文件一致）' : (d.existed ? '（覆盖原文件）' : '')}`);
+      })
+      .catch((err) => setDirBrowseError(String(err?.message ?? err)))
+      .finally(() => setDirBrowseBusy(false));
+  }
+  /** 「未改动」提醒三选——resolve 回 handleToolbarExport 的挂起点。 */
+  function resolveSaveReminder(choice) {
+    const r = saveReminder;
+    setSaveReminder(null);
+    r?.resolve?.(choice);
+  }
+
   async function handleToolbarExport() {
     if (exportBusy) return;
     console.log('[导出 .femo] 开始即时生成');
     const exportText = handleGraphToFemo();
     console.log('[导出 .femo] 生成完成, 长度:', exportText.length);
     if (plugin && typeof onExport === 'function') {
-      // 插件模式：系统保存文件对话框选位置命名 → 服务端保存 → 地址存会话。
+      // 插件模式：三态行为在宿主 editor-page（系统对话框+会话记录），画布零感知。
       setExportBusy(true);
       try {
         const path = await onExport(exportText, proj.name || 'flow');
@@ -3356,17 +3689,64 @@ const submitHumanInput = useCallback(
       }
       return;
     }
-    // 独立模式：浏览器下载（原行为）。
-    const blob = new Blob([exportText], {
-      type: 'text/plain',
-    });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `${proj.name || 'flow'}.femo`;
-    a.click();
-    console.log('[导出 .femo] 下载已触发');
-    showExportToast(`✓ 已开始下载 ${proj.name || 'flow'}.femo`);
+    // 独立模式三态（2026-09-30，与 dsh 同语义；落盘/账本/path 槽都在服务端）：
+    // 有 path → 直存（与盘上一致先提醒）；无 path → 首存（桌面=系统对话框、
+    // 手机=工程目录浮层）。
+    setExportBusy(true);
+    try {
+      if (standaloneSavedPath) {
+        const d = await apiPost('/api/save-script', { path: standaloneSavedPath, femo: exportText });
+        if (d.changed === false) {
+          const choice = await new Promise((resolve) => setSaveReminder({ path: d.path, resolve }));
+          if (choice === 'back') return;   // 返回画布：静默（与 dsh「返回编辑画布」同口径）
+          if (choice === 'save') {
+            const d2 = await apiPost('/api/save-script', { path: d.path, femo: exportText, force: true });
+            setStandaloneSavedPath(d2.path);
+            showExportToast(`✓ 已保存到 ${d2.path}`);
+          } else {
+            await startSaveAs(exportText); // 另存为：换地址，记录跟过去
+          }
+        } else {
+          setStandaloneSavedPath(d.path);
+          showExportToast(`✓ 已保存到 ${d.path}`);
+        }
+      } else {
+        await startSaveAs(exportText);
+      }
+    } catch (err) {
+      console.warn('[导出 .femo] 保存失败:', err);
+      alert(String(err?.message ?? err));
+    } finally {
+      setExportBusy(false);
+    }
   }
+
+  /** 首存/另存为的选位置（独立模式）：桌面弹服务端系统保存对话框（起始目录
+   *  =projects/，取消静默——与 dsh 同口径）；手机开工程目录浮层，保存键走
+   *  handleDirSave 接手（开层即返回，exportBusy 已在 finally 里松开）。 */
+  async function startSaveAs(exportText) {
+    if (isMobile) {
+      openDirBrowse('save');
+      return;
+    }
+    const safe = (proj.name || 'flow').replace(/[\\/:*?"<>|]/g, '_');
+    const d = await apiPost('/api/pick-save-path', { name: safe });
+    if (d.path === null || d.path === undefined) return;   // 用户取消：静默
+    const d2 = await apiPost('/api/save-script', { path: d.path, femo: exportText });
+    setStandaloneSavedPath(d2.path);
+    showExportToast(`✓ 已保存到 ${d2.path}`);
+  }
+
+  // ── 旧「浏览器 Blob 下载」路径（已退役，观察期 2026-09-30，连块删除）──
+  // 独立模式导出改走服务端存盘三态（上文），下载不再可达；若观察期后无回退
+  // 诉求，连同本注释一起删。
+  // const blob = new Blob([exportText], { type: 'text/plain' });
+  // const a = document.createElement('a');
+  // a.href = URL.createObjectURL(blob);
+  // a.download = `${proj.name || 'flow'}.femo`;
+  // a.click();
+  // console.log('[导出 .femo] 下载已触发');
+  // showExportToast(`✓ 已开始下载 ${proj.name || 'flow'}.femo`);
 
   // Apply FEMO text (from preview or import)
   function applyFEMOText(text) {
@@ -3446,7 +3826,7 @@ const submitHumanInput = useCallback(
     setLastValidFemo(text);
     setSel(null);
     // 建立结构基线：此刻画布与原文一致，之后的结构性变化才计为「图被修改」。
-    lastSyncedGraphRef.current = structuralSignature(newNodes, newEdges);
+    lastSyncedGraphRef.current = structuralSignature(newNodes, newEdges, libActions);
     console.log('7. 全部完成');
   }
 
@@ -3515,7 +3895,7 @@ const submitHumanInput = useCallback(
     setFEMOrnings([]);
     setFemoDirty(false);
     setGraphDirty(false);
-    lastSyncedGraphRef.current = structuralSignature(nodes, edges);
+    lastSyncedGraphRef.current = structuralSignature(nodes, edges, actionStore);
     // 链路②：把生成文本写入会话 record（带 baseRev，冲突走 409 弹窗）。
     if (typeof onPersistScript === 'function') onPersistScript(out);
   }
@@ -3657,7 +4037,9 @@ const selNode = sel?.type === 'node' ? nm.get(sel.id) : null;
     return (
       <ErrorBoundary>
         <FontStyle scoped={plugin} />
-        {/* 独立模式导入用的隐藏 file input（插件模式走 host 系统选择器）。
+        {/* 隐藏 file input——如今只剩 web 宿主自动挂载（?mount=1 的播种脚本按
+            `input[type=file][accept=".femo"]` 唯一选择器找它注入）在用；人工
+            导入 2026-09-30 起走系统对话框/目录浮层（FileReader 拿不到路径）。
             桌面工具栏那份在手机端不渲染，故此处补一份——与桌面共用同一个
             fileInputRef / handleImportFile，两条分支互斥挂载不冲突。 */}
         <input
@@ -3672,7 +4054,7 @@ const selNode = sel?.type === 'node' ? nm.get(sel.id) : null;
           <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{
               maxWidth: 430, width: 'calc(100% - 48px)', padding: '18px 20px', borderRadius: 12,
-              background: 'var(--femo-surface, #fff)', border: '1px solid var(--femo-border, #e0e0e0)',
+              background: 'var(--femo-modal-bg, #fff)', border: '1px solid var(--femo-border, #e0e0e0)',
               boxShadow: '0 8px 28px rgba(0,0,0,0.22)', fontSize: 13, lineHeight: 1.6,
             }}>
               <div style={{ fontWeight: 700, marginBottom: 6 }}>⚠️ 有未落盘修改</div>
@@ -3737,6 +4119,7 @@ nodes={nodes}
           handlePortUp={handlePortUp}
           handleCanvasDragOver={handleCanvasDragOver}
           handleCanvasDrop={handleCanvasDrop}
+          setGuides={updateGuides}
           canvasOpacity={canvasOpacity}
           canvasContent={
             <>
@@ -3824,6 +4207,7 @@ nodes={nodes}
                 })}
                 {conn && (() => { const d = getTempConnLine(); return d ? <path d={d} fill="none" stroke="var(--femo-primary)" strokeWidth={2} strokeDasharray="6,3" style={{pointerEvents:'none'}} /> : null; })()}
               </svg>
+              <SnapGuides guides={snapGuides} scale={scale} />
               {nodes.map((n) => {
                 const enrichedNode = n.type === 'action' ? { ...n, action: actionMap.get(n.actionId) } : n;
                 const commonProps = {
@@ -3834,7 +4218,7 @@ nodes={nodes}
                     setSel({ type: 'node', id: enrichedNode.id });
                     setDrag({ id: enrichedNode.id, sx: e.clientX, sy: e.clientY, ox: enrichedNode.x, oy: enrichedNode.y });
                   },
-                  onPortDown: (e, dir) => handlePortDown(e, enrichedNode.id, dir),
+                  onPortDown: (e, dir, x, y) => handlePortDown(e, enrichedNode.id, dir, x, y),
                   onPortUp: (e, dir) => handlePortUp(e, enrichedNode.id, dir),
                   onBodyMouseUp: (e) => handleBodyMouseUp(e, enrichedNode.id),
                 };
@@ -3843,9 +4227,9 @@ nodes={nodes}
                   const motherNode = enrichedNode.forNodeId ? nm.get(enrichedNode.forNodeId) : null;
                   return <ForOutNodeView key={enrichedNode.id} node={enrichedNode} sel={sel?.type==='node'&&sel.id===enrichedNode.id} forSpecialType={motherNode?.specialType||'FOR'} onBodyMouseUp={(e) => handleBodyMouseUp(e, enrichedNode.id)} onBubbleClick={(nid) => { setDrag(null); setConn(null); setIsPanning(false); setSel({ type: 'node', id: nid }); }} onPortDown={(e, dir, x, y) => handlePortDown(e, enrichedNode.id, dir, x, y)} onPortUp={(e, dir) => handlePortUp(e, enrichedNode.id, dir)} />;
                 }
-                if (enrichedNode.type === 'par_out') return <ParOutNodeView key={enrichedNode.id} node={enrichedNode} sel={sel?.type==='node'&&sel.id===enrichedNode.id} onBody={(e) => { e.stopPropagation(); if (drag||isPanning||conn){setDrag(null);setIsPanning(false);setConn(null);return;} setSel({type:'node',id:enrichedNode.id}); setDrag({id:enrichedNode.id,sx:e.clientX,sy:e.clientY,ox:enrichedNode.x,oy:enrichedNode.y}); }} onPortDown={(e, dir) => handlePortDown(e, enrichedNode.id, dir)} onPortUp={(e, dir) => handlePortUp(e, enrichedNode.id, dir)} onBodyMouseUp={(e) => handleBodyMouseUp(e, enrichedNode.id)} />;
+                if (enrichedNode.type === 'par_out') return <ParOutNodeView key={enrichedNode.id} node={enrichedNode} sel={sel?.type==='node'&&sel.id===enrichedNode.id} onBody={(e) => { e.stopPropagation(); if (drag||isPanning||conn){setDrag(null);setIsPanning(false);setConn(null);return;} setSel({type:'node',id:enrichedNode.id}); setDrag({id:enrichedNode.id,sx:e.clientX,sy:e.clientY,ox:enrichedNode.x,oy:enrichedNode.y}); }} onPortDown={(e, dir, x, y) => handlePortDown(e, enrichedNode.id, dir, x, y)} onPortUp={(e, dir) => handlePortUp(e, enrichedNode.id, dir)} onBodyMouseUp={(e) => handleBodyMouseUp(e, enrichedNode.id)} />;
                 if (enrichedNode.type === 'position') return <PositionNodeView key={enrichedNode.id} node={enrichedNode} {...commonProps} />;
-                return <ActionNodeView key={enrichedNode.id} node={enrichedNode} {...commonProps} onBubbleClick={handleBubbleClick} nodeState={nodeStates[enrichedNode.id]} isActive={activeNodeIds.has(enrichedNode.id)} errorNodeIds={errorNodeIds} onDbl={() => { if (enrichedNode.type==='action'&&enrichedNode.action) setModal({type:'editNode',action:enrichedNode.action,nodeId:enrichedNode.id}); else if (enrichedNode.type==='module') { const mod=enrichedNode.modDef; if(mod) editModule(mod); } }} />;
+                return <ActionNodeView key={enrichedNode.id} node={enrichedNode} {...commonProps} onBubbleClick={handleBubbleClick} onActionPatch={patchAction} nodeState={nodeStates[enrichedNode.id]} isActive={activeNodeIds.has(enrichedNode.id)} errorNodeIds={errorNodeIds} onDbl={() => { if (enrichedNode.type==='action'&&enrichedNode.action) setModal({type:'editNode',action:enrichedNode.action,nodeId:enrichedNode.id}); else if (enrichedNode.type==='module') { const mod=enrichedNode.modDef; if(mod) editModule(mod); } }} />;
               })}
             </>
           }
@@ -3958,6 +4342,8 @@ nodes={nodes}
         />
         {/* 导入清单（第一级，2026-09-11）：**特意不传 onBrowse**——手机端的
             系统文件对话框开在电脑屏幕上，按了也够不着，留着只会让人以为按坏了。
+            2026-09-30 起传 onBrowseDir：手机端自己的一腿=工程目录浮层（服务端
+            projects/ 围栏内浏览/打开）。
             挂在这里而不是 MobileLayout 内部：zIndex 9999 的 fixed 浮层盖住
             移动端布局（900）与运行守卫（1000）即可，无需穿参数。 */}
         <FemoFileList
@@ -3967,9 +4353,28 @@ nodes={nodes}
           error={femoFileError}
           busyPath={femoFileBusyPath}
           onPick={handlePickFromList}
-          onForget={typeof onForgetFemoFile === 'function' ? handleForgetFromList : undefined}
+          onForget={handleForgetFromList}
+          onBrowseDir={plugin ? undefined : () => openDirBrowse('open')}
           onClose={() => setFemoFileOpen(false)}
         />
+        <FemoDirBrowse
+          open={dirBrowseOpen}
+          mode={dirBrowseMode}
+          dir={dirBrowseDir}
+          dirs={dirBrowseDirs}
+          files={dirBrowseFiles}
+          loading={dirBrowseLoading}
+          error={dirBrowseError}
+          busy={dirBrowseBusy}
+          defaultName={proj.name || 'flow'}
+          onEnterDir={handleDirEnter}
+          onUpDir={handleDirUp}
+          onCreateFolder={handleDirMkdir}
+          onOpenFile={handleDirOpenFile}
+          onSave={handleDirSave}
+          onClose={() => setDirBrowseOpen(false)}
+        />
+        <FemoSaveReminder reminder={saveReminder} onChoice={resolveSaveReminder} />
       </ErrorBoundary>
     );
   }
@@ -4027,7 +4432,7 @@ nodes={nodes}
                 letterSpacing: '-0.03em',
               }}
             >
-              <span style={{ color: 'var(--femo-primary)' }}>FEMO</span> Studio
+              <span style={{ color: 'var(--femo-primary)' }}>FEMO</span> Generator
             </div>
             <div
               style={{
@@ -4037,7 +4442,7 @@ nodes={nodes}
                 letterSpacing: '0.01em',
               }}
             >
-              Flow EMerges Opus.
+              Flow Emerges Mag Opus.
             </div>
           </div>
 
@@ -4175,7 +4580,8 @@ nodes={nodes}
           }}>
             {/* 底部三键（2026-09-08）：与手机端设置三键同套配方——等宽 flex:1 1 0 +
                 FA 图标（FaPalette 主题 / FaUserPlus 新建SOUL / FaTerminal 调试）+
-                minHeight 30 芯片家族高度 + 文字段省略号兜底；桌面端有指针，反馈走
+                minHeight 30 芯片家族高度；2026-09-29 文字去掉改纯图标，
+                语义靠 title 悬停提示交代。桌面端有指针，反馈走
                 hover 提亮 + 按压回缩（.femo-setting-btn，FontStyle 全局块）。
                 顺序与手机端对齐：主题 → 新建 SOUL → 调试。红点内移防裁剪。 */}
             <button
@@ -4197,9 +4603,6 @@ nodes={nodes}
               }}
             >
               <FaPalette size={12} style={{ flexShrink: 0 }} />
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
-                {FEMO_THEMES.find((t) => t.id === themeSel)?.name || themeSel}
-              </span>
             </button>
             <button
               onClick={() => { setSoulForm({ soul_id: '', soul_name: '', description: '' }); setSoulFormError(''); setSoulModalOpen(true); }}
@@ -4220,7 +4623,6 @@ nodes={nodes}
               }}
             >
               <FaUserPlus size={12} style={{ flexShrink: 0 }} />
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>新建 SOUL</span>
             </button>
             <button
               onClick={() => setDebugOpen(true)}
@@ -4242,7 +4644,6 @@ nodes={nodes}
               }}
             >
               <FaTerminal size={12} style={{ flexShrink: 0 }} />
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>调试</span>
               {debugLog.some((e) => e.level === 'error') && (
                 <span
                   style={{
@@ -4412,7 +4813,9 @@ nodes={nodes}
               </div>
             )}
             {/* 暂停反馈条（2026-09-07 静默吞错修复）：error=请求失败（红）；
-                warning=受理未确认/幂等无操作（黄）。锚在 exportToast 上方，
+                warning=受理未确认/幂等无操作（黄）。与 exportToast 同位——
+                锚在工具栏右下方、保存按钮信息条的位置（2026-09-27 用户点名：
+                原先上提 44px 会盖住运行/暂停等按钮，移下来让开按钮）。
                 8s 自动消失（showPauseNotice 统一管理）。 */}
             {pauseNotice !== null && (
               <div
@@ -4421,7 +4824,6 @@ nodes={nodes}
                   position: 'absolute',
                   top: 'calc(100% + 6px)',
                   right: 12,
-                  transform: 'translateY(-44px)',
                   zIndex: 91,
                   maxWidth: 'min(560px, 100%)',
                   padding: '7px 12px',
@@ -4444,16 +4846,35 @@ nodes={nodes}
                 钉死一个动作/一套样式/一句文案，从生到死不变；运行阶段只决定渲染
                 哪几枚（三枚与「导入/导出」同为 ToolChip 家族：同高度/内边距/圆角/
                 字号 + 各带一枚 FA 图标，只靠色调分语义）：
-                  绿「运行」(FaPlay)      = fresh_start（reset:true 从头开演；未开跑与挂起态都出现）
-                  红「暂停」(FaPause)      = pause（只在跑的时候出现；2026-09-12
-                  用户点名 stop→pause 全链路改名——原「停止」键，语义即挂起可续跑）
+                  绿「运行」(FaPlay)      = fresh_start（reset:true 从头运行；未开跑与挂起态都出现）
+                  红「停止」(FaStop)      = pause（running 与挂起态都出现；2026-09-12
+                  用户点名 stop→pause 全链路改名，2026-09-30 再点名改回「停止」+fa-stop
+                  方块——引擎语义不变，pause=suspended 挂起可续跑；
+                  2026-09-20 拍板挂起态也保留此键——前后端状态混乱时的强停入口，
+                  显式带 pluginJobId 走引擎档案裁决，重复按=幂等知情不误报）
                   琥珀「继续」(FaForward) = resume（从断点续跑；只在暂停之后的挂起态出现）
                 挂起态顺序=常驻的运行键在前、挂起专属的继续键在后。（引擎无独立
                 硬暂停语义——pause=suspended 可续跑）。状态实时化=run_state
-                快照驱动。 */}
+                快照驱动。2026-09-24 用户点名暂停键全状态常驻（idle 也显示——
+                没有可停执行体时按压=幂等知情回执，见 handlePauseWorkflow）。 */}
             {(flowStatus === 'idle' || flowStatus === 'paused') && (
               enginePending ? (
-                <ToolChip icon={FaSpinner} tone="neutral" disabled title="引擎冷启动中（bridge 未就绪）——就绪后即可开演">
+                // 【2026-09-19 冷启动补拉】芯片可点：宿主自动 2s 轮询为主，
+                // 这里给用户一个立即重探的抓手（点了重拉 session-state，
+                // 引擎就绪即换回运行/继续键，不再永远卡在加载态）。
+                <ToolChip
+                  icon={FaSpinner}
+                  tone="neutral"
+                  onClick={() => {
+                    if (typeof onEngineRetry === 'function') {
+                      pushDebug('info', '引擎', '手动重探引擎状态…');
+                      onEngineRetry();
+                    }
+                  }}
+                  title={typeof onEngineRetry === 'function'
+                    ? '引擎冷启动中——就绪后自动恢复；点此立即重新探测'
+                    : '引擎冷启动中（bridge 未就绪）——就绪后即可启动运行'}
+                >
                   引擎启动中…
                 </ToolChip>
               ) : (
@@ -4461,22 +4882,22 @@ nodes={nodes}
                   icon={FaPlay}
                   tone="success"
                   onClick={() => handleRunWorkflow(undefined, 'human', { reset: true })}
-                  title="从头开演整个剧本（fresh start；挂起的一场会自动存档）"
+                  title="从头运行整个FEMO脚本（fresh start；挂起的一次会自动存档）"
                 >
                   运行
                 </ToolChip>
               )
             )}
-            {flowStatus === 'running' && (
-              <ToolChip
-                icon={FaPause}
-                tone="danger"
-                onClick={handlePauseWorkflow}
-                title="暂停（可续跑：断点保留，之后可点「继续」接着跑）"
-              >
-                暂停
-              </ToolChip>
-            )}
+              {
+                <ToolChip
+                  icon={FaStop}
+                  tone="danger"
+                  onClick={handlePauseWorkflow}
+                  title="停止（可续跑：断点保留，之后可点「继续」接着跑；挂起态重复按=幂等，状态混乱时可校正）"
+                >
+                  停止
+                </ToolChip>
+              }
             {flowStatus === 'paused' && (
               <ToolChip
                 icon={FaForward}
@@ -4489,7 +4910,8 @@ nodes={nodes}
             )}
             {/* 文件读写（2026-09-11 用户点名调序：从运行控制左侧移到右侧，与手机端
                 标题栏同序；同日工具栏统一重造：与运行控制同款芯片、同带 FA 图标）。
-                隐藏 file input 跟导入键一起走；导出回执 toast 仍锚在工具栏右下方。 */}
+                隐藏 file input 只服务 web 自动挂载（人工导入走对话框/目录浮层）；
+                导出回执 toast 仍锚在工具栏右下方。 */}
             <input
               ref={fileInputRef}
               type="file"
@@ -4501,18 +4923,18 @@ nodes={nodes}
               icon={FaFolderOpen}
               tone="neutral"
               onClick={handleToolbarImport}
-              title="导入 .femo（打开本地剧本文件）"
+              title="打开 .femo（选择本地脚本文件）"
             >
-              导入
+              打开
             </ToolChip>
             <ToolChip
               icon={FaFloppyDisk}
               tone="neutral"
               onClick={handleToolbarExport}
               disabled={exportBusy}
-              title={exportBusy ? '保存中…' : '导出 .femo（把当前剧本保存到本地）'}
+              title={exportBusy ? '保存中…' : '保存 .femo（把当前FEMO脚本保存到本地）'}
             >
-              {exportBusy ? '保存中…' : '导出'}
+              {exportBusy ? '保存中…' : '保存'}
             </ToolChip>
             {/* 编译（零 token 干跑）入口 2026-09-08 迁入调试窗头部——
                 工具栏位置退役：编译的日志就显示在调试窗，按钮放窗里语义更顺，
@@ -4779,6 +5201,7 @@ nodes={nodes}
                     ) : null;
                   })()}
               </svg>
+              <SnapGuides guides={snapGuides} scale={scale * effectiveZoom(cvRef.current)} />
 
               {/* Nodes */}
               {nodes.map((n) => {
@@ -4805,7 +5228,7 @@ nodes={nodes}
                       oy: enrichedNode.y,
                     });
                   },
-                  onPortDown: (e, dir) => handlePortDown(e, enrichedNode.id, dir),
+                  onPortDown: (e, dir, x, y) => handlePortDown(e, enrichedNode.id, dir, x, y),
                   onPortUp: (e, dir) => handlePortUp(e, enrichedNode.id, dir),
                   onBodyMouseUp: (e) => handleBodyMouseUp(e, enrichedNode.id),
                 };
@@ -4860,7 +5283,7 @@ if (enrichedNode.type === 'par_out') {
         setSel({ type: 'node', id: enrichedNode.id });
         setDrag({ id: enrichedNode.id, sx: e.clientX, sy: e.clientY, ox: enrichedNode.x, oy: enrichedNode.y });
       }}
-      onPortDown={(e, dir) => handlePortDown(e, enrichedNode.id, dir)}
+      onPortDown={(e, dir, x, y) => handlePortDown(e, enrichedNode.id, dir, x, y)}
       onPortUp={(e, dir) => handlePortUp(e, enrichedNode.id, dir)}
       onBodyMouseUp={(e) => handleBodyMouseUp(e, enrichedNode.id)}
     />
@@ -4877,6 +5300,7 @@ if (enrichedNode.type === 'par_out') {
                     node={enrichedNode}
                     {...commonProps}
                     onBubbleClick={handleBubbleClick}
+                    onActionPatch={patchAction}
                     nodeState={nodeStates[enrichedNode.id]}
                     isActive={activeNodeIds.has(enrichedNode.id)}
                     errorNodeIds={errorNodeIds}
@@ -5296,7 +5720,9 @@ if (enrichedNode.type === 'par_out') {
           </div>
 
       {/* FEMO Preview */}
-      {plugin && savedPath === undefined && (
+      {/* 未保存警示条：插件=会话账里没有 scriptPath；独立=服务端 path 槽为空
+          （undefined=槽还没拉到，不闪这条）。 */}
+      {(plugin ? savedPath === undefined : standaloneSavedPath === null) && (
         <div style={{
           fontSize: 11,
           color: 'var(--femo-warning-strong)',
@@ -5307,7 +5733,7 @@ if (enrichedNode.type === 'par_out') {
           marginBottom: 4,
           lineHeight: 1.4,
         }}>
-          ⚠ 剧本未保存。外接依赖文件只支持绝对地址。
+          ⚠ 脚本未保存。外接依赖文件只支持绝对地址。
         </div>
       )}
       <FemoPreview
@@ -5424,8 +5850,9 @@ if (enrichedNode.type === 'par_out') {
         createUrl={plugin ? '/femo-plugin/souls' : getBackendBaseUrl() + '/api/souls/create'}
       />
 
-      {/* 导入清单（第一级，2026-09-11）：桌面端带右上角「浏览…」，按它走原来的
-          系统文件对话框；清单只会在插件模式打开（独立模式没有账本）。 */}
+      {/* 导入清单（第一级，2026-09-11）：桌面端带右上角「浏览…」=二级系统文件
+          对话框（插件=宿主 onImport；独立=服务端系统对话框，2026-09-30 起）。
+          清单两模式都开：账本是公共层单源（插件走宿主回调、独立打 web 服务）。 */}
       <FemoFileList
         open={femoFileOpen}
         files={femoFileList}
@@ -5433,10 +5860,28 @@ if (enrichedNode.type === 'par_out') {
         error={femoFileError}
         busyPath={femoFileBusyPath}
         onPick={handlePickFromList}
-        onForget={typeof onForgetFemoFile === 'function' ? handleForgetFromList : undefined}
+        onForget={handleForgetFromList}
         onBrowse={handleBrowseImport}
         onClose={() => setFemoFileOpen(false)}
       />
+      <FemoDirBrowse
+        open={dirBrowseOpen}
+        mode={dirBrowseMode}
+        dir={dirBrowseDir}
+        dirs={dirBrowseDirs}
+        files={dirBrowseFiles}
+        loading={dirBrowseLoading}
+        error={dirBrowseError}
+        busy={dirBrowseBusy}
+        defaultName={proj.name || 'flow'}
+        onEnterDir={handleDirEnter}
+        onUpDir={handleDirUp}
+        onCreateFolder={handleDirMkdir}
+        onOpenFile={handleDirOpenFile}
+        onSave={handleDirSave}
+        onClose={() => setDirBrowseOpen(false)}
+      />
+      <FemoSaveReminder reminder={saveReminder} onChoice={resolveSaveReminder} />
     </div> {/* 闭合最外层 flex 容器 */}
     </ErrorBoundary>
   );

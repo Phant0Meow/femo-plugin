@@ -26,7 +26,8 @@ def get_db_path() -> str:
     if not _db_path:
         from femoBridges.getDir.get_dir import get_user_dir
         user_dir = get_user_dir()
-        _db_path = os.path.join(user_dir, "user_data", "memory", "Chronica.wor")
+        from femoBridges.getDir.get_dir import get_data_dir
+        _db_path = os.path.join(get_data_dir(), "memory", "Chronica.wor")
         print(f"[config] ⚠️ 未设置数据库路径，使用默认值: {_db_path}")
     # 如果是相对路径，基于 user_dir 解析
     if not os.path.isabs(_db_path):

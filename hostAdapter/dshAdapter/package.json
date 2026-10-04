@@ -1,7 +1,7 @@
 {
   "name": "femo-plugin",
   "version": "1.0.2",
-  "description": "Femo (FlowEngineforMinds) 多智能体剧本引擎的 dsh 插件版 — 无主模型 Femo 会话、聊天窗口角色气泡、剧本控制（含完整引擎，自包含，整个文件夹搬走即用）",
+  "description": "Femo (FlowEngineforMinds) 多智能体脚本引擎的 dsh 插件版 — 无主模型 Femo 会话、聊天窗口角色气泡、FEMO脚本控制（含完整引擎，自包含，整个文件夹搬走即用）",
   "keywords": [
     "deepseek-harness",
     "dsh",
@@ -35,7 +35,7 @@
     "prepare": "node build.mjs",
     "build": "node build.mjs",
     "watch": "node build.mjs --watch",
-    "link-workspace": "powershell -ExecutionPolicy Bypass -File ../scripts/link-workspace.ps1"
+    "link-workspace": "powershell -ExecutionPolicy Bypass -File ../../developer/scripts/link-workspace.ps1"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "^4.0.2",
@@ -46,6 +46,7 @@
     "@deepseek-ai/dsh-system-prompt": "^0.1.1-rc.2",
     "@deepseek-ai/dsh-tools": "^0.1.1-rc.2",
     "@deepseek-ai/schemastery": "^3.18.1",
-    "esbuild": "^0.25.0"
+    "esbuild": "^0.25.0",
+    "yaml": "^2.9.1"
   }
 }

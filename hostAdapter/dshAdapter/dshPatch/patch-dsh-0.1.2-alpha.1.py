@@ -4,7 +4,7 @@
 
 基线: dsh-v0.1.2-alpha.1 (HEAD cd5ef81)，对应需求书 femo-plugin/dshPatch/DSH-0.1.2-fork修改需求.md
 用法: python patch-dsh-0.1.2-alpha.1.py <快照根目录> [--dry-run]
-      例: python patch-dsh-0.1.2-alpha.1.py D:\\myFiles\\dsh\\dsh-meow0.1.2-alpha.1
+      例: python patch-dsh-0.1.2-alpha.1.py D:\\dsh-snapshot\\dsh-meow0.1.2-alpha.1
 
 覆盖:
   MEOW 条目 3 (M-013 会话事件类型运行时注册面) — 4 处

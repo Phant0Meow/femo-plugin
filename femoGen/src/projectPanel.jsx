@@ -3,7 +3,7 @@
 // ════════════════════════════════════════
 
 import React, { useState, useEffect } from 'react';
-import { Field, PR, inp, btnP, btnS, TYPES } from './common';
+import { Field, inp, btnP } from './common'; // 已注释死导入（观察期 2026-09-26）：PR, btnS, TYPES（未使用）
 
 /** 拉取 dsh 可用模型列表（宿主 /femo-plugin/models，聚合 ctx.llm）。
  * 返回 [models, err]：models = {defaultProvider, providers:[{id, models:[{id}]}]} 或 null。 */
@@ -50,7 +50,7 @@ export function sourceOptions(models, current) {
 function ProjPanel({ proj, actorNames, onChange }) {
   const u = (x) => onChange({ ...proj, ...x });
   // 「输入工具」选中态（按 actor 名）：tools 数组清空时仍保持 custom 态，
-  // 与「未声明」（空数组=剧本未写）区分——否则点选后空数组被误判为未选。
+  // 与「未声明」（空数组=FEMO脚本未写）区分——否则点选后空数组被误判为未选。
   const [customSel, setCustomSel] = useState({});
   // dsh 可用模型列表（source 下拉数据源）
   const [models, modelErr] = useModelList();

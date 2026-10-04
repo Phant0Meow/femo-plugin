@@ -33,11 +33,13 @@ action 发言 @ai(@speaker):
 action 判断 @ai(@主持人):
   prompt: |
     综合两位研究员的发言，分析他们是否达成一致，差异点在哪。
-    最后输出变量赋值：
-    如果他们达成一致，你输出：SET VARIABLE: <<agree = true>>
-    如果他们仍有分歧，你输出：SET VARIABLE: <<agree = false>>
+    最后输出变量赋值（赋值语句必须独占一行才被识别）：
+    如果他们达成一致，你输出赋值信号：
+    SET VARIABLE: <<agree = true>>
+    如果他们仍有分歧，你输出赋值信号：
+    SET VARIABLE: <<agree = false>>
   scope: AImembers
-  out: agree(bool, "是否达成一致")
+  out: agree
 
 action 汇总 @ai(@主持人):
   prompt: |
@@ -49,7 +51,7 @@ action 拍板 @human(@用户):
   prompt: "你批准这个最终方案吗？"
   showprompt: "人类用户请拍板：批准 / 驳回"
   scope: all
-  out: 通过(bool, "是否批准")
+  out: 通过
 
 mainflow:
   [START] -> 开场 -> [pos]       # 不指定action的节点为空节点，空节点名字随意

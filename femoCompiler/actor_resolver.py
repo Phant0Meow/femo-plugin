@@ -14,7 +14,7 @@ _RESERVED_ATTRS = {'type', 'soul', 'source', 'tools', 'name'}
 
 def resolve_actor_var(vm, actors: Dict[str, Any], actor_ref: str) -> str:
     """
-    解析 Actor 类型变量，返回最终的演员实体名（带 @）。
+    解析 Actor 类型变量，返回最终的角色实体名（带 @）。
     例如 @speaker -> @Diana。
     只支持简单的一级变量（赋值时一定是实体名），最多追 10 层链。
     """
@@ -36,7 +36,7 @@ def resolve_actor_var(vm, actors: Dict[str, Any], actor_ref: str) -> str:
                 continue
             else:
                 raise ValueError(
-                    f"Actor 变量 {current!r} 的值不是合法的演员引用，而是 {val!r}"
+                    f"Actor 变量 {current!r} 的值不是合法的角色引用，而是 {val!r}"
                 )
         else:
             raise ValueError(f"未声明的 Actor 引用: {current!r}")
@@ -51,7 +51,7 @@ def resolve_actor_attr(vm, actors: Dict[str, Any], actor_ref: str, attr_name: st
     - 如果 attr_name 是保留属性，直接从 actors 定义获取。
     - 否则，当作字典名，以实体名为键从 vars 中取值。
     """
-    # 1. 解析出真正的演员实体
+    # 1. 解析出真正的角色实体
     if actor_ref not in actors:
         print(f"[actor_resolver] 属性访问遇到变量 {actor_ref!r}，尝试解析")
         actor_ref = resolve_actor_var(vm, actors, actor_ref)

@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.host.json",
+  "compilerOptions": {
+    "typeRoots": ["D:/myFiles/dsh/dsh-src-0.1.7-alpha.2/node_modules/@types"]
+  }
+}

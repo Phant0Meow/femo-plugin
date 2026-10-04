@@ -1,7 +1,7 @@
 # DSH 0.1.2 快照 fork 修改需求书（基于 0.1.2-alpha.1 实测调查）
 
-> **用途**：0.1.2-rc.x 上 npm 后切新快照时，让接手 AI 按本文件**逐条**把新版快照恢复成喵版状态。与快照内 `MEOW_MODIFICATIONS.md`（rc.2 版）配套使用：rc.2 版记录的是"已完成的 diff"，本文件记录的是"0.1.2 上怎么重做"。
-> **调查基线**：官方 tag `dsh-v0.1.2-alpha.1`（HEAD = cd5ef81 Merge PR #3248），源码 clone 于 `D:\myFiles\dsh\_review\dsh-alpha-0.1.2`（对照核验用，保留勿删）。
+> **用途**：0.1.2-rc.x 上 npm 后切新快照时，让接手 AI 按本文件**逐条**把新版快照恢复成喵版状态。与快照内 `MEOW_MODIFICATIONS.md`（rc.2 版）配套使用：rc.2 版记录的是"已完成的 diff"，本文件记录的是"0.1.2 上怎么重做"。（`MEOW_MODIFICATIONS.md` 是作者的改动笔记，只存于私有源仓，不随本仓发布。）
+> **调查基线**：官方 tag `dsh-v0.1.2-alpha.1`（HEAD = cd5ef81 Merge PR #3248），源码 clone 于本地存档目录 `<你的存档目录>/dsh-alpha-0.1.2`（对照核验用，保留勿删）。
 > **调查方法**：本地双仓库逐符号核验（rc.2 快照 vs alpha clone），全部行号/原文来自 alpha 实读，非推测。
 > **⚠️ 行号免责**：行号以 alpha.1 为准；rc.x 落地后如对不上，按文中给出的**符号搜索词**重新定位（机制面大概率稳定，行号会漂移）。
 > **红线路径**：`packages/core/session/src/known-event-types.ts` 是**生成文件**（`scripts/gen-persistence-catalog.ts` 生成、`pnpm run verify-persistence-catalog` 校验新鲜度）——**严禁手改**（M-004 的教训：手改行会被 revert 且校验报不新鲜）。所有扩展一律走运行时注册面（本文件条目 3）。
@@ -132,7 +132,7 @@ export function isKnownSessionEventType(type: string): boolean {
 - **为什么**：注册面是运行时行为，必须有契约测试钉住（disposer 移除注册后重新拒绝，证明 HMR 安全）。
 
 ### 应用方法与验证
-1. 手改四处（浅克隆无 cherry-pick；可对照 rc.2 快照 `git -C D:\myFiles\dsh\dsh-meow0.1.1-rc.2 show 57662a0` 取原 diff）。
+1. 手改四处（浅克隆无 cherry-pick；可对照 rc.2 快照 `git -C <喵版快照目录> show 57662a0` 取原 diff）。
 2. 验证：`pnpm run test packages/session/session-persistence`（rc.2 版为 505/509 过，sqlite symlink EPERM 为环境性失败与本题无关）；`pnpm run verify-persistence-catalog`（确认没碰生成文件）；3081 起后开一个含 `femo-plugin/chat` 的旧 Femo 会话，历史正常加载即成功。
 
 ---
@@ -149,7 +149,7 @@ rc.2 的 `parseDshArgs` 在 `apps/cli/src/bin.ts`；**alpha 里搬到了 `apps/c
 - **位置**：`apps/cli/src/bin.ts`，`parseDshArgs(...)` 调用之后（L24 附近；或按 dda82f7 原风格放进 args.ts，二选一以最小 diff 为准）。
 - **改法**：守卫块原样（代码见 rc.2 提交 `dda82f7`）：解析 home 与官方默认比较（Windows 忽略大小写），相同则打印 `dsh-meow: DSH_HOME is unset...` 并 `process.exit(1)`。
 - **依赖确认**：`@deepseek-ai/dsh-home-paths` 在 alpha 存在且被使用（`apps/cli/src/profile-boot.ts` L32 就有 `import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'`），import 无障碍。
-- **验证**：清空 DSH_HOME 裸跑应报错退出；设 `DSH_HOME=D:\myFiles\dsh\dsh-home` 正常启动。
+- **验证**：清空 DSH_HOME 裸跑应报错退出；设 `DSH_HOME=<你的 dsh 家目录>` 正常启动。
 
 ---
 

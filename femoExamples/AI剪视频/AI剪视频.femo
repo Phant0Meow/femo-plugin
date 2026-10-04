@@ -23,7 +23,7 @@ action 提文案 @human(@用户):
     注意：后续所有工作都基于文案，强烈建议这一步用心打磨，后面就别改了。因为后面再改文案会很麻烦。
   scope: all
   out:
-    textPass(bool, "文案是否定稿")
+    textPass
 
 action 写文案 @ai(@剪辑师):
   prompt: |
@@ -50,7 +50,7 @@ action 审配音 @human(@用户):
     如果没问题，请输出：SET VARIABLE: <<voicePass = true>>
   scope: all
   out:
-    voicePass(bool, "配音是否过关")
+    voicePass
 
 action 生成设计稿 @ai(@剪辑师):
   prompt: |
@@ -76,7 +76,7 @@ action 审设计稿 @human(@用户):
     确认没问题准备进行下一步时，请输出：SET VARIABLE: <<designPass = true>>
   scope: all
   out:
-    designPass(bool, "设计稿是否定稿")
+    designPass
 
 action 生成图 @ai(@剪辑师):
   prompt: |
@@ -95,7 +95,7 @@ action 图片落实 @human(@用户):
     最终所有素材确定时，请输出：SET VARIABLE: <<picPass = true>>
   scope: all
   out:
-    picPass(bool, "素材是否齐了")
+    picPass
 
 action 调整设计稿 @ai(@剪辑师):
   prompt: |
@@ -111,7 +111,7 @@ action 调整至定稿 @human(@用户):
     如果确认定稿，请输出：SET VARIABLE: <<yes = true>>
   scope: all
   out:
-    yes(bool, "是否定稿开剪")
+    yes
 
 action 开剪 @ai(@剪辑师):
   prompt: |

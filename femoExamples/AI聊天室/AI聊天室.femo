@@ -1,0 +1,74 @@
+﻿# 群聊室：单循环轮替发言（不与上一位重复），沉默 n+2 轮保底必发言，无限循环
+
+meta:
+  name = AI群聊
+  version = 1.0
+  session = new
+  preamble = "﻿# 群聊室：单循环轮替发言（不与上一位重复），沉默 n+2 轮保底必发言，无限循环"
+
+actors:
+  ai @DeepSeek = soul:ai1
+  ai @GLM = soul:ai2
+  ai @豆包 = soul:ai3
+  ai @Kimi = soul:ai4
+  ai @GPT = soul:ai5
+  ai @千问 = soul:ai6
+  human @人类 = soul:human
+
+code:
+  WAIT = file:"D:\myFiles\dsh\femo-plugin\femoExamples\AI聊天室\random_wait_time.py"
+
+action 人类发言 @human(@人类):
+  prompt: |
+    "请在群聊中自由发言……"
+  scope: all
+
+module 群聊:
+  vars:
+    @speaker = ""
+    ai_members = [@DeepSeek, @GLM, @豆包]
+    沉默轮数 = {@DeepSeek: 0, @GLM: 0, @豆包: 0}
+
+  action 随机等一会儿并选AI发言 @func(WAIT.pick_next_speaker):
+    in:
+      ais = ai_members
+      last_speaker = @speaker
+      silence = 沉默轮数
+    out:
+      @speaker, 沉默轮数
+
+  action AI发言 @ai(@speaker):
+    prompt: |
+      "你是{@speaker}，在群聊里自由发言，想聊什么聊什么。"
+    scope: all
+
+  flow:
+    [IN] -> [随机等一会儿并选AI发言]: 随机等一会儿并选AI发言 -> [AI发言]: AI发言 -> [IN]
+
+#  sketch:
+#    [随机等一会儿并选AI发言] = 309, -55
+#    [AI发言] = 309, 42
+
+mainflow:
+  [群聊]: &群聊
+  [人类发言]: 人类发言
+  [hub]: 
+  [群聊环]: 
+  [人类环]: 
+
+  [START] -> [hub]
+  [hub] -> fork:
+    -> [群聊环]
+    -> [人类环]
+  [群聊环] -> [群聊]
+  [群聊] -> [群聊环]
+  [人类环] -> [人类发言]
+  [人类发言] -> [人类环]
+
+#sketch:
+#  [END] = 600, 200
+#  [群聊] = 147, 175
+#  [人类发言] = 468, -10
+#  [hub] = 157, 0
+#  [群聊环] = 157, 91
+#  [人类环] = 313, 0

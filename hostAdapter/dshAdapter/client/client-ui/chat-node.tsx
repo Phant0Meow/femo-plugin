@@ -2,7 +2,7 @@
  * client-ui/chat-node.tsx — femo-plugin/chat 会话节点（定义 + 渲染视图）。
  *
  * 每个 femo-plugin/chat 事件渲染为一行聊天：speaker 名字行（兼流式直播锚点）、
- * role 气泡、notice/sys 居中灰字、prompt 舞台提示条、human_wait 高亮框、
+ * role 气泡、notice/sys 居中灰字、prompt 运行提示条、human_wait 高亮框、
  * error 红行、tool_call 单行摘要。视角过滤（offstage/god/角色 scope）在
  * 渲染层完成。
  * （2026-08-26 结构整理自 client.tsx 原样迁出，行为零变化。）
@@ -33,7 +33,7 @@ export interface FemoChatData {
   readonly visible?: readonly string[]
   readonly seq: number
   /** stream-host 专属：锚定的镜像 turn 号（重映射后），Deep diving 按
-   * 该 turn 的 open 状态显示（多演员并发时各自 turn 各自判定）。 */
+   * 该 turn 的 open 状态显示（多角色并发时各自 turn 各自判定）。 */
   readonly turn?: number
 }
 
@@ -108,7 +108,8 @@ export const femoChatDefinition: ConversationNodeDefinition<FemoChatData> = {
   match: (event) => {
     // 'femo-plugin/chat' = pre 2026-09-12 femo→femo rename history; kept
     // renderable so old session logs display identically to new ones.
-    if (event.type === 'femo-plugin/chat' || event.type === 'femo-plugin/chat') {
+    // （原两臂同款条件：改名前后两个事件名，改名完成后收敛为单臂——刀⑧-3。）
+    if (event.type === 'femo-plugin/chat') {
       const d = event.data as FemoChatData
       // 【V5 让位】带 turn 的新版 speaker 由 femo-turn-head 节点接管渲染
       // （head 动态吸附段落头，恒贴内容）；无 turn 的旧 speaker 保留本行渲染。
@@ -119,11 +120,13 @@ export const femoChatDefinition: ConversationNodeDefinition<FemoChatData> = {
       if (d.kind === 'prompt' && typeof (event.data as { turn?: unknown }).turn === 'number') return null
       // 【2026-09-10 让位】带 turn 的回合失败行由 femo-turn-head 接管（名字行
       // 下方红色失败条，归属恒正确——官方 turnError 行在 par 交错下会挂错
-      // 演员名下）；无 turn 的 error 行（引擎通知等）保留本行渲染。
+      // 角色名下）；无 turn 的 error 行（引擎通知等）保留本行渲染。
       if (d.kind === 'error' && typeof (event.data as { turn?: unknown }).turn === 'number') return null
       // 【2026-09-10 v7 让位】kind='live' 轻锚是 femo-live-tail 的 start 事件
       // （窗底直播区的定位锚），自身永不渲染为聊天行。
       if (d.kind === 'live') return null
+      // 【链路B 让位】hub 锚行由 femo-hub-anchor 节点渲染（内容接缝挂载点）。
+      if (d.kind === 'hub') return null
       return { id: String(event.seq), role: 'start' }
     }
     return null
@@ -173,10 +176,10 @@ export function FemoChatNodeView({ node, useSession, t }: ChatNodeViewProps<'fem
   // thinking) are god-only, and dialogue lines show only when the actor's
   // scope includes this viewer. Absent `visible` = visible to everyone.
   if (view === 'offstage') {
-    // 戏外视角：主会话=纯 DSH 原生页面（user+主模型），femo 行全部隐藏
-    // （角色行/名字行/引擎通知/等待提示都属戏内，上帝窗承载；也遮住旧版本
+    // FEMO外视角：主会话=纯 DSH 原生页面（user+主模型），femo 行全部隐藏
+    // （角色行/名字行/引擎通知/等待提示都属FEMO内，上帝窗承载；也遮住旧版本
     // 写进主会话的历史残留行）。唯一例外=sys 运行回执（femo-run 动作成功
-    // 的状态条，属戏外系统消息而非戏内内容，host 只写主会话不进投影窗）。
+    // 的状态条，属FEMO外系统消息而非FEMO内内容，host 只写主会话不进投影窗）。
     if (kind !== 'sys') return null
   } else if (view !== 'god') {
     if (kind === 'notice' || kind === 'error' || kind === 'thinking' || kind === 'tool_call') return null
@@ -294,7 +297,7 @@ export function FemoChatNodeView({ node, useSession, t }: ChatNodeViewProps<'fem
   if (actor === HUMAN_ROLE_ACTOR) {
     // 【2026-09-06 猫猫拍板】人类节点发言 UI=dsh 原生 user 气泡样式：右对齐、
     // specific-bubble 底色、22px 圆角——与主窗口 user 消息同观感。语义不变
-    // （仍是戏内 role 行=喂人类节点的发言，非主模型 user 消息）。样式照抄
+    // （仍是FEMO内 role 行=喂人类节点的发言，非主模型 user 消息）。样式照抄
     // ui-conversation chat/MessageItem.module.css 的 userRow+bubble，token 全
     // --dsw（主题自动跟随）；字号沿用投影窗对话流 13px（16px 原值在投影窗
     // 密度下突兀），形状/颜色/对齐与原生一致。

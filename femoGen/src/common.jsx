@@ -4,6 +4,8 @@
 
 import React from 'react';
 import { THEME_CSS } from './themes';
+// 拖拽吸附对齐（纯计算，与 React/DOM 无关）：桌面端 onMM 与手机端 nodeDrag 共用
+import { SNAP_PX, computeSnap, snapAndLink } from './snap';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -113,7 +115,9 @@ const PSW = 90,
   PSH = 36; // Position node size
 
 const TYPES = [
-  { t: 'ai', lbl: '@ai', c: 'var(--femo-primary-strong)', bg: 'var(--femo-type-ai-bg)' },
+  // ai 字/描边色必须跟自己的 type-ai 走、不指 primary：web 主题 primary 是绿，
+  // 指过去会绿字配 ai 蓝底（token 化时代 primary 恰为 ai 蓝的历史遗留，2026-09-30 归位）
+  { t: 'ai', lbl: '@ai', c: 'var(--femo-type-ai)', bg: 'var(--femo-type-ai-bg)' },
   { t: 'human', lbl: '@human', c: 'var(--femo-type-human)', bg: 'var(--femo-success-soft)' },
   { t: 'mind', lbl: '@mind', c: 'var(--femo-type-mind)', bg: 'var(--femo-type-mind-bg)' },
   { t: 'func', lbl: '@func', c: 'var(--femo-type-func)', bg: 'var(--femo-warning-soft)' },
@@ -162,6 +166,8 @@ function getNodeSize(node) {
 
 
 // ═══ SMART PORT CALCULATION ═══
+// preferDifferent 已弃用（2026-09-19）：曾经让环边避开最优端口，实测是回边/PAR
+// 线束扭曲的根因，所有调用点已改为默认值；参数保留仅为兼容旧签名。
 function getSmartPorts(srcNode, tgtNode, preferDifferent = false, occupiedSrcDirs = new Set(), occupiedTgtDirs = new Set()) {
   const ss = getNodeSize(srcNode);
   const ts = getNodeSize(tgtNode);
@@ -235,23 +241,78 @@ function getSmartPorts(srcNode, tgtNode, preferDifferent = false, occupiedSrcDir
 }
 
 // ═══ SMART BEZIER — 控制点提取 ═══
+// 2026-09-19 曲线手感重做。旧版两端共用一个硬夹 offset（max(40, min(dist*0.4, 120))）：
+// 短边鼓包（40px 最小臂超过边长一半）、长边僵直（120px 上限转不动）、对向连接交叉成大 S 弯。
+// 新版规则：
+//  1. 臂长 = 端点沿自身行进方向投影的一半，不设上限——长边自然拉直；
+//  2. BEZ_MIN_ARM 最小伸出量，保证出节点后方向可读再转弯；
+//  3. 垂直拐角（行进方向一横一竖）：取两条行进线的交点为肘点，两侧控制点
+//     对称等距，肘部是圆角（半径封顶 BEZ_ELBOW_MAX）而不是折角或大 S 弯；
+//     肘点不在行进前方（钩形绕行，环边常见）时保持正臂长自然绕行；
+//  4. 同轴同向（两控制点在同一条轴线上相向铺开，含端口面对面、同向错位 jog）
+//     总伸出超过轴距时按比例压缩——短边依旧笔直，不会互相穿过；背对/绕行不压缩。
+const EDGE_DIR_VEC = {
+  right:  { x: 1, y: 0 },
+  left:   { x: -1, y: 0 },
+  bottom: { x: 0, y: 1 },
+  top:    { x: 0, y: -1 },
+};
+const BEZ_MIN_ARM = 32;   // 离开节点的最小伸出量（画布 px）
+const BEZ_ELBOW_PAD = 38; // 拐角/绕行时在最小臂上额外加的余量，值越大肘前肘后过渡越从容
+const BEZ_ELBOW_MAX = 80; // 垂直拐角圆角半径上限
+
+const _isAxis = (v) => (v.x === 0) !== (v.y === 0);
+
 function getControlPoints(x1, y1, dir1, x2, y2, dir2) {
-  const dist = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
-  const offset = Math.max(40, Math.min(dist * 0.4, 120));
-  let cx1 = x1, cy1 = y1, cx2 = x2, cy2 = y2;
-  switch (dir1) {
-    case 'right':  cx1 = x1 + offset; break;
-    case 'left':   cx1 = x1 - offset; break;
-    case 'bottom': cy1 = y1 + offset; break;
-    case 'top':    cy1 = y1 - offset; break;
+  const len = Math.hypot(x2 - x1, y2 - y1) || 1;
+  // 行进方向：出端 u1 = 端口外法线；入端 u2 = 外法线取反（进节点时的行进方向）。
+  // center（for_out 圆口）等未指定方向回退为起终连线方向，曲线从圆口自然展开。
+  const u1 = EDGE_DIR_VEC[dir1] || { x: (x2 - x1) / len, y: (y2 - y1) / len };
+  const out2 = EDGE_DIR_VEC[dir2];
+  const u2 = out2 ? { x: -out2.x, y: -out2.y } : { x: (x2 - x1) / len, y: (y2 - y1) / len };
+  const proj1 = (x2 - x1) * u1.x + (y2 - y1) * u1.y; // 终点在出线方向上的投影
+  const proj2 = (x2 - x1) * u2.x + (y2 - y1) * u2.y; // 起点在入线方向上的投影
+  const perp = _isAxis(u1) && _isAxis(out2) && u1.x * u2.x + u1.y * u2.y === 0;
+  let arm1 = Math.max(BEZ_MIN_ARM, proj1 * 0.5) + (perp ? BEZ_ELBOW_PAD : 0);
+  let arm2 = Math.max(BEZ_MIN_ARM, proj2 * 0.5) + (perp ? BEZ_ELBOW_PAD : 0);
+  if (perp) {
+    // 垂直拐角：肘点 C = u1 行进线 ∩ u2 行进线。C 同时位于两段行进的前方时，
+    // 两侧控制点对称取 a = min(arm1, arm2, run1, run2, BEZ_ELBOW_MAX)，
+    // 得到绕 C 的对称圆角肘，控制点互不越界、不会反折出 S 弯；
+    // C 不在前方（钩形绕行）时不走肘部公式，保持正臂长绕过目标再沿行进方向进场。
+    const u1Horiz = u1.x !== 0;
+    const leg1Ahead = u1Horiz ? (x2 - x1) * u1.x > 0 : (y2 - y1) * u1.y > 0;
+    const leg2Ahead = u1Horiz ? (y2 - y1) * u2.y > 0 : (x2 - x1) * u2.x > 0;
+    if (leg1Ahead && leg2Ahead) {
+      const run1 = Math.abs(u1Horiz ? x2 - x1 : y2 - y1); // p0 → C 沿 u1
+      const run2 = Math.abs(u1Horiz ? y2 - y1 : x2 - x1); // C → p3 沿 u2
+      const cx = u1Horiz ? x2 : x1;
+      const cy = u1Horiz ? y1 : y2;
+      const a = Math.min(arm1, arm2, run1, run2, BEZ_ELBOW_MAX);
+      return {
+        p0: { x: x1, y: y1 },
+        p1: { x: cx - u1.x * a, y: cy - u1.y * a },
+        p2: { x: cx + u2.x * a, y: cy + u2.y * a },
+        p3: { x: x2, y: y2 },
+      };
+    }
+  } else if (proj1 > 0 && proj2 > 0) {
+    // 同轴同向：两控制点在同一条轴线上相向铺开，总伸出超过轴距时按比例压缩，
+    // 避免互相穿过把直线鼓成 S 弯。
+    const gap = Math.min(proj1, proj2);
+    if (gap > 0 && arm1 + arm2 > gap) {
+      const k = gap / (arm1 + arm2);
+      arm1 *= k;
+      arm2 *= k;
+    }
   }
-  switch (dir2) {
-    case 'left':   cx2 = x2 - offset; break;
-    case 'right':  cx2 = x2 + offset; break;
-    case 'top':    cy2 = y2 - offset; break;
-    case 'bottom': cy2 = y2 + offset; break;
-  }
-  return { p0: { x: x1, y: y1 }, p1: { x: cx1, y: cy1 }, p2: { x: cx2, y: cy2 }, p3: { x: x2, y: y2 } };
+  return {
+    p0: { x: x1, y: y1 },
+    p1: { x: x1 + u1.x * arm1, y: y1 + u1.y * arm1 },
+    // 入端控制点在端口外侧、沿行进方向的反向放置（曲线沿 u2 方向进场）
+    p2: { x: x2 - u2.x * arm2, y: y2 - u2.y * arm2 },
+    p3: { x: x2, y: y2 },
+  };
 }
 
 // ═══ SMART BEZIER — 路径字符串（向后兼容） ═══
@@ -321,7 +382,11 @@ function computeEdgeGeometry(edge, srcNode, tgtNode, options) {
   //  'isCycleEdge=', isCycleEdge, 'isParEdge=', isParEdge);
 
   // 1. 智能端口选择
-  let { srcPort, tgtPort, srcDir, tgtDir } = getSmartPorts(srcNode, tgtNode, isCycleEdge);
+  // 2026-09-19：环边不再 preferDifferent（避开最优端口）——这是回边/PAR 线束
+  // 扭曲成麻花的根因（for 一进一出、par 整条环路路径含内部 action 边全部中招）。
+  // 现在环边与普通边一样选最优端口；同廊道的对向边由 portEdgeGroupMap 的
+  // ±offset 自动分成平行双车道，不会重叠。
+  let { srcPort, tgtPort, srcDir, tgtDir } = getSmartPorts(srcNode, tgtNode);
   // console.log('[computeEdgeGeometry] getSmartPorts:', { srcPort, tgtPort, srcDir, tgtDir });
 
   // 2. for_out 特殊端口：强制为节点中心
@@ -532,7 +597,7 @@ const btnS = {
 function F({ label, hint, children }) {
   return (
     // flex: 1 + minWidth: 0：并排字段（如 Version/Owner）在 flex 行里自动
-    // 平分宽度；block 父级下 flex 属性不生效，单列布局不受影响。
+    // 平分宽度；block 母级下 flex 属性不生效，单列布局不受影响。
     <div style={{ marginBottom: 13, flex: 1, minWidth: 0 }}>
       <div
         style={{
@@ -673,6 +738,7 @@ function makeDefaultNodes(mode) {
 }
 
 // ═══ NAME UNIQUENESS HELPER ═══
+/* ═══ 已退役（观察期起 2026-09-26 死代码排查，全仓零引用；观察无误后连块删除）：getAllNames（定义+导出外全仓零引用，构建产物已摇树剔除） ═══
 function getAllNames(lib, proj) {
   const names = new Set();
   (lib?.actions || []).forEach((a) => names.add(a.name));
@@ -683,6 +749,7 @@ function getAllNames(lib, proj) {
   });
   return names;
 }
+═══ 已退役块结束 ═══ */
 
 // ═══ FOR ↔ for_out 拖拽位置联动（桌面端 onMM 与手机端 nodeDrag 共用一份定义） ═══
 // nodes=全量节点数组，draggedNode=被拖节点（含最新引用），(newX,newY)=被拖节点新位置。
@@ -711,5 +778,7 @@ export {
   getNodeSize, getSmartPorts, smartBezier, getControlPoints, bezierMidpoint,
   computeEdgeGeometry,
   findBackEdges, findAllCycleEdges, inp, btnP, btnS, F as Field,
-  PortCircle, PR, makeDefaultNodes, getAllNames, applyForLinkage,
+  PortCircle, PR, makeDefaultNodes, applyForLinkage, // getAllNames 已注释（观察期 2026-09-26 死代码排查）：全仓零引用
+  // 拖拽吸附（snap.js 重导出，调用方统一从 common 取）
+  SNAP_PX, computeSnap, snapAndLink,
 };

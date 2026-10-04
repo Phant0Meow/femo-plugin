@@ -36,7 +36,7 @@ from femoBridges.ContextExample import (
 def _load_file_or_text(value: str, base_dir: str = "") -> str:
     """
     根据新规则加载内容：
-    - file:"path" → 读取文件（绝对路径直接用；相对路径相对 base_dir=剧本目录；
+    - file:"path" → 读取文件（绝对路径直接用；相对路径相对 base_dir=FEMO脚本目录；
       未保存态 base_dir 为空时相对路径报错）
     - "文本" 或 裸文本 → 字面量
     """
@@ -56,10 +56,10 @@ def _load_file_or_text(value: str, base_dir: str = "") -> str:
         elif base_dir:
             full_path = os.path.join(base_dir, filepath)
         else:
-            print(f"[block_collector] ❌ 相对路径需要剧本文件地址: {filepath}")
+            print(f"[block_collector] ❌ 相对路径需要脚本文件地址: {filepath}")
             raise FileNotFoundError(
-                f"相对路径 '{filepath}' 需要剧本文件地址（剧本未保存）。"
-                f"请先「导出 .FEMO」保存剧本，或改用绝对路径。"
+                f"相对路径 '{filepath}' 需要脚本文件地址（脚本未保存）。"
+                f"请先「导出 .FEMO」保存FEMO脚本，或改用绝对路径。"
             )
         if not os.path.exists(full_path):
             print(f"[block_collector] ❌ 文件不存在: {full_path}")
@@ -82,23 +82,26 @@ def _load_file_or_text(value: str, base_dir: str = "") -> str:
 
 
 
-def _parse_method_ref(method_str: str) -> Tuple[Optional[str], Optional[str], dict]:
-    """
-    解析 'module.function' 或 'method_name' 格式的方法引用。
-    返回 (module_name, function_name, kwargs)
-    """
-    if not method_str:
-        return None, None, {}
-    
-    method_str = method_str.strip()
-    
-    # 格式：module.function
-    if '.' in method_str:
-        parts = method_str.split('.', 1)
-        return parts[0], parts[1], {}
-    
-    # 格式：method_name（需要在已注册的方法表中查找）
-    return None, method_str, {}
+# ━━━ 已退役·观察期（2026-09-26 起）━━━ _parse_method_ref：全仓零调用（双窗口交叉扫描+逐项复核），
+# 'module.function' 引用解析已由 parser 侧的对应逻辑承担。无报错数日后整段删除（含本注）。
+# def _parse_method_ref(method_str: str) -> Tuple[Optional[str], Optional[str], dict]:
+#     """
+#     解析 'module.function' 或 'method_name' 格式的方法引用。
+#     返回 (module_name, function_name, kwargs)
+#     """
+#     if not method_str:
+#         return None, None, {}
+#
+#     method_str = method_str.strip()
+#
+#     # 格式：module.function
+#     if '.' in method_str:
+#         parts = method_str.split('.', 1)
+#         return parts[0], parts[1], {}
+#
+#     # 格式：method_name（需要在已注册的方法表中查找）
+#     return None, method_str, {}
+# ━━━ 观察期退役段结束：_parse_method_ref ━━━
 
 
 def _collect_system_blocks(blocks: Dict[str, Any], meta: dict, base_dir: str,
@@ -126,7 +129,7 @@ def _collect_system_blocks(blocks: Dict[str, Any], meta: dict, base_dir: str,
         except Exception as e:
             print(f"[block_collector] ⚠️ 加载 soul 失败: {e}")
 
-    # ── 4. user_info（剧本 owner 信息） ──
+    # ── 4. user_info（FEMO脚本 owner 信息） ──
     blocks['user_info'] = ""
     owners = meta.get('owner', [])
     if owners:
@@ -171,8 +174,8 @@ def collect_blocks(
 
     参数：
         action: 当前 Action 定义对象
-        meta: 剧本 meta 字典
-        actors_def: 剧本 actors 字典
+        meta: FEMO脚本 meta 字典
+        actors_def: FEMO脚本 actors 字典
         var_manager: VarFacade 实例（R2 起：get/set 同名接口，VarManager 退役）
         evaluator: Evaluator 实例（R2 接线：prompt/showprompt 的 {var} 替换统一
                    走 evaluator.interpolate_prompt——修复旧 hasattr 恒 False 导致
@@ -180,11 +183,11 @@ def collect_blocks(
         code_modules: 已加载的 Python 模块字典 {alias: module}
         registered_methods: 已注册的方法字典 {method_name: (module_alias, func_name)}
         session_id: 当前 session ID
-        base_dir: 剧本文件所在目录
+        base_dir: 脚本文件所在目录
         context_mode: 默认上下文拼接模式（full/incremental/first_full_then_
                       incremental）。由调用方传入——DSH 宿主后端在 femo_bridge
                       钉 first_full_then_incremental，直连等老调用方吃默认 full。
-                      只作用于默认 context 路径；剧本显式声明的自定义 context
+                      只作用于默认 context 路径；FEMO脚本显式声明的自定义 context
                       方法优先级更高，不受此参数影响。
 
     返回：
@@ -262,7 +265,7 @@ def collect_blocks(
         # 结构化 soul_id/soul_name/response[+cot/tool_results]
         blocks['context'] = build_session_context_json(session_id, actor_info or {}, context_mode, actors_def)
     elif context_defs:
-        # 没有指定 context 但剧本定义过：用第一个定义的（原行为保留）
+        # 没有指定 context 但FEMO脚本定义过：用第一个定义的（原行为保留）
         first_key = list(context_defs.keys())[0]
         method_def = context_defs[first_key]
         #print(f"[block_collector] 📖 未指定 context，使用第一个: {first_key} → {method_def.module_alias}.{method_def.func_name}")
@@ -324,7 +327,7 @@ def collect_blocks(
             except:
                 pass
     if not user_name:
-        # 如果 actor_info 中没有 user 字段，说明 prompt 来自剧本，使用 [提醒]
+        # 如果 actor_info 中没有 user 字段，说明 prompt 来自FEMO脚本，使用 [提醒]
         if not actor_info or 'user' not in actor_info:
             user_name = '[节点提醒]'
         elif meta.get('owner'):

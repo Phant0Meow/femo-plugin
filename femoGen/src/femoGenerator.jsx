@@ -3,20 +3,20 @@
 // ════════════════════════════════════════
 
 
-import { findBackEdges, findAllCycleEdges, TYPES, SPECIAL_COLORS } from './common';
+import { findBackEdges, findAllCycleEdges } from './common'; // 已注释死导入（观察期 2026-09-26）：TYPES, SPECIAL_COLORS（未使用）
 
 
 // ═══ 自动 vars 规划（图 → 文本）═══
-// action modal 里的 in / out / resolve 参数 / 执行人@ 用到的变量，生成剧本时
+// action modal 里的 in / out / resolve 参数 / 执行人@ 用到的变量，生成FEMO脚本时
 // 自动补 vars 声明（引擎要求变量先声明后赋值，否则运行时报错）：
-//   - action 定义在主画布（path=['mainflow']）→ 补进剧本级 vars:
+//   - action 定义在主画布（path=['mainflow']）→ 补进FEMO脚本级 vars:
 //   - action 定义在模块里 → 补进该模块 vars:
-//   - 变量跨作用域出现（≥2 个模块，或主画布+模块）→ 升级到剧本级 vars，
+//   - 变量跨作用域出现（≥2 个模块，或主画布+模块）→ 升级到FEMO脚本级 vars，
 //     并把各模块里的同名声明拿掉——模块 local 帧会遮蔽全局（帧栈：循环帧 >
 //     模块帧 > __script__），跨作用域的变量留模块副本会让模块内赋值出模块即丢。
 
 // 提取标识符时跳过的词：逻辑/字面量保留词、out 类型与标签字段、列表操作函数、
-// resolve 自动模式的特有参数（这些位置出现的词不是剧本变量）
+// resolve 自动模式的特有参数（这些位置出现的词不是FEMO脚本变量）
 const AUTOVAR_SKIP = new Set([
   'and', 'or', 'not', 'in', 'is',
   'True', 'False', 'None', 'true', 'false', 'TRUE', 'FALSE',
@@ -70,7 +70,7 @@ function collectActionVarUses(a) {
   const push = (raw, dv = '') => { if (raw) uses.push({ raw, dv }); };
 
   // 1) out 变量（每行可逗号分隔多个）：
-  //    name(type, "标签") / dict.@key(type, "") / name = v / name += N / name = add(x)
+  //    name(required) / name(optional) / dict.@key / name = v / name += N / name = add(x)
   String(a.outVars || '').split('\n').forEach((line) => {
     _splitTopLevel(line, ',').forEach((item) => {
       const t = item.trim().replace(/^,+|,+$/g, '');
@@ -124,7 +124,7 @@ function collectActionVarUses(a) {
   return uses;
 }
 
-// 汇总所有 action 的变量需求 → { globalExtra（补进剧本级 vars）,
+// 汇总所有 action 的变量需求 → { globalExtra（补进FEMO脚本级 vars）,
 // moduleVarsById（对应模块调整后的 vars 数组：去掉被提升的、补进新增的）}
 function planAutoVars(proj, libActions, libModules) {
   const actions = libActions || [];
@@ -206,7 +206,7 @@ function planAutoVars(proj, libActions, libModules) {
       return;
     }
 
-    // 跨作用域（主画布参与，或 ≥2 个模块）：升级到剧本级 vars，模块副本一律拿掉
+    // 跨作用域（主画布参与，或 ≥2 个模块）：升级到FEMO脚本级 vars，模块副本一律拿掉
     if (!declaredGlobal.has(id)) {
       // 优先沿用某模块里已有声明的拼写和初值（用户可能已给过有意义的初值）
       let decl = null;
@@ -248,7 +248,7 @@ function planAutoVars(proj, libActions, libModules) {
 
 function buildFEMO(nodes, edges, proj, mode, modName, libModules, libActions) {
   // 文件头原文（meta: 之前的注释）最先回写——parseFEMO 捕获、graphBuilder 透传。
-  // 空画布也要保住它：用户导入的剧本哪怕一个节点都没摆，头注释不能丢。
+  // 空画布也要保住它：用户导入的脚本哪怕一个节点都没摆，头注释不能丢。
   const preamble = (typeof proj?.preamble === 'string' ? proj.preamble : '').replace(/\s+$/, '');
   if (!nodes.length) {
     return preamble ? `${preamble}\n\n# 空画布，请添加节点` : '# 空画布，请添加节点';

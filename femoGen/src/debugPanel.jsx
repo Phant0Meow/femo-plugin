@@ -32,7 +32,15 @@
 //  - 2026-09-11 排版改单行（用户点名，紧接着上一条）：两行制（09-08 r3）
 //    每条占两行太费竖向空间，改回「时间 [来源] 正文」一条内联流，折行续行
 //    顶格（不做表格式分栏对齐）。底色与可整段选中不变。
-//  - 2026-09-11 分页签（用户点名）：『剧本』= 以上全部（运行事件/干跑流水）；
+//  - 2026-09-24 筛选下拉（用户点名）：头部新增「所有/异常（错误+警告）/
+//    关键词」筛选——初版叫「仅错误」，用户追改把 warning 也并入（改名
+//    「异常」）；选关键词即在旁弹出输入框实时过滤（大小写不敏感）。只裁
+//    当前视图：复制跟随筛选（所见即所得），清空/页签计数仍看整页真实数据。
+//  - 2026-09-24 桥心跳定级 info（用户点名）：编译器页的 femo_bridge[trace]
+//    逐帧留痕（rx/tx/done）走 stderr 是刻意设计（stdout 是 NDJSON 协议通道，
+//    往那里打日志正是 TORN_LINE 撕裂成因），不是异常——「异常」筛选不再
+//    把它算异常行，渲染加 [info] 灰标+正文弱化。真正的 stderr 异常行照旧。
+//  - 2026-09-11 分页签（用户点名）：『FEMO脚本』= 以上全部（运行事件/干跑流水）；
 //    『编译器』= 后端编译器/引擎运行时的 stdout print 原文 + stderr（[stderr]
 //    前缀）——宿主 src/bridge.ts / src/debug-run.ts 逐行转发进 diag-feed
 //    （tag 'engine'），前端经 SSE femo_diag 实时收 + 开面板时 GET
@@ -77,6 +85,11 @@ const fmtTime = (ts) => {
 // 不会被误判成级别。
 const HOST_LEVEL_RE = /^\[(log|info|warn|error)\]\s*/;
 
+// 桥的诊断心跳（femo_bridge.py _trace 的固定前缀，2026-09-23 观测插桩）：
+// rx/tx/done 逐帧留痕，刻意走 stderr（stdout 是协议通道）——定级 info，
+// 不算异常行、渲染弱化，别让法证面把日志刷成一片红。
+const BRIDGE_TRACE_RE = /femo_bridge\[trace\]:/;
+
 function DebugPanel({
   entries,
   onClose,
@@ -93,7 +106,7 @@ function DebugPanel({
   hostEntries = [],
   onClearHost,
 }) {
-  // 页签选择是本面板的 UI 私事，不上抛给宿主；默认停在『剧本』（原有信息）。
+  // 页签选择是本面板的 UI 私事，不上抛给宿主；默认停在『FEMO脚本』（原有信息）。
   const [tab, setTab] = useState('script');
   const errorCount = useMemo(
     () => entries.filter((e) => e.level === 'error').length,
@@ -107,18 +120,52 @@ function DebugPanel({
     () => hostEntries.filter((e) => /^\[error\]/.test(e.text || '')).length,
     [hostEntries]
   );
-  // 四页的清单/清除/计数一次列清——加页时只动这里，避免各处 if 分支漂移。
+  // ── 日志筛选（2026-09-24 用户点名）─────────────────────────────────────
+  // 'all' 全显 / 'error' 只看异常行（error+warn 同显——用户追改：警告也算
+  // 进去）/ 'keyword' 只看含关键词的行（大小写不敏感子串，空词=全显）。
+  // 各页「异常行」口径：FEMO脚本/FEMOGen=e.level 字段（error|warn）；Host=行首
+  // [error]/[warn] 标记（渲染分支同口径预解析）；编译器=引擎 stderr
+  // （[stderr] 前缀行——stdout 本无级别概念，stderr 即异常）。关键词对全文
+  // 匹配，脚本页连带来源 kind 一并入 hay。筛选只裁「当前视图」：复制跟随
+  // （所见即所得），清空/页签计数仍看整页真实数据。
+  const [filterMode, setFilterMode] = useState('all');
+  const [filterKw, setFilterKw] = useState('');
+  const filterKwNorm = filterMode === 'keyword' ? filterKw.trim().toLowerCase() : '';
+  const passFilter = useCallback((e, page) => {
+    if (filterMode === 'error') {
+      if (page === 'compiler') {
+        // 桥心跳定级 info（2026-09-24）：不算异常行，别的心算 stderr=异常
+        if (BRIDGE_TRACE_RE.test(e.text || '')) return false;
+        return /\[stderr\]/.test(e.text || '');
+      }
+      if (page === 'host') return /^\[(error|warn)\]/.test(e.text || '');
+      return e.level === 'error' || e.level === 'warn';
+    }
+    if (filterMode === 'keyword') {
+      if (!filterKwNorm) return true;
+      const hay = page === 'script' ? `${e.kind || ''} ${e.text || ''}` : (e.text || '');
+      return hay.toLowerCase().includes(filterKwNorm);
+    }
+    return true;
+  }, [filterMode, filterKwNorm]);
+  const scriptView = useMemo(() => entries.filter((e) => passFilter(e, 'script')), [entries, passFilter]);
+  const compilerView = useMemo(() => compilerEntries.filter((e) => passFilter(e, 'compiler')), [compilerEntries, passFilter]);
+  const femogenView = useMemo(() => femogenEntries.filter((e) => passFilter(e, 'femogen')), [femogenEntries, passFilter]);
+  const hostView = useMemo(() => hostEntries.filter((e) => passFilter(e, 'host')), [hostEntries, passFilter]);
+  const hasFilter = filterMode === 'error' || (filterMode === 'keyword' && filterKwNorm.length > 0);
+  // 四页的清单/视图/清除/计数一次列清——加页时只动这里，避免各处 if 分支漂移。
+  // view=筛选后的可见行（渲染+复制走它），list=整页真实数据（清空/计数走它）。
   const TABS = [
-    { id: 'script', label: '剧本', list: entries, clear: onClear, errors: errorCount,
-      title: '剧本页：运行事件与干跑流水',
-      clearTitle: '清空剧本页的日志' },
-    { id: 'compiler', label: '编译器', list: compilerEntries, clear: onClearCompiler, errors: 0,
+    { id: 'script', label: '脚本', list: entries, view: scriptView, clear: onClear, errors: errorCount,
+      title: '脚本页：运行事件与干跑流水',
+      clearTitle: '清空脚本页的日志' },
+    { id: 'compiler', label: '编译器', list: compilerEntries, view: compilerView, clear: onClearCompiler, errors: 0,
       title: '编译器页：引擎（编译器/运行时）打印的原始日志，含标准输出与错误信息',
       clearTitle: '清空编译器页的输出' },
-    { id: 'femogen', label: 'FEMOGen', list: femogenEntries, clear: onClearFemogen, errors: femogenErrorCount,
+    { id: 'femogen', label: 'FEMOGen', list: femogenEntries, view: femogenView, clear: onClearFemogen, errors: femogenErrorCount,
       title: 'FEMOGen 页：femoGen 页面自身产生的日志（log / warn / error）',
       clearTitle: '清空 FEMOGen 页的前端日志' },
-    { id: 'host', label: 'Host', list: hostEntries, clear: onClearHost, errors: hostErrorCount,
+    { id: 'host', label: 'Host', list: hostEntries, view: hostView, clear: onClearHost, errors: hostErrorCount,
       title: 'Host 页：投影窗、会话等宿主侧功能打印的日志',
       clearTitle: '清空 Host 页的宿主日志' },
   ];
@@ -127,16 +174,19 @@ function DebugPanel({
   const isFemogen = active.id === 'femogen';
   const isHost = active.id === 'host';
   // 复制/清空一律作用于**当前这一页**的列表——跨页操作会让人误以为清掉了别处。
-  const activeList = active.list;
+  // 2026-09-24 起复制跟随筛选（所见即所得=复制当前可见行）；清空仍清整页，
+  // 置灰看真实条数（activeReal），不因筛空而误置灰。
+  const activeView = active.view;
+  const activeReal = active.list;
   const clearActive = active.clear;
   const canClear = typeof clearActive === 'function';
-  // 复制全部（2026-09-08 取代清空）：剧本页 [时间][级别] 来源: 全文；编译器页
+  // 复制全部（2026-09-08 取代清空）：脚本页 [时间][级别] 来源: 全文；编译器页
   // 引擎 print 无级别概念，只 [时间] 原文；FEMOGen 页 [时间][console 方法] 文本。
   // 一条一行。非 https/localhost 场景 navigator.clipboard 可能缺席 → 回退 execCommand。
   const [copied, setCopied] = useState(false);
   const copyAll = useCallback(() => {
-    if (activeList.length === 0) return;
-    const text = activeList
+    if (activeView.length === 0) return;
+    const text = activeView
       .map((e) =>
         isCompiler || isHost
           ? `[${fmtTime(e.ts)}] ${e.text}`
@@ -166,7 +216,7 @@ function DebugPanel({
     } else {
       fallbackCopy();
     }
-  }, [activeList, isCompiler]);
+  }, [activeView, isCompiler]);
 
   // 行样式（两页共用，2026-09-11 提出来避免两处各写一份漂移）：
   // 容器一次定死内边距/圆角/折行/字号——注意 fontSize+lineHeight 必须留在
@@ -196,6 +246,21 @@ function DebugPanel({
   };
   // 编译器页正文：引擎 print 无级别，一律常规色、无底色。
   const compilerTextSt = { ...monoText, color: 'var(--femo-text-2)' };
+  // 筛选后空态（2026-09-24）：页面有数据但当前筛选一行不剩——与「真的没有
+  // 日志」的空态区分开，免得误以为日志丢了。
+  const filterEmptySt = {
+    fontSize: 10.5,
+    color: 'var(--femo-text-4-weak)',
+    lineHeight: 1.8,
+    padding: '8px 2px',
+  };
+  const filterEmptyRow = (
+    <div style={filterEmptySt}>
+      当前筛选下没有匹配的日志。
+      <br />
+      把筛选切回「所有」，或清空关键词，即可恢复显示。
+    </div>
+  );
 
   return (
     <div
@@ -203,20 +268,22 @@ function DebugPanel({
         position: 'absolute',
         inset: 0,
         zIndex: 30,
-        background: 'var(--femo-panel-bg)',
+        background: 'var(--femo-debug-bg)',
         borderRight: 'var(--femo-border-w) solid var(--femo-border-strong)',
         display: 'flex',
         flexDirection: 'column',
         minHeight: 0,
       }}
     >
-      {/* 头部：标题 + 错误计数 + 编译 + 复制 + 清空 + 关闭 */}
+      {/* 头部：标题 + 错误计数 + 编译 + 复制 + 筛选 + 清空 + 关闭
+          （2026-09-24 起带筛选下拉，选关键词时旁挂输入框；窄面板放不下自动折行） */}
       <div
         style={{
           padding: '10px 12px',
           borderBottom: 'var(--femo-border-w) solid var(--femo-border)',
           display: 'flex',
           alignItems: 'center',
+          flexWrap: 'wrap',
           gap: 6,
           flexShrink: 0,
         }}
@@ -231,7 +298,7 @@ function DebugPanel({
         >
           调试
         </span>
-        {/* 错误计数徽标 2026-09-11 挪到「剧本」页签上（跟内容同页更直观） */}
+        {/* 错误计数徽标 2026-09-11 挪到「FEMO脚本」页签上（跟内容同页更直观） */}
         <span style={{ flex: 1 }} />
         {/* 编译（2026-09-08）：零 token 编译干跑，日志直接流到本面板。
             蓝底主色——面板头部唯一的主操作，与右侧次级「复制」形成层级。 */}
@@ -258,13 +325,13 @@ function DebugPanel({
         )}
         <button
           onClick={copyAll}
-          disabled={activeList.length === 0}
+          disabled={activeView.length === 0}
           title={
-            activeList.length === 0
-              ? '当前页暂无可复制的日志'
-              : isCompiler
-                ? '复制当前页（编译器）全部输出'
-                : '复制当前页（剧本）全部日志（时间 / 级别 / 来源 / 全文）'
+            activeView.length === 0
+              ? (activeReal.length === 0 ? '当前页暂无可复制的日志' : '当前筛选下没有匹配的日志可复制')
+              : hasFilter
+                ? `复制当前页（${active.label}）当前可见的日志（跟随筛选）`
+                : `复制当前页（${active.label}）全部日志（时间 / 级别 / 来源 / 全文）`
           }
           style={{
             padding: '3px 8px',
@@ -274,9 +341,9 @@ function DebugPanel({
             color: copied ? 'var(--femo-success-strong)' : 'var(--femo-text-2)',
             fontSize: 10,
             fontWeight: 700,
-            cursor: activeList.length === 0 ? 'default' : 'pointer',
+            cursor: activeView.length === 0 ? 'default' : 'pointer',
             fontFamily: 'var(--femo-font-sans)',
-            opacity: activeList.length === 0 ? 0.5 : 1,
+            opacity: activeView.length === 0 ? 0.5 : 1,
           }}
         >
           {copied ? '已复制' : '复制'}
@@ -286,8 +353,8 @@ function DebugPanel({
         {canClear && (
           <button
             onClick={clearActive}
-            disabled={activeList.length === 0}
-            title={activeList.length === 0 ? '当前页暂无日志可清空' : active.clearTitle}
+            disabled={activeReal.length === 0}
+            title={activeReal.length === 0 ? '当前页暂无日志可清空' : active.clearTitle}
             style={{
               padding: '3px 8px',
               borderRadius: 'var(--femo-radius-md)',
@@ -296,13 +363,56 @@ function DebugPanel({
               color: 'var(--femo-text-2)',
               fontSize: 10,
               fontWeight: 700,
-              cursor: activeList.length === 0 ? 'default' : 'pointer',
+              cursor: activeReal.length === 0 ? 'default' : 'pointer',
               fontFamily: 'var(--femo-font-sans)',
-              opacity: activeList.length === 0 ? 0.5 : 1,
+              opacity: activeReal.length === 0 ? 0.5 : 1,
             }}
           >
             清空
           </button>
+        )}
+        {/* 筛选（2026-09-24 用户点名）：所有 / 仅错误 / 关键词——选关键词即在
+            旁弹出输入框（实时筛选、大小写不敏感；清空输入框=恢复全显）。只裁
+            当前视图：复制跟随筛选，清空/页签计数仍看整页真实数据。 */}
+        <select
+          value={filterMode}
+          onChange={(e) => setFilterMode(e.target.value)}
+          title="日志筛选：所有 / 异常（错误与警告）/ 关键词"
+          style={{
+            padding: '3px 4px',
+            borderRadius: 'var(--femo-radius-md)',
+            border: 'var(--femo-border-w) solid var(--femo-border-strong)',
+            background: 'var(--femo-bg)',
+            color: filterMode === 'all' ? 'var(--femo-text-2)' : 'var(--femo-text-1)',
+            fontSize: 10,
+            fontWeight: 700,
+            fontFamily: 'var(--femo-font-sans)',
+            cursor: 'pointer',
+          }}
+        >
+          <option value="all">所有</option>
+          <option value="error">异常</option>
+          <option value="keyword">关键词</option>
+        </select>
+        {filterMode === 'keyword' && (
+          <input
+            autoFocus
+            value={filterKw}
+            onChange={(e) => setFilterKw(e.target.value)}
+            placeholder="含此关键词…"
+            title="只显示包含该关键词的日志（大小写不敏感；清空输入框=全部显示）"
+            style={{
+              width: 108,
+              padding: '3px 6px',
+              borderRadius: 'var(--femo-radius-md)',
+              border: 'var(--femo-border-w) solid var(--femo-border-strong)',
+              background: 'var(--femo-bg)',
+              color: 'var(--femo-text-1)',
+              fontSize: 10,
+              fontFamily: 'var(--femo-font-sans)',
+              outline: 'none',
+            }}
+          />
         )}
         <button
           onClick={onClose}
@@ -325,7 +435,7 @@ function DebugPanel({
         </button>
       </div>
 
-      {/* 页签条（2026-09-11 用户点名）：『剧本』= 原有运行信息；『编译器』= 后端
+      {/* 页签条（2026-09-11 用户点名）：『FEMO脚本』= 原有运行信息；『编译器』= 后端
           编译器的 print 原文；『FEMOGen』= 前端 femoGen 自己的 console 输出；
           『Host』= 宿主（投影窗这边）本插件代码的 console 输出。各自带条数：
           有错时按原头部徽标口径显示「N 错」（红），无错显示总条数（灰）——
@@ -403,15 +513,26 @@ function DebugPanel({
               <br />
               这里显示引擎（编译器/运行时）打印的原始日志：
               <br />
-              运行或干跑剧本时，标准输出和错误信息（带 [stderr] 前缀）都会实时出现在这里。
+              运行或干跑FEMO脚本时，标准输出和错误信息（带 [stderr] 前缀）都会实时出现在这里。
             </div>
+          ) : compilerView.length === 0 ? (
+            filterEmptyRow
           ) : (
-            compilerEntries.map((e) => (
-              <div key={e.id} style={rowSt}>
-                <span style={timeSt}>{fmtTime(e.ts)}</span>
-                <span style={compilerTextSt}> {e.text}</span>
-              </div>
-            ))
+            compilerView.map((e) => {
+              // 桥心跳（femo_bridge[trace]）定级 info（2026-09-24）：灰 [info]
+              // 标+正文弱化，与真 stderr 异常行一眼可分；[info] 是显示层标记，
+              // 不进 e.text——复制仍是原文（所见即所得不受影响）。
+              const isTrace = BRIDGE_TRACE_RE.test(e.text || '');
+              return (
+                <div key={e.id} style={rowSt}>
+                  <span style={timeSt}>{fmtTime(e.ts)}</span>
+                  {isTrace ? (
+                    <span style={{ ...timeSt, fontWeight: 700, color: 'var(--femo-neutral)' }}> [info]</span>
+                  ) : null}
+                  <span style={isTrace ? { ...compilerTextSt, color: 'var(--femo-text-3)' } : compilerTextSt}> {e.text}</span>
+                </div>
+              );
+            })
           )
         ) : isFemogen ? (
           femogenEntries.length === 0 ? (
@@ -429,9 +550,11 @@ function DebugPanel({
               <br />
               页面运行中随时产生、随时出现在这里。
             </div>
+          ) : femogenView.length === 0 ? (
+            filterEmptyRow
           ) : (
-            femogenEntries.map((e) => {
-              // 级别配色与『剧本』页同源（同 LEVEL_STYLE）：warn 黄底 / error
+            femogenView.map((e) => {
+              // 级别配色与『FEMO脚本』页同源（同 LEVEL_STYLE）：warn 黄底 / error
               // 红底 / log·info 无底色。console 方法名当"来源"栏位显示。
               const st = LEVEL_STYLE[e.level] || LEVEL_STYLE.info;
               const kindSt = { ...timeSt, fontWeight: 700, color: st.dot };
@@ -460,8 +583,10 @@ function DebugPanel({
               <br />
               引擎打印的日志不在这页，请看「编译器」页。
             </div>
+          ) : hostView.length === 0 ? (
+            filterEmptyRow
           ) : (
-            hostEntries.map((e) => {
+            hostView.map((e) => {
               // 行首 [warn]/[error] 标记由宿主 src/host-log.ts 加：同款级别配色，
               // 标记收进"来源"栏，正文不留前缀。
               const m = HOST_LEVEL_RE.exec(e.text || '');
@@ -489,16 +614,18 @@ function DebugPanel({
           >
             暂无运行记录。
             <br />
-            点上方「编译」可零 token 干跑剧本（AI/人类由调试器替答）；
+            点上方「编译」可零 token 干跑FEMO脚本（AI/人类由调试器替答）；
             <br />
             正式运行后，后端的实时事件与报错也会出现在这里。
             <br />
-            剧本 / 编译器 / FEMOGen / Host 四个标签页各有独立的日志，
+            FEMO脚本 / 编译器 / FEMOGen / Host 四个标签页各有独立的日志，
             <br />
             复制和清空按钮只作用于当前所在的标签页。
           </div>
+        ) : scriptView.length === 0 ? (
+          filterEmptyRow
         ) : (
-          entries.map((e) => {
+          scriptView.map((e) => {
             const st = LEVEL_STYLE[e.level] || LEVEL_STYLE.info;
             const text = e.text || '';
             // 单行内联排版（2026-09-11 用户点名，改回 09-08 r3 的两行制）：

@@ -14,11 +14,11 @@ vars/checkpoint.py — per-task 快照编解码（语言层）
 恢复执行模型 = **分支直启**（对比审查吸收）：恢复时不为 root 起协程
 （root 多半已 fork 终止），直接对 positions 中每个 task 起独立分支协程、
 从记录 node_id 执行；该跑哪个 flow 由 def_chain/模块栈顶决定（栈顶为
-剧本级 → mainflow；否则对应模块 flow）。joined 前已签到的 task 随 env
+FEMO脚本级 → mainflow；否则对应模块 flow）。joined 前已签到的 task 随 env
 恢复，凑齐判定不丢签到记录。
 
 旧 checkpoint 数据（合并视图平铺格式）不兼容——已拍板作废，续跑按
-fresh 开演。serialize_var 自含实现（与 task_pause._serialize_var 同逻辑；
+fresh 启动运行。serialize_var 自含实现（与 task_pause._serialize_var 同逻辑；
 语言层不反向依赖执行层——旧四件套 FEMO_checkpoint → task_pause 的坑不重犯；
 接线收尾时 task_pause 反过来改用本函数）。
 """
@@ -92,7 +92,7 @@ def restore_state(data: Dict[str, Any]) -> Tuple[
         got = data.get('version') if isinstance(data, dict) else type(data).__name__
         raise ValueError(
             f"checkpoint 快照版本不符（期望 version {VERSION}，得到 {got}）。"
-            f"旧格式快照已作废，请重新开演。")
+            f"旧格式快照已作废，请重新启动运行。")
     try:
         envs = {tid: deserialize_env(d) for tid, d in data['envs'].items()}
         world = WorldStore(shared_names=frozenset(data.get('shared_names') or []),

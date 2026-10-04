@@ -13,14 +13,14 @@ def wait_30():
     print("[sleep_test] ⏰ 等待结束")
     
 def wait_random():
-    """等待 30 秒后返回"""
+    """等待 几十 秒后返回"""
     t = random.randint(0,100)
     print(f"[sleep_test] 💤 开始等待 {t} 秒...")
     time.sleep(t)
     print("[sleep_test] ⏰ 等待结束")
     
 def wait_10():
-    """等待 30 秒后返回"""
+    """等待 几 秒后返回"""
     t = random.randint(0,10)
     print(f"[sleep_test] 💤 开始等待 {t} 秒...")
     time.sleep(t)

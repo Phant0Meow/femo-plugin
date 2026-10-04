@@ -1,0 +1,800 @@
+/* 结构层：全部组件版式，颜色一律 var() 引 token，禁止裸色值。*/
+/* ═══ 结构层：只管形状与版式，颜色一律 var() ══════════════════════ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: var(--sans); color: var(--ink); font-size: 14px; line-height: 1.7;
+}
+.wrap { position: relative; z-index: 1; max-width: 860px; margin: 0 auto; padding: 0 22px 80px; }   /* 顶上不留白（2026-10-03 用户拍板：顶栏按钮以上的空间去掉，对所有主题生效） */
+
+/* ── 仪典头（节目单封面）────────────────────────────────────────── */
+/* 两个标题的字号随视宽连续缩放（2026-10-03）：clamp 锚点取「640px 处=旧移动端值、
+   宽屏封顶=旧桌面值」，手机（约 412px）落到约 8px / 16px——中英两行在窄屏不再撑满。
+   写在结构层而非主题层：theme.css 只供颜色 token，三主题自动同吃。 */
+.kicker {
+  display: flex; align-items: center; justify-content: center; gap: 16px;
+  font-family: var(--mono); font-size: clamp(7px, 0.88vw + 4.4px, 10px); letter-spacing: .34em; text-transform: uppercase;
+  color: var(--gold); opacity: .92;
+}
+.kicker::before, .kicker::after { content: ''; height: 1px; width: 64px; }
+.kicker::before { background: linear-gradient(90deg, transparent, var(--gold-hi)); }
+.kicker::after { background: linear-gradient(90deg, var(--gold-hi), transparent); }
+h1 {
+  font-family: var(--serif); font-size: clamp(15px, 2.55vw + 5.5px, 28px); font-weight: 400; text-align: center;
+  letter-spacing: .18em; margin: 16px 0 8px; color: var(--ink);
+}
+h1 .amp { color: var(--gold); }
+.sub { text-align: center; color: var(--ink-2); font-size: 13px; }
+
+/* ── 控制台条 + 遥测带 ──────────────────────────────────────────── */
+.console {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+  margin: 26px 0 0; padding: 12px 16px;
+  background: var(--panel-grad);
+  border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: var(--raise-sm);
+}
+.conn {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 11.5px; color: var(--ink-2);
+  padding: 4px 13px; border: 1px solid var(--line-strong); border-radius: 999px;
+  background: var(--surface-raised);
+}
+.conn .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--red); position: relative; flex: none; }
+.conn.on { border-color: var(--teal-dim); }
+.conn.on .dot { background: var(--teal); }
+.conn.on .dot::after {
+  content: ''; position: absolute; inset: -4px; border-radius: 50%;
+  border: 1px solid var(--teal); opacity: 0; animation: ping 2.4s ease-out infinite;
+}
+@keyframes ping { 0% { transform: scale(.45); opacity: .85; } 70%, 100% { transform: scale(1.35); opacity: 0; } }
+.ctl { display: inline-flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 11px; color: var(--ink-3); letter-spacing: .1em; }
+.console .meta2 { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+
+/* ── 主会话面板（2026-09-21）：独立一等面板（控制台之下、遥测带之上，常驻）。
+   每接入宿主一行 = host 名 + 该宿主 FEMO 会话下拉；选中即 ctrl 'bind' 换主
+   session。数据全由 hub ctrl 'sessions' 供给。── */
+.sesspanel {
+  margin: 10px 0 0; padding: 10px 16px 12px;
+  background: var(--panel-grad);
+  border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: var(--raise-sm);
+}
+.sesspanel-head {
+  display: flex; align-items: baseline; gap: 12px; width: 100%;
+  padding: 0 0 8px; background: none; border: 0; border-bottom: 1px solid var(--line);
+  font: inherit; text-align: left; color: inherit; cursor: pointer;
+}
+.sesspanel-title { font-family: var(--mono); font-size: 11px; letter-spacing: .3em; color: var(--gold); }
+.sesspanel-hint { margin-left: auto; font-family: var(--mono); font-size: 10px; color: var(--ink-3); letter-spacing: .08em; }
+/* 折叠（2026-09-27 用户拍板，全主题通用）：面板收成可展开/收起的卡片——点头部
+   翻转，箭头随之转向；收起时底线与余白一并收走，只剩一条标题长条。 */
+.sesspanel-caret {
+  flex: none; align-self: center; margin: 0 0 0 4px;
+  width: 0; height: 0; border: 4px solid transparent; border-top-color: var(--ink-3);
+  transition: transform .15s ease;
+}
+.sesspanel.collapsed { padding-bottom: 10px; }
+.sesspanel.collapsed .sesspanel-head { padding-bottom: 0; border-bottom-color: transparent; }
+.sesspanel.collapsed .sesspanel-body { display: none; }
+.sesspanel.collapsed .sesspanel-caret { transform: rotate(-90deg); }
+.sesspanel-body { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; }
+.sesspanel-body:empty::after { content: '暂无接入宿主。'; font-family: var(--mono); font-size: 11px; color: var(--ink-3); letter-spacing: .1em; }
+.sessrow { display: flex; align-items: center; gap: 12px; }
+.sesshost { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; color: var(--ink-3); min-width: 68px; flex: none; }
+.sessrow .dd { position: relative; flex: 1; min-width: 0; }
+.sessrow .dd-btn { width: 100%; }
+.sessrow .dd-label::before { content: '主 · '; color: var(--gold); font-family: var(--mono); letter-spacing: .1em; }
+.sessempty { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+/* 视角菜单（自绘下拉）：原生 optgroup 的组标在手机上长得像个选项——
+   组标自己画成「线—名—线」分割线，取色走 token，全主题一致。 */
+.dd { position: relative; display: inline-flex; }
+.dd-btn {
+  display: inline-flex; align-items: center; justify-content: space-between; gap: 8px;
+  min-width: 104px; max-width: 220px; text-align: left;
+  font-family: var(--mono); font-size: 12px; color: var(--ink);
+  background: var(--surface-raised); border: 1px solid var(--line-strong);
+  border-radius: 7px; padding: 4px 10px; cursor: pointer; box-shadow: var(--press-in);
+}
+.dd-btn .dd-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dd-btn::after { content: ''; border: 4px solid transparent; border-top-color: currentColor; margin-top: 5px; opacity: .7; }
+.dd-menu {
+  /* 屏幕自适应（2026-09-22）：fixed + JS 逐次定位（attachDropdown 里 place()），
+     开/滚/缩放时按可视区现算——按钮贴边、窗口变形菜单都不出屏；top/left 0 是
+     落位前的静默缺省，菜单只在 hidden 掀开后经 place() 落位才可见。 */
+  position: fixed; top: 0; left: 0; z-index: 40;
+  min-width: 180px; max-width: min(340px, calc(100vw - 24px));
+  max-height: 60vh; overflow-y: auto; padding: 6px;
+  background: var(--dbg-bg); border: 1px solid var(--line-strong); border-radius: 10px;
+  box-shadow: var(--dbg-shadow); backdrop-filter: blur(8px);
+}
+.dd-group {
+  display: flex; align-items: center; gap: 8px; margin: 8px 6px 4px;
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .18em; color: var(--ink-3);
+}
+.dd-group::before, .dd-group::after { content: ''; flex: 1; height: 1px; background: var(--line-strong); }
+.dd-item {
+  display: block; width: 100%; text-align: left; padding: 7px 12px;
+  border: 0; border-radius: 6px; background: transparent; color: var(--ink);
+  font: 12.5px/1.5 var(--sans); cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dd-item:hover { background: var(--gold-faint); }
+.dd-item.on { color: var(--gold-bright); background: var(--gold-faint); }
+/* 场次下拉的宿主签（2026-09-22）：联机共演的多台宿主画成右缘一排小铭牌，
+   主文案纯文本走通用 esc 渲染，签是受控 HTML（名字 esc 过）。触发键同一套：
+   dd-btn 本就 space-between，.dd-side 靠 margin-left:auto 贴住右缘箭头。 */
+.dd-item.dd-flex { display: flex; align-items: center; gap: 10px; }
+.dd-item.dd-flex .dd-main { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.dd-item .dd-side { flex: none; }
+.dd-btn .dd-side { margin-left: auto; }
+.jhosts { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; overflow: hidden; }
+.jhost {
+  font-family: var(--mono); font-size: 9.5px; line-height: 1; letter-spacing: .08em;
+  color: var(--ink-3); background: var(--surface-raised);
+  border: 1px solid var(--line-strong); border-radius: 4px; padding: 2px 5px;
+  white-space: nowrap;   /* 触发键被挤时徽章整体裁切，不允字内折行（手机→竖排） */
+}
+.dd-btn .dd-side { min-width: 0; flex-shrink: 1; overflow: hidden; }
+.stats { display: flex; flex-wrap: wrap; margin: 12px 0 0; }
+.stat {
+  display: inline-flex; align-items: baseline; gap: 7px; padding: 2px 16px;
+  font-family: var(--mono); font-size: 11px;
+}
+.stat:first-child { padding-left: 2px; }
+.stat + .stat { border-left: 1px solid var(--line); }
+.stat i { font-style: normal; color: var(--ink-3); letter-spacing: .12em; }
+.stat b { color: var(--ink); font-weight: 600; }
+
+/* ── 时间轨：左轨一线，节点按类型着色 ───────────────────────────── */
+/* 顶距 12px（2026-10-03 用户拍板「运行开始的上面不要空这么多，对所有主题」）：
+   旧 30px 会与首行 meta 分隔行自己的 26px 顶边距叠成约 65px 大空档；首行是
+   分隔行（运行开始）时不再叠那份呼吸（下条），中段分隔行的 26px 保留。 */
+.tl { margin-top: 12px; }
+.tl > .metaRow:first-child .meta { margin-top: 0; }
+.row { position: relative; display: grid; grid-template-columns: 22px minmax(0, 1fr); column-gap: 14px; padding: 9px 0; }
+.rail { position: relative; }
+.rail::before { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--rail-line); transform: translateX(-.5px); }
+.tl .row:first-child .rail::before { top: 12px; }
+.tl .row:last-child .rail::before { bottom: auto; height: 13px; }
+.pip {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 1;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--bg0); border: 1px solid var(--ink-3);
+}
+.pip.k-gold { border-color: var(--gold); background: var(--gold-faint); box-shadow: var(--glow-gold); }
+.pip.k-teal { border-color: var(--teal); background: var(--teal-faint); box-shadow: var(--glow-teal); }
+.pip.k-amber { border-color: var(--amber); background: var(--amber-faint); }
+.pip.k-red { border-color: var(--red); background: var(--red-faint); box-shadow: var(--glow-red); }
+.pip.k-green { border-color: var(--green); background: var(--green-faint); }
+.pip.k-violet { border-color: var(--violet); background: var(--violet-faint); }
+.cell { min-width: 0; }
+.rowhead {
+  display: flex; align-items: baseline; gap: 8px; margin-bottom: 5px;
+  font-family: var(--mono); font-size: 10px; letter-spacing: .06em; color: var(--ink-3);
+}
+.t { font-family: var(--mono); font-size: 10px; color: var(--ink-3); }
+/* 来源宿主标签（[dsh] / [zcode]）：**host 是角色的字段**（2026-09-19 用户拍板）。
+   ——每一条消息都来自某个宿主，所以每条消息的开头都标它的来源：[dsh]@Eve 读作
+   「这条由 dsh 跑的 @Eve 说的」。前缀只在**渲染层**拼出来——actor/targets 里的
+   名字永远是裸名（往数据里塞前缀会破坏 scope/靶向的基名匹配）。 */
+.hs {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .06em;
+  color: var(--ink-3);
+}
+
+/* ── 卡片族：发丝边玻璃面板 ─────────────────────────────────────── */
+.section {
+  position: relative; padding: 13px 17px;
+  background: var(--card-grad);
+  border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: var(--raise-lg);
+}
+.section::before {  /* 顶缘一线金光：这块是「谁在说话」 */
+  content: ''; position: absolute; top: -1px; left: 16px; right: 16px; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold-hi), transparent);
+}
+.section > * + * { margin-top: 8px; }
+.section.open { border-color: var(--teal-dim); box-shadow: var(--open-halo); }
+/* 名字槽：节目单上的花名——衬线金字。原位渲染纯名字，不拼额外行。
+   2026-09-21 放宽为全局 .who：段名字槽与FEMO外用户气泡的名字行共用一套
+   （用户拍板「用户的名字跟导演的那样式一样」）。.who 只在这两处出现，
+   放宽不波及他处；气泡内补一行间距（.bubble .who）。 */
+.who {
+  font-family: var(--serif); font-size: 13px; font-weight: 600; letter-spacing: .12em;
+  color: var(--gold-bright); display: flex; align-items: center; gap: 9px;
+}
+.who::before { content: ''; width: 5px; height: 5px; flex: none; background: var(--gold); transform: rotate(45deg); opacity: .85; }
+.say { white-space: pre-wrap; word-break: break-word; font-size: 13px; line-height: 1.8; }
+.bubble {
+  padding: 11px 15px; background: var(--card-bg);
+  border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: var(--raise-lg);
+}
+.bubble .bwho { font-family: var(--mono); font-size: 10px; letter-spacing: .1em; color: var(--ink-3); margin-bottom: 4px; }
+.bubble .who { margin-bottom: 7px; }   /* 用户气泡里的金色名字行与正文留一档呼吸 */
+.bubble.live { border-style: dashed; border-color: var(--gold-dim); }
+/* 插件注入（2026-09-21 拍板）：dsh 插件喂进主会话的机器料包（派工回执/重试
+   反馈/停止运行通知），不是用户也不是戏里的话——做成思考链/工具调用同款折叠块，
+   换蓝族（蓝=输入提示，机器指令喂给模型的输入，同一语义）。默认全折。 */
+.plugin {
+  padding: 8px 13px; background: var(--blue-faint);
+  border: 1px solid var(--blue-line); border-left: 2px solid var(--blue-dim); border-radius: 7px;
+  white-space: pre-wrap; word-break: break-word; font-size: 10px; color: var(--ink-2);
+}
+.plugin .fold-head { color: var(--blue); }
+.plugin .tag { color: var(--blue); }
+/* 思考链：暗处的仪表，青光 */
+.cot {
+  padding: 8px 13px; background: var(--teal-faint);
+  border: 1px solid var(--teal-line); border-left: 2px solid var(--teal-dim); border-radius: 7px;
+  white-space: pre-wrap; word-break: break-word; font-size: 10px; color: var(--ink-2);
+}
+.pgap { display: block; }  /* 连续空行折成的段间小垫：pre-wrap 下空行是一整行高，按块定高（2026-09-20 拍板） */
+.cot .pgap { height: 4px; }   /* 思考链：空行高度（10px×1.7=17px）的 1/4 */
+/* 折叠头（思考链/工具调用/工具结果共用；2026-09-20 cot 拍板、2026-09-21 工具两行跟进）：
+   默认全折，点头部展开/收起，正文在 .fold-body。头部颜色随容器（cot 青/tool 绿/toolres 紫）。 */
+.fold-head {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 0; border: 0; background: none;
+  font: inherit; text-align: left; cursor: pointer;
+}
+.cot .fold-head { color: var(--teal); }
+.plugin .fold-head { color: var(--blue); }
+.tool .fold-head { color: var(--green); }
+.tool.toolres .fold-head { color: var(--violet); }
+.fold-head .tag { margin-bottom: 0; }
+.fold-head:focus { outline: none; }
+.fold-caret { margin-left: auto; width: 0; height: 0; border: 4px solid transparent; border-top-color: currentColor; opacity: .55; transition: transform .15s ease; }
+.fold.open .fold-caret { transform: rotate(180deg); }
+.fold:not(.open) .fold-body { display: none; }
+.say .pgap { height: .9em; }
+/* ── 正式发言 Markdown（2026-09-21 拍板）：say 槽与独立 say 气泡渲染 MD。
+   安全姿势：全文先 esc，转换只产出自家标签；代码块整段 esc 不吃转换。
+   色彩纪律：代码=机器语走绿族（与工具同族），链接=蓝，标题=金，其余随墨色。
+   不引外部库——单文件在 http 与 file:// 下都要活着。 ── */
+.md > :first-child { margin-top: 0; }
+.md > :last-child { margin-bottom: 0; }
+.mdp { margin: 7px 0; }
+.md-h { font-weight: 700; color: var(--gold-bright); margin: 12px 0 4px; line-height: 1.5; }
+.md-h1 { font-size: 15.5px; } .md-h2 { font-size: 14.5px; } .md-h3 { font-size: 14px; }
+.md-h4, .md-h5, .md-h6 { font-size: 13.5px; }
+.md-hr { border: 0; border-top: 1px solid var(--line-strong); margin: 10px 0; }
+.mdbq { border-left: 2px solid var(--gold-dim); padding: 1px 0 1px 10px; margin: 7px 0; color: var(--ink-2); }
+.md ul, .md ol { margin: 5px 0; padding-left: 1.6em; }
+.md li { margin: 2px 0; }
+.md li > ul, .md li > ol { margin: 2px 0; }
+.md del { color: var(--ink-3); }
+.md a { color: var(--blue); text-underline-offset: 2px; }
+.mdinline {
+  font-family: var(--mono); font-size: .92em; color: var(--ink);
+  background: var(--green-faint); border: 1px solid var(--green-line); border-radius: 4px; padding: 0 5px;
+}
+.mdcode { margin: 7px 0; background: var(--bg1); border: 1px solid var(--line-strong); border-radius: 7px; overflow: hidden; }
+.mdlang { font-family: var(--mono); font-size: 10px; letter-spacing: .08em; color: var(--green); padding: 5px 12px 4px; border-bottom: 1px solid var(--line); }
+.mdcode pre { margin: 0; padding: 9px 12px; overflow-x: auto; }
+.mdcode code { font-family: var(--mono); font-size: 11.5px; color: var(--ink); white-space: pre; }
+.mdtabwrap { overflow-x: auto; margin: 7px 0; }
+.mdtable { border-collapse: collapse; font-size: 12.5px; }
+.mdtable th, .mdtable td { border: 1px solid var(--line-strong); padding: 3px 10px; text-align: left; vertical-align: top; }
+.mdtable th { color: var(--gold-bright); background: var(--gold-faint); font-weight: 600; }  /* 正式回答：空行高度（14px×1.8=25.2px）的 1/2 ≈ 12.6px */
+/* 工具调用 / 结果：终端片子 */
+.tool {
+  padding: 8px 13px; background: var(--green-faint);
+  border: 1px solid var(--green-line); border-left: 2px solid var(--green-dim); border-radius: 7px;
+}
+.tool code {
+  display: block; font-family: var(--mono); font-size: 11.5px; color: var(--ink-2);
+  word-break: break-all; white-space: pre-wrap;
+}
+.tool.toolres {
+  background: var(--violet-faint); border-color: var(--violet-line); border-left-color: var(--violet-dim);
+}
+/* 工具结果内嵌行（2026-09-21 拍板：结果栏退役，并进工具调用折叠体）：细线分隔 + 紫签 */
+.tool .resline { margin-top: 7px; padding-top: 7px; border-top: 1px solid var(--line); }
+.tool .resline .tag { color: var(--violet); margin-bottom: 4px; }
+/* 标签：等宽小字 + FA 内联小图标（不用 emoji） */
+.tag {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 4px;
+  font-family: var(--mono); font-size: 10px; letter-spacing: .16em;
+}
+.tag svg { opacity: .8; flex: none; }
+.cot .tag { color: var(--teal); }
+.tool .tag { color: var(--green); }
+.tool.toolres .tag { color: var(--violet); }
+.retry .tag { color: var(--amber); }
+.fail .tag { color: var(--red); }
+.whisper .tag { color: var(--amber); }
+.plugin .tag { color: var(--blue); }
+.outside .tag { color: var(--ink-3); }
+/* 舞台指示（narrate）：脚本里的斜体括注 */
+.narrate {
+  font-family: var(--serif); font-style: italic; color: var(--ink-2); font-size: 13.5px;
+  border-left: 1px solid var(--line-strong); padding-left: 12px;
+  white-space: pre-wrap; word-break: break-word;
+}
+/* 未收口的段（r.open）：块已开、内容还在来——淡色呼吸，不抢内容 */
+.narrate.doing {
+  font-size: 12.5px; color: var(--ink-3); border-left-color: var(--line);
+  animation: breath 1.6s ease-in-out infinite;
+}
+@keyframes breath { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+/* 重试 / 失败：单行场注（无底无框居中小字），颜色区分 */
+.retry, .fail {
+  padding: 7px 13px; border-radius: 7px; font-size: 12.5px;
+  white-space: pre-wrap; word-break: break-word; color: var(--ink-2);
+}
+/* 重试行（2026-09-20 拍板）：与失败同款单行场注，琥珀墨色区分。 */
+.retry {
+  padding: 4px 0; text-align: center; color: var(--amber);
+}
+/* 失败行（2026-09-20 拍板）：单行场注——「失败：」前缀 + 原括号文本，
+   无底色无边框居中小字；tag 不再单独渲染。 */
+.fail {
+  padding: 4px 0; text-align: center; color: var(--fail-ink);
+}
+/* 耳语：琥珀虚线，气声 */
+.whisper {
+  padding: 10px 14px; background: var(--amber-faint);
+  border: 1px dashed var(--amber-dim); border-radius: 8px;
+  white-space: pre-wrap; word-break: break-word; font-size: 13.5px;
+}
+/* FEMO外：虚线素框 */
+.outside {
+  padding: 10px 14px; border: 1px dashed var(--line-strong); border-radius: 8px;
+  white-space: pre-wrap; word-break: break-word; font-size: 13.5px; color: var(--ink-2);
+}
+/* 横幅（showprompt/notice/prompt）：幕帘式居中横幅，菱饰 tag + 渐变底。
+   描边随主题：剧场=金/蓝双线框，素瓷=无框只留凹刻高光（2026-09-20 拍板）。
+   prompt 同构换蓝（在等我）——通过局部 token 换肤，组件只认 --bn-*。
+   与 dsh 投影窗 .femo-hub-banner 同规。 */
+.banner {
+  --bn-border: var(--gold-dim); --bn-grad: var(--banner-grad);
+  --bn-frame: var(--gold-line); --bn-tag: var(--gold);
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  margin-top: 2px; padding: 12px 22px 11px; text-align: center;
+  background: var(--bn-grad);
+  border: 1px solid var(--bn-border); border-radius: 8px;
+  box-shadow: var(--press-in);
+}
+.banner::before { content: ''; position: absolute; inset: 3px; border: 1px solid var(--bn-frame); border-radius: 5px; pointer-events: none; }
+.banner .tag { color: var(--bn-tag); margin-bottom: 0; font-weight: 600; }
+.banner .tag::before, .banner .tag::after { content: ''; width: 4px; height: 4px; background: currentColor; transform: rotate(45deg); opacity: .65; }
+.banner .txt { white-space: pre-wrap; word-break: break-word; font-size: 13px; color: var(--ink); }
+.banner.prompt {
+  --bn-border: var(--blue-dim); --bn-grad: var(--banner-grad-blue);
+  --bn-frame: var(--blue-line); --bn-tag: var(--blue);
+}
+/* 描边随主题（2026-09-20 拍板）：剧场保留金/蓝双线框，素瓷无框只留凹刻高光。 */
+:root[data-theme="porcelain"] .banner {
+  --bn-border: transparent; --bn-frame: transparent;
+}
+/* 素瓷·思考链（2026-09-20 拍板）：无底无框随素瓷，标题行一道优雅短下划线。 */
+:root[data-theme="porcelain"] .cot {
+  background: none; border: 0; border-left: 0; padding: 6px 2px 2px;
+}
+:root[data-theme="porcelain"] .cot .fold-head {
+  display: inline-flex; width: auto; gap: 7px;
+  border-bottom: 1px solid var(--teal-line);
+  padding-bottom: 3px;
+}
+:root[data-theme="porcelain"] .cot .fold-head:hover { border-bottom-color: var(--teal-dim); }
+/* 素瓷·折叠头短下划线（2026-09-21 拍板）：工具调用/结果与思考链同款，色随容器。 */
+/* 素瓷·插件注入折叠头（2026-09-21）：与思考链/工具同款短下划线，色随容器（蓝）。 */
+:root[data-theme="porcelain"] .plugin .fold-head {
+  display: inline-flex; width: auto; gap: 7px;
+  border-bottom: 1px solid var(--blue-line);
+  padding-bottom: 3px;
+}
+:root[data-theme="porcelain"] .plugin .fold-head:hover { border-bottom-color: var(--blue-dim); }
+/* 素瓷·插件注入：同扫尾去盒，色签信息由 tag 保留。 */
+:root[data-theme="porcelain"] .plugin {
+  background: none; border: 0; border-left: 0; padding: 4px 2px;
+}
+:root[data-theme="porcelain"] .tool .fold-head {
+  display: inline-flex; width: auto; gap: 7px;
+  border-bottom: 1px solid var(--green-line);
+  padding-bottom: 3px;
+}
+:root[data-theme="porcelain"] .tool.toolres .fold-head { border-bottom-color: var(--violet-line); }
+:root[data-theme="porcelain"] .tool .fold-head:hover { border-bottom-color: var(--green-dim); }
+:root[data-theme="porcelain"] .tool.toolres .fold-head:hover { border-bottom-color: var(--violet-dim); }
+/* 素瓷·扫尾（2026-09-20 拍板）：工具/结果/耳语/戏外也去盒，随素瓷平面语言；
+   色签信息由 tag 与等宽字保留。 */
+:root[data-theme="porcelain"] .tool {
+  background: none; border: 0; border-left: 0; padding: 4px 2px;
+}
+:root[data-theme="porcelain"] .whisper {
+  background: none; border: 0; padding: 4px 2px;
+}
+:root[data-theme="porcelain"] .outside {
+  border: 0; padding: 4px 2px;
+}
+/* 翡翠·时间轨（2026-09-26 用户拍板）：与 web 侧栏的卡片标签页同语言——
+   不要左轨竖线与节点圆点，卡片占满整行：行退化单列、左轨（线+点）整体隐掉，
+   行距收窄成侧栏卡片堆的 8px 间隔。折叠块内文的 2px 左描边保留
+   （web 侧栏 cot-body 本就同款竖描边）。 */
+:root[data-theme="jade"] .row { display: block; padding: 4px 0; }
+:root[data-theme="jade"] .rail { display: none; }
+/* 翡翠·数据面（2026-09-26 用户拍板「好好设计」；09-27 收盒改判）：对齐 web
+   侧栏标签页的现成词汇——
+   · 小标签（.tag，全页一切「思考链/工具调用/结果/插件/耳语/公告」的签）=
+     侧栏的白玻璃 chip：细线圆角小牌，字色仍随语义族；
+   · 思考链/工具调用/插件注入 = **同一套素面**：无盒无底，chip 签 + 一道
+     家族色左细线（紫/薄荷/蓝灰），正文随墨二色——用户不收杂盒，三类一体；
+   · 横幅（公告/showprompt/输入提示）= 侧栏断连横幅：浅彩平底大圆角盒，
+     单线框，去内圈细框、去菱饰、无影。 */
+:root[data-theme="jade"] .tag {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line);
+  border-radius: 6px; padding: 1px 8px;
+  letter-spacing: .08em;
+  width: fit-content; max-width: 100%;   /* 块级 flex 本会撑满整行：chip 只许裹住内容（结果签/FEMO外签） */
+}
+:root[data-theme="jade"] .cot,
+:root[data-theme="jade"] .tool,
+:root[data-theme="jade"] .plugin {
+  background: none; border: 0; border-radius: 0; padding: 2px 0 2px 10px;
+  border-left: 2px solid var(--teal-dim);   /* 思考链=紫线（家族色各改） */
+}
+:root[data-theme="jade"] .tool { border-left-color: var(--green-dim); }
+:root[data-theme="jade"] .plugin { border-left-color: var(--blue-dim); }
+:root[data-theme="jade"] .banner {
+  --bn-frame: transparent;
+  --bn-border: rgba(111, 191, 58, 0.3);
+  border-radius: 14px;
+  box-shadow: none;
+}
+/* 翡翠·横幅签与正文（2026-09-28 用户二轮拍板）：盒子和底色**都要**（上一轮
+   去框作废），要去的是标签字外面那层 chip 壳——框、底色、图标全撤，只留
+   「输入提示/公告」裸字当小签（对齐灵魂页提示块的裸标签）；三种横幅正文
+   统一 10.5px，节词不斜体。 */
+:root[data-theme="jade"] .banner .tag {
+  background: none; border: 0; padding: 0;
+}
+:root[data-theme="jade"] .banner .tag svg { display: none; }
+:root[data-theme="jade"] .banner.showprompt,
+:root[data-theme="jade"] .banner.prompt {
+  align-items: stretch; text-align: left; gap: 4px;
+  padding: 7px 10px 8px;
+}
+:root[data-theme="jade"] .banner.showprompt {
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--line);
+  border-left: 2px solid rgba(143, 221, 85, 0.45);
+  border-radius: 8px;
+}
+/* 翡翠·人类席提示块（2026-10-03 用户拍板：对齐灵魂页人类发言卡，两边同一设计）
+   ——块体（底色/边框/圆角/字号）2026-09-28 起本就同值，这里对齐的是标签：
+   灵魂页叫「节词」「提示」（9.5px 粗体、2px 疏字距；节词标签随底色、提示标签
+   亮绿）。标签文字本体在 JS 里随横幅族（公告/输入提示，另两主题沿用），翡翠
+   藏原字、::after 补灵魂页叫法，标签菱饰与图标此前已在本主题隐藏。
+   节词正文维持 2026-09-28 拍板「节词不斜体」，不随灵魂页的引文斜体走。 */
+:root[data-theme="jade"] .banner.showprompt .tag {
+  color: var(--ink-3); font-size: 9.5px; letter-spacing: 2px;
+}
+:root[data-theme="jade"] .banner.showprompt .tag > span { display: none; }
+/* ::after 复位要连菱形装饰的宽高/底色/旋转一起翻掉（基础规则四件都上），否则
+   两个字的标签被压回 4×4 像素的小绿渣 */
+:root[data-theme="jade"] .banner.showprompt .tag::after {
+  content: '节词'; display: inline;
+  width: auto; height: auto; background: none; transform: none; opacity: 1;
+}
+:root[data-theme="jade"] .banner.showprompt .txt { color: var(--ink-2); line-height: 1.65; }
+:root[data-theme="jade"] .banner.prompt {
+  background: rgba(111, 191, 58, 0.07);
+  border: 1px solid rgba(143, 221, 85, 0.22);
+  border-radius: 9px;
+}
+:root[data-theme="jade"] .banner.prompt .tag {
+  color: rgba(143, 221, 85, 0.75); font-size: 9.5px; letter-spacing: 2px;
+}
+:root[data-theme="jade"] .banner.prompt .tag > span { display: none; }
+:root[data-theme="jade"] .banner.prompt .tag::after {
+  content: '提示'; display: inline;
+  width: auto; height: auto; background: none; transform: none; opacity: 1;
+}
+:root[data-theme="jade"] .banner .tag::before,
+:root[data-theme="jade"] .banner .tag::after { display: none; }
+/* 翡翠·左上状态灯（2026-09-27 用户拍板）：连接灯与顶栏按钮的「点亮」色
+   不随思考链走紫，按侧栏惯例收编品牌亮绿——连接灯=中性玻璃 pill + 亮绿
+   呼吸点（侧栏 .conn 原样），激活钮=亮绿字+绿线圈。 */
+:root[data-theme="jade"] .conn.on { border-color: var(--line); }
+:root[data-theme="jade"] .conn.on .dot { background: var(--gold); }
+:root[data-theme="jade"] .conn.on .dot::after { border-color: var(--gold); }
+:root[data-theme="jade"] .topbtn:active,
+:root[data-theme="jade"] .topbtn.on { color: var(--gold); }
+:root[data-theme="jade"] .topbtn.on .tb-badge { color: var(--gold); background: var(--gold-faint); }
+/* 翡翠·字号（2026-09-27 用户拍板，两轮收紧）：消息流对齐侧栏标签页的精致
+   小字——12px 台词 / 11.5px 状态行 / 10.5px 机器等宽字，底 12.5。只动翡翠。 */
+:root[data-theme="jade"] body { font-size: 12.5px; }
+:root[data-theme="jade"] .say, :root[data-theme="jade"] .who,
+:root[data-theme="jade"] .narrate, :root[data-theme="jade"] .whisper,
+:root[data-theme="jade"] .outside { font-size: 12px; }
+:root[data-theme="jade"] .banner .txt { font-size: 10.5px; }
+:root[data-theme="jade"] .retry, :root[data-theme="jade"] .fail { font-size: 11.5px; }
+:root[data-theme="jade"] .tool code, :root[data-theme="jade"] .mdinline,
+:root[data-theme="jade"] .mdcode code { font-size: 10.5px; }
+:root[data-theme="jade"] .mdtable { font-size: 11.5px; }
+:root[data-theme="jade"] .ihuman-text { font-size: 12.5px; }
+:root[data-theme="jade"] .meta .mtxt { font-size: 13px; }
+/* 翡翠·实心绿寄出钮（2026-09-27 用户拍板；2026-10-02 钮上名字行）：寄出钮改
+   侧栏 primary 语言——135° 绿渐变实心、深绿底字、绿投影；hover 提亮、按下微缩
+   （侧栏 button.primary 原样）。尺寸（11px 字号 1px 垂直内距）随 .who-tools，
+   高度仍压在名字行原行高之内。 */
+:root[data-theme="jade"] .ihuman-send {
+  color: #0d1a08; background: linear-gradient(135deg, #8fdd55 0%, #57b33a 100%);
+  border: 0; box-shadow: 0 3px 12px rgba(111, 191, 58, 0.3);
+}
+:root[data-theme="jade"] .ihuman-send:hover {
+  color: #0d1a08; filter: brightness(1.08);
+}
+:root[data-theme="jade"] .ihuman-send:active { transform: scale(0.96); }
+/* 翡翠·人类席对齐（2026-09-28 用户拍板）：输入席整体对齐 web 侧栏灵魂页
+   的人类发言卡——暗色凹输入框、绿圈聚焦（侧栏 focus ring 原样）、状态字收绿；
+   变量浮层同套（钮回白玻璃、值名收绿、确认钮也是实心绿）。
+   召唤行不再有翡翠专属皮（2026-10-02 用户拍板：它挂 .narrate.doing 原类，
+   与「正在…」行全自动同款，主题层不再另画）。 */
+:root[data-theme="jade"] .ihuman-note.busy { color: var(--green); }
+:root[data-theme="jade"] .ihuman-text {
+  background: rgba(0, 0, 0, 0.28); border: 1px solid var(--line); border-radius: 9px;
+}
+:root[data-theme="jade"] .ihuman-text:focus { border-color: #6fbf3a; box-shadow: 0 0 0 3px rgba(111, 191, 58, 0.16); }   /* 描边=侧栏 --green 原值（2026-09-28 用户拍板对齐） */
+:root[data-theme="jade"] .varbtn {
+  color: var(--ink); background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line-strong);
+}
+:root[data-theme="jade"] .varbtn:hover { color: var(--ink); border-color: var(--line-strong); }
+:root[data-theme="jade"] .varbtn[aria-expanded="true"] { color: var(--ink); border-color: var(--gold); box-shadow: none; }
+:root[data-theme="jade"] .varpanel { background: rgba(0, 0, 0, 0.25); border: 1px solid var(--line); }
+:root[data-theme="jade"] .var-row .var-name { color: var(--gold-bright); }
+:root[data-theme="jade"] .var-input { background: rgba(0, 0, 0, 0.28); border: 1px solid var(--line); border-radius: 9px; }
+:root[data-theme="jade"] .var-input:focus { border-color: #6fbf3a; box-shadow: 0 0 0 3px rgba(111, 191, 58, 0.16); }   /* 描边=侧栏 --green 原值（2026-09-28 用户拍板对齐） */
+:root[data-theme="jade"] .var-confirm {
+  color: #0d1a08; background: linear-gradient(135deg, #8fdd55 0%, #57b33a 100%);
+  border: 0; box-shadow: 0 3px 12px rgba(111, 191, 58, 0.3);
+}
+:root[data-theme="jade"] .var-confirm:hover { color: #0d1a08; filter: brightness(1.08); }
+/* 翡翠·去斜体（2026-09-28 用户拍板；2026-10-02 召唤行并进场注同款，其单列一行删）：
+   场注两处衬线斜体改回正体——召唤行挂 .narrate.doing 原类，随此条一并转正。 */
+:root[data-theme="jade"] .narrate,
+:root[data-theme="jade"] .narrate.doing { font-style: normal; }
+/* 翡翠·字重对齐（2026-09-28 用户拍板）：按灵魂页的档位统一——面板标题与
+   横幅块签 700（灵魂页 card-title/节词·提示签同档），按钮一律 600；
+   chip、元信息、名字行不另加粗（灵魂页本就常规/600，现状已符）。 */
+:root[data-theme="jade"] .sesspanel-title,
+:root[data-theme="jade"] .banner .tag { font-weight: 700; }
+:root[data-theme="jade"] .ihuman-send,
+:root[data-theme="jade"] .varbtn,
+:root[data-theme="jade"] .var-confirm,
+:root[data-theme="jade"] .topbtn { font-weight: 600; }
+/* 翡翠·进行中的段（2026-10-02 用户拍板，翻案 09-29 的琥珀黄）：AI 发言中与
+   等人类两种「正在进行」的段外框统一成会发光的绿——亮绿细框 + 呼吸灯盒影
+   （边缘光晕 2.4s 一起一伏；用户不喜欢黄，琥珀整批退役）。.humanwait 段不再
+   例外、与 AI 发言中同框（卡内是「点这里输入发言……」可点行）；右上呼吸点
+   仍只归发言中的段（状态之辨），同样改绿（翡翠下 --gold 即亮绿）。 */
+:root[data-theme="jade"] .section.open {
+  border-color: rgba(143, 221, 85, 0.5);
+  background: linear-gradient(180deg, rgba(111, 191, 58, 0.05), rgba(255, 255, 255, 0.03));
+  box-shadow: none;
+  animation: jade-open-breath 2.4s ease-in-out infinite;
+}
+@keyframes jade-open-breath {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(143, 221, 85, 0.22), 0 0 6px rgba(111, 191, 58, 0.14); }
+  50%      { box-shadow: 0 0 0 1px rgba(143, 221, 85, 0.6),  0 0 18px rgba(111, 191, 58, 0.42); }
+}
+:root[data-theme="jade"] .section.open:not(.humanwait)::after {
+  content: ''; position: absolute; top: 10px; right: 12px;
+  width: 8px; height: 8px; border-radius: 50%; background: var(--gold);
+  animation: jade-seat-pulse 1.2s ease-out infinite;
+}
+@keyframes jade-seat-pulse { from { box-shadow: 0 0 0 0 rgba(143, 221, 85, 0.5); } to { box-shadow: 0 0 0 6px rgba(143, 221, 85, 0); } }
+/* 段内草稿（r.drafts）：正在写的那条，字一个个往里长。写完（定稿）原地变成
+   历史条目——草稿样式与定稿同款，只多一支金色光标。页面不做打字动画：
+   显示的就是 hub 给的草稿文本本身，刷新/换端天然接得上。 */
+.draft { opacity: .94; }
+.draft::after {
+  content: ''; display: inline-block; width: 2px; height: 1.05em; margin-left: 2px;
+  vertical-align: -.18em; background: var(--gold-bright);
+  animation: blink 1s steps(1) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+/* ── 场幕（开场/运行结束）：节目单分隔式——细线 · 菱 · 衬线字 · 菱 · 细线 ── */
+.row.metaRow { display: block; }
+.meta { display: flex; align-items: center; gap: 14px; margin: 26px 0 16px; }
+.meta::before, .meta::after { content: ''; flex: 1; height: 1px; }
+.meta::before { background: linear-gradient(90deg, transparent, var(--gold-dim)); }
+.meta::after { background: linear-gradient(90deg, var(--gold-dim), transparent); }
+.meta .mtxt {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-family: var(--serif); font-size: 15px; letter-spacing: .3em; margin-right: -.3em;
+}
+.meta.gold { color: var(--gold-bright); }
+.meta.gold svg { color: var(--gold); }
+.meta.end { color: var(--ink-3); }
+.meta.end::before { background: linear-gradient(90deg, transparent, var(--line-strong)); }
+.meta.end::after { background: linear-gradient(90deg, var(--line-strong), transparent); }
+.meta.plain { color: var(--ink-3); font-family: var(--mono); font-size: 11px; letter-spacing: .06em; }
+.meta.plain::before { background: linear-gradient(90deg, transparent, var(--line)); }
+.meta.plain::after { background: linear-gradient(90deg, var(--line), transparent); }
+.meta.plain.err { color: var(--red); }
+.meta.plain.err svg { color: var(--red); }
+/* ── 席位内联输入区（2026-09-21；2026-10-02 底部停靠）：轮到人类时，时间轨里
+   那块「正在…」升级成可点击的输入席——点开就地写、就地寄；等待中的段整段
+   停靠在时间轨最末（.dock，直播块之后），新到的 AI 流式输出长在它上面，交卷
+   收口 hub 搬家落号账末、就地转正。本区是人类输入的唯一画法；提交锁每席
+   一把（ihumanDrafts[wait_key].busy）。金色=舞台事件。── */
+/* 停靠席不再自带额外上边距（2026-10-02 用户拍板）：等待段与前后行同距，
+   人类这一栏自然融进消息流，不再凭空空一拍。 */
+.dock { margin-top: 0; }
+/* 召唤行（2026-10-02 用户拍板）：与 AI 节点的「正在…」行同款同大——DOM 直接
+   挂 .narrate.doing 原类（字体/颜色/呼吸动画/各主题调字全自动跟随），名字由
+   段头名字槽交代。这里只做按钮复位（去底去框去默认居中）并重接同款左缘线；
+   hover 微亮示意可点。本块必须排在 .narrate.doing 之后（同特异性靠顺序取胜）。 */
+.ihuman-hint {
+  display: block; width: 100%; text-align: left; overflow: hidden;
+  background: none; border: 0; border-left: 1px solid var(--line);
+  cursor: pointer;
+}
+.ihuman-hint:hover { color: var(--ink-2); border-left-color: var(--ink-3); }
+.ihuman-hint.has-draft { color: var(--ink-2); white-space: nowrap; text-overflow: ellipsis; }   /* 失焦收起后：行内亮草稿首行 */
+/* 输入框（2026-10-02 用户拍板）：单行起步≈召唤行同尺寸，随内容行数长高
+   （composer 输入时 fit 撑高、render 草稿回填后重撑，见 util.fitTextarea），
+   失焦收回一行（草稿留席不丢）。resize 手柄退役——高度已经自动，不再交给手。 */
+.ihuman-text {
+  display: block; width: 100%; resize: none; padding: 2px 10px;
+  background: var(--bg1); color: var(--ink);
+  border: 1px solid var(--teal-line); border-radius: 7px;   /* 描边同 AI 思考链的青（2026-09-22 用户拍板） */
+  font: inherit; font-size: 13px; line-height: 1.6;
+  overflow: hidden;
+}
+.ihuman-text:focus { outline: none; border-color: var(--teal-dim); box-shadow: var(--glow-teal); }   /* 聚焦=青的同族加亮 */
+/* 名字行右侧工具组（2026-10-02 用户拍板）：寄出（+变量赋值）与人类名字同排、
+   贴右缘；按钮 11px 字号+1px 垂直内距≈18px，压在原行高（~22px）之内不撑行。
+   「Enter 寄出 · …」快捷键提示行同日退役——快捷键进 placeholder，不再占一行。 */
+.who-tools { margin-left: auto; display: flex; align-items: center; gap: 6px; flex: none; }
+.who-tools button {
+  font: inherit; font-size: 11px; line-height: 1.35; letter-spacing: .06em;
+  padding: 1px 10px; cursor: pointer;
+}
+.ihuman-send {
+  color: var(--gold-bright); background: var(--gold-faint);
+  border: 1px solid var(--gold-dim); border-radius: 6px;
+}
+.ihuman-send:hover { color: var(--ink); border-color: var(--gold); }
+.ihuman-note { margin-top: 7px; font-size: 12px; color: var(--ink-2); }
+.ihuman-note.err { color: var(--red); }
+.ihuman-note.busy { color: var(--teal); animation: breath 1.6s ease-in-out infinite; }
+/* ── 变量赋值浮层（2026-09-24；2026-10-02 赋值钮上名行）：人类节点声明 out 变量
+   时的「变量名 = 输入框」面板——DSH 投影窗 composer 同款逻辑移植。赋值钮自身
+   住名字行右端（.who-tools .varbtn，2026-10-02 用户拍板），面板开时挂在名字行
+   之下、输入框之上（.section 直接子元素，槽距随段走），.varbar 包裹壳退役。── */
+.varbtn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 12px; cursor: pointer; font: inherit; font-size: 12px; letter-spacing: .08em;
+  color: var(--teal); background: var(--teal-faint);
+  border: 1px solid var(--teal-dim); border-radius: 6px;
+}
+.varbtn:hover { color: var(--ink); border-color: var(--teal); }
+.varbtn[aria-expanded="true"] { color: var(--ink); border-color: var(--teal); box-shadow: var(--glow-teal); }
+.varpanel {
+  margin-top: 6px; padding: 9px 11px;
+  background: var(--bg1); border: 1px solid var(--teal-line); border-radius: 8px;
+}
+.var-head { font-family: var(--mono); font-size: 10px; letter-spacing: .08em; color: var(--ink-3); margin-bottom: 7px; }
+.var-row { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+.var-row .var-name {
+  flex: 0 1 auto; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--mono); font-size: 12px; color: var(--teal);
+}
+.var-row .var-eq { color: var(--ink-3); font-family: var(--mono); }
+.var-input {
+  flex: 1; min-width: 0; padding: 5px 9px;
+  background: var(--bg0); color: var(--ink);
+  border: 1px solid var(--line-strong); border-radius: 6px;
+  font: inherit; font-size: 13px;
+}
+.var-input:focus { outline: none; border-color: var(--teal-dim); box-shadow: var(--glow-teal); }
+.var-confirm {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 7px;
+  padding: 5px 14px; cursor: pointer; font: inherit; font-size: 12px; letter-spacing: .08em;
+  color: var(--gold-bright); background: var(--gold-faint);
+  border: 1px solid var(--gold-dim); border-radius: 6px; box-shadow: var(--raise-sm);
+}
+.var-confirm:hover { color: var(--ink); border-color: var(--gold); }
+/* ── 调试浮层：暗色终端玻璃 ─────────────────────────────────────── */
+/* 顶栏（2026-09-22）：页面最上一行按钮栏——print 与主题归位到 Projection Center
+   上方；print 展开面板绝对定位挂在顶栏下，不再固定在右上角。 */
+.topbar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; position: relative; }
+/* 运行控制三钮（2026-10-04 用户拍板）：开始/继续/停止纯图标成一组，贴顶栏最左；
+   皮肤走 .topbtn 既有 token（三主题自动适配），iconbtn 只收窄内距。 */
+.runctl { display: inline-flex; gap: 6px; }
+.topbtn.iconbtn { padding: 7px 11px; }
+.topbtn.iconbtn:disabled { opacity: .5; cursor: default; }
+/* 顶栏按钮（2026-09-22 二版）：真新拟物——无边框、表面微渐变、
+   够深的双向影、顶缘高光，像颗真能按下去的实体键；凹凸全走 token，
+   两主题各自发挥（素瓷=新拟物实体键本色，剧场=铜牌灯：玻璃底细线
+   勾勒、hover 金字、点亮青光）。 */
+.topbtn {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: .1em; color: var(--ink-2);
+  background: var(--topbtn-bg); border: 0; border-radius: 12px;
+  padding: 7px 16px; cursor: pointer;
+  box-shadow: var(--topbtn-raise);
+  transition: box-shadow .18s ease, color .18s ease;
+}
+.topbtn:hover { color: var(--topbtn-hover-ink); }
+.topbtn:active, .topbtn.on {
+  color: var(--teal);
+  background: var(--surface-raised);
+  box-shadow: var(--topbtn-press);
+}
+.topbtn .tb-ico { display: inline-flex; opacity: .8; }
+.topbtn .tb-badge {
+  font-size: 10px; color: var(--gold); background: var(--gold-faint);
+  border-radius: 8px; padding: 0 7px; line-height: 16px;
+  box-shadow: var(--topbtn-badge-shadow);
+}
+.topbtn.on .tb-badge { color: var(--teal); background: var(--teal-faint); }
+.dbg-wrap { position: static; display: flex; flex-direction: column; align-items: flex-end; }
+.dbg-panel {
+  display: none; position: absolute; top: calc(100% + 6px); right: 0;
+  width: min(560px, calc(100vw - 32px)); height: 46vh;
+  background: var(--dbg-bg); border: 1px solid var(--line-strong); border-radius: 12px;
+  box-shadow: var(--dbg-shadow); overflow: hidden;
+  backdrop-filter: blur(8px); z-index: 50;
+}
+.dbg-wrap.open .dbg-panel { display: flex; flex-direction: column; }
+.dbg-head {
+  display: flex; align-items: center; gap: 10px; padding: 7px 12px;
+  border-bottom: 1px solid var(--line); font-family: var(--mono); font-size: 10.5px;
+  letter-spacing: .08em; color: var(--ink-2);
+}
+.dbg-head .sp { flex: 1; }
+.dbg-head button {
+  font: inherit; letter-spacing: .08em; color: var(--ink-2); background: transparent;
+  border: 1px solid var(--line-strong); border-radius: 6px; padding: 2px 9px; cursor: pointer;
+}
+.dbg-head button:hover { color: var(--ink); border-color: var(--ink-3); }
+.dbg-head button.flash-ok { color: var(--gold); border-color: var(--gold-dim); }
+.dbg-body { flex: 1; overflow-y: auto; padding: 6px 0; font-family: var(--mono); font-size: 11.5px; line-height: 1.55; }
+.dbg-body::-webkit-scrollbar { width: 8px; }
+.dbg-body::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 4px; }
+.dbg-line { display: flex; gap: 8px; padding: 1px 12px; white-space: pre-wrap; word-break: break-all; }
+.dbg-line .lt { color: var(--ink-3); flex: none; }
+.dbg-line .ls { flex: none; width: 44px; color: var(--teal); opacity: .75; }
+.dbg-line .lx { flex: 1; min-width: 0; }
+.dbg-line.stderr { background: var(--red-faint); }
+.dbg-line.stderr .ls { color: var(--red); opacity: 1; }
+.dbg-empty { padding: 18px 14px; color: var(--ink-3); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; }
+}
+@media (max-width: 640px) {
+  .wrap { padding: 0 14px 60px; }
+  .stat { padding: 2px 10px; }
+  .console { padding: 10px 12px; }
+  .sesspanel { padding: 8px 12px 10px; }
+  .sesspanel-hint { display: none; }
+}
+
+/* ── 贴底跟随 + 滚到底/回顶圆钮（2026-09-21；回顶钮 2026-10-04 对称加设）：
+   流式输出时本来在底就跟着长，用户往上翻了就不打扰；右下角常驻一枚「回到底」
+   圆钮，到底自动隐藏；右上角镜像一枚「回顶部」圆钮（top:18px 对 bottom:18px，
+   同一右缘对齐），在顶自动隐藏。皮肤一体、只分家落位。── */
+.jump-btm, .jump-top {
+  position: fixed; right: 18px; z-index: 30;
+  width: 38px; height: 38px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font: inherit; background: var(--surface-raised); color: var(--ink-2);
+  border: 1px solid var(--line-strong); box-shadow: var(--raise-lg);
+  cursor: pointer;
+}
+.jump-btm { bottom: 18px; }
+.jump-top { top: 18px; }
+.jump-btm:hover, .jump-top:hover { color: var(--gold); border-color: var(--gold-dim); }
+.jump-btm[hidden], .jump-top[hidden] { display: none; }
+/* 底部刷新条（2026-09-29 用户拍板）：页面最下面一枚刷新钮，与顶栏刷新的区别
+   只在刷新后保持贴底跟随（sessionStorage 带旗过 reload，render 起步读旗置
+   followBottom，见 render.mjs）。按钮直接复用顶栏 .topbtn 的 token 皮肤，
+   三主题自动适配，这里只管站位居中。 */
+.tailbar { display: flex; justify-content: center; padding: 14px 0 30px; }

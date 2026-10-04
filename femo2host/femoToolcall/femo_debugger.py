@@ -4,11 +4,11 @@
 femo_debugger.py — Femo 调试模式（FakeHost 假宿主）
 ====================================================
 
-零 token 干跑 .femo 剧本：AI / human / mind 节点全部由调试器替答。
+零 token 干跑 .femo 脚本：AI / human / mind 节点全部由调试器替答。
 引擎本体一行不改——SET VARIABLE 提取、out 白名单校验、evaluator 解析、
 resolve/@func 调用、变量帧（fork/join/for/par）、模块进出栈、落库，
 全部走引擎真实管线。只有「LLM 思考」和「人类打字」被替换成合成值；
-因此它测的不只是剧本 bug，引擎 bug 也能暴露。
+因此它测的不只是FEMO脚本 bug，引擎 bug 也能暴露。
 
 原理（FakeHost）：
   引擎宿主模式下，AI 节点（_invoke_ai_llm）发 ai_request 事件后
@@ -95,7 +95,7 @@ def _force_utf8_stdio():
                 pass
 
 
-# ── 引擎导入路径：本脚本在 femo2host/femoToolcall/ 下，插件根是其祖父目录 ──
+# ── 引擎导入路径：本脚本在 femo2host/femoToolcall/ 下，插件根是其祖母目录 ──
 # 本脚本在 femo2host/femoToolcall/ 下，插件根需上溯三层（2026-09-13 迁入 femo2host/）
 _HERE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if _HERE not in sys.path:
@@ -227,14 +227,15 @@ class DBSandbox:
     """把 FEMO_config._db_path 指到沙盒库；退出时恢复原路径（不删任何文件）。
 
     沙盒目录固定复用 cache/debug-sandbox/（相对插件根），每轮 run 用
-    独立库文件名（run-<时间戳>.wor）。旧沙库滚动保留最近 3 天，超期自动
-    清理（2026-09-12 由「只建不删」改制——只增不减的沙盒会无限长胖）。
+    独立库文件名（run-<时间戳>.wor）。旧沙库滚动保留最近 24 小时，超期自动
+    清理（2026-09-12 由「只建不删」改制——只增不减的沙盒会无限长胖；
+    2026-09-25 保 3 天收紧为 24 小时，与 cache/logs 口径对齐）。
     """
 
     @staticmethod
-    def _sweep_old(sandbox_dir: str, keep_days: int = 3) -> int:
-        """删除沙盒里 mtime 超过 keep_days 的旧文件，返回删除数。"""
-        cutoff = time.time() - keep_days * 86400
+    def _sweep_old(sandbox_dir: str, keep_hours: int = 24) -> int:
+        """删除沙盒里 mtime 超过 keep_hours 小时的旧文件，返回删除数。"""
+        cutoff = time.time() - keep_hours * 3600
         removed = 0
         try:
             for name in os.listdir(sandbox_dir):
@@ -266,7 +267,7 @@ class DBSandbox:
         os.makedirs(self._sandbox_dir, exist_ok=True)
         swept = self._sweep_old(self._sandbox_dir)
         if self.verbose and swept:
-            print(f"[debug] 🧹 沙盒清理: 移除 {swept} 个超过 3 天的旧文件")
+            print(f"[debug] 🧹 沙盒清理: 移除 {swept} 个超过 24 小时的旧文件")
         self.db_path = self.path()
         FEMO_config.set_db_path(self.db_path)
         if self.verbose:
@@ -292,7 +293,7 @@ class ValueOracle:
     L1 --set 用户覆盖（v1|v2 序列轮换）
     L2 ASSIGN 型 out（"refuse_count += 1"）→ 语义已含在 out 文本，渲染层处理
     L3 dropdown choices（引擎 evaluator 求值后 rng 挑选）
-    L4 prompt 线索（<<VAR = 示例>> 模板；@占位 → actor 名单挑真实演员）
+    L4 prompt 线索（<<VAR = 示例>> 模板；@占位 → actor 名单挑真实角色）
     L5 vars 声明初值类型反推（bool 翻转 / 数字保持 / @actor 挑人）
     L6 兜底 "debug"（响亮记 warning）
     """
@@ -403,7 +404,7 @@ class ValueOracle:
             self._warn(f"读取存活名单失败: {e}")
         return set(best)
 
-    # ── actor 挑选（@占位 → 真实演员）──
+    # ── actor 挑选（@占位 → 真实角色）──
     def _pick_actor(self, placeholder: str, facade) -> Optional[str]:
         candidates: List[str] = []
         try:
@@ -422,7 +423,7 @@ class ValueOracle:
                         k for k in v.keys() if isinstance(k, str) and k.startswith('@'))
         except Exception as e:
             self._warn(f"读取变量世界 actor 名单失败: {e}")
-        # 存活名单优先（2026-09-12）：剧本里若有「存活玩家列表」变量（$alive/存活名单
+        # 存活名单优先（2026-09-12）：脚本里若有「存活玩家列表」变量（$alive/存活名单
         # /players 等），合成票只从**存活者**里挑——否则会投给已淘汰的人（干跑实测：
         # 某 3 人出局的局，第 4 轮合成票还在投第 2 轮就出局的人），票一散就永远平票、
         # 每轮进 PK，死循环跑不完（谁是卧底 8 人局干跑 180s 超时就是这么来的）。
@@ -600,9 +601,9 @@ class FakeHost:
     """监听引擎事件，替 AI / human 节点提供合成输入。
 
     事件契约（与 FEMO_runtime._emit_event / FEMO_errors 源码一致）：
-      ai_request {wait_key, node_name, ai_name, blocks, actor_info, source,...}
+      ai_request {wait_key, node_name, actor_name, blocks, actor_info, source,...}
       human_wait {wait_key, node_name, prompt, scope, out_vars, ...}
-      node_retry {node_name, wait_key, ai_name, feedback, attempt, target}
+      node_retry {node_name, wait_key, actor_name, feedback, attempt, target}
       node_start {node_name, node_type, prompt?, scope}
     回传：runner.engine.human_input.provide_input(wait_key, payload)
     """
@@ -694,14 +695,16 @@ class FakeHost:
                     self.log(f"🎲 {node} 概率沉默（不赋值 {_display_name(od)}）")
                     self._emit('silence', node=node, var=_display_name(od))
                     continue
-                # flaky：概率输出无效赋值（未声明变量）→ assign_error
-                # → node_retry → 换值重发（完整测试重试链路）
+                # flaky：概率输出无效赋值（合法变量 + 非法表达式）→ assign_error
+                # → node_retry → 换值重发（完整测试重试链路）。
+                # 2026-09-29 白名单外降警告后，旧手法（赋 out 外变量）不再触发
+                # 重试，改用「+= 右侧非数字」必经表达式解析失败的同一条通道。
                 if self.flaky and self.rng.random() < self.flaky:
                     self.flaky_fired.append(f"{node}:{_display_name(od)}")
                     self.log(f"💥 {node} flaky 无效赋值（触发重试链路）")
                     self._emit('flaky', node=node, var=_display_name(od))
                     lines.append(
-                        "SET VARIABLE: <<__flaky_undefined_var = 1>>")
+                        f"SET VARIABLE: <<{od.var_name} += abc>>")
                     continue
                 line = self._render_assignment(od, value)
                 if line:
@@ -829,13 +832,13 @@ class FakeHost:
     # ── node → action 定义（主查节点绑定，兜底同名；含模块内节点）──
     def _action_def_for(self, node_name: str):
         runner = self.runner
-        # 1) 剧本级 flow 节点绑定
+        # 1) FEMO脚本级 flow 节点绑定
         node_obj = (runner.script.flow.nodes or {}).get(node_name)
         if node_obj is not None and getattr(node_obj, 'action_name', None):
             ad = (runner.script.actions or {}).get(node_obj.action_name)
             if ad is not None:
                 return ad
-        # 2) 同名兜底（常见剧本节点名==action 名）
+        # 2) 同名兜底（常见FEMO脚本节点名==action 名）
         ad = (runner.script.actions or {}).get(node_name)
         if ad is not None:
             return ad
@@ -965,10 +968,10 @@ def wrap_module_test(script, module_path: str):
 #════════════════════════════════════════════════════════════
 
 def load_script(femo_path: str, base_dir: Optional[str] = None):
-    """编译剧本（沙库内进行，soul/user 查询落沙库）。
+    """编译FEMO脚本（沙库内进行，soul/user 查询落沙库）。
 
-    base_dir：覆盖 code: 相对引用的解析目录（默认=剧本所在目录）。
-    调试路由用：剧本文本暂存沙盒，引用按原剧本目录解析——与正式
+    base_dir：覆盖 code: 相对引用的解析目录（默认=FEMO脚本所在目录）。
+    调试路由用：脚本文本暂存沙盒，引用按原FEMO脚本目录解析——与正式
     运行同语义（否则 file:"xxx.py" 落在别处必 404）。
     返回 (script, base_dir) 已并入 script——引擎 FEMORunner 的 base_dir
     参数必须用它（code: 相对路径按它解析），Script 对象本身不带该信息。"""
@@ -1034,7 +1037,7 @@ def run_once(script, seed: int, overrides: Dict[str, List[str]],
 
     # ── --set 跑前直接注入变量世界（root task '__script__' 帧）──
     # 语义：定向设定初始状态，让条件边按指定方向走（比 L1 覆盖更早、更可控）。
-    # 值解析：@actor → 引擎 actors 表真实演员名；数字/布尔/字符串直接入帧。
+    # 值解析：@actor → 引擎 actors 表真实角色名；数字/布尔/字符串直接入帧。
     if overrides:
         root_env = runner.world.envs.get('t0')
         if root_env is None:
@@ -1049,7 +1052,7 @@ def run_once(script, seed: int, overrides: Dict[str, List[str]],
                 aname = val
                 if aname not in (runner.script.actors or {}):
                     raise ValueError(
-                        f"--set {k}={raw}: actor '{aname}' 不在剧本 actors 中。"
+                        f"--set {k}={raw}: actor '{aname}' 不在FEMO脚本 actors 中。"
                         f"可用: {sorted(runner.script.actors.keys())}")
             root_env.frames['__script__'][k] = val
         print(f"[debug] 💉 --set 已注入: "
@@ -1188,7 +1191,7 @@ def _reached_nodes(merged) -> set:
 
 
 def _module_flow(script, module_mode: Optional[str]):
-    """module 模式的判定用 flow：被测模块自己的 flow；整剧本模式 mainflow。
+    """module 模式的判定用 flow：被测模块自己的 flow；整个FEMO脚本模式 mainflow。
     （module 模式下 script.flow 已被 wrapper 换成合成主流程，不能用它做
     覆盖判定的分母/分子。）"""
     if not module_mode:
@@ -1213,7 +1216,7 @@ def _module_has_out(script, module_mode: Optional[str]) -> Optional[bool]:
 
 def _unreached_nodes(merged, script,
                      module_mode: Optional[str] = None) -> List[str]:
-    """本场（多轮合并后）一次都没走到的作者节点——死分支/漏接线的证据。
+    """本次（多轮合并后）一次都没走到的作者节点——死分支/漏接线的证据。
 
     2026-09-11 抽出：原先只在 print_report 里算（人看得见），JSON 终报
     （AI/工具消费方）看不到；femo-debug 工具要把「全部信息」回给主模型，
@@ -1224,7 +1227,7 @@ def _unreached_nodes(merged, script,
     模式下它已被 wrapper 换成合成主流程（全是结构节点），模块自己的死分支
     永远报不出来；现按被测模块自己的 flow 算。
 
-    flow 为 None（解析没得到流程，如空/垃圾剧本）时返回空表：直接摸
+    flow 为 None（解析没得到流程，如空/垃圾FEMO脚本）时返回空表：直接摸
     flow.nodes 会 AttributeError——那会在 print_report 里炸掉，连带后面的
     write_json_report 也不执行（-report 静默丢文件）。"""
     flow = _module_flow(script, module_mode)
@@ -1254,7 +1257,7 @@ def print_report(runs: List[dict], script, module_mode: Optional[str]):
     outcomes = [r['outcome'] for r in runs]
     ok = sum(1 for o in outcomes if o == 'completed')
     loops = sum(1 for o in outcomes if o == 'max_steps')
-    # 边覆盖率分母：module 模式看被测模块自己的 flow；整剧本看 mainflow
+    # 边覆盖率分母：module 模式看被测模块自己的 flow；整个FEMO脚本看 mainflow
     total_edges = 0
     mflow = _module_flow(script, module_mode)
     if mflow is not None:
@@ -1311,7 +1314,7 @@ def write_json_report(path: str, runs: List[dict], script,
     merged = runs[0]['tracker']
     for r in runs[1:]:
         merged.cross_run_merge(r['tracker'])
-    # 边覆盖率分母：module 模式看被测模块自己的 flow；整剧本看 mainflow
+    # 边覆盖率分母：module 模式看被测模块自己的 flow；整个FEMO脚本看 mainflow
     total_edges = 0
     mflow = _module_flow(script, module_mode)
     if mflow is not None:
@@ -1435,7 +1438,7 @@ def cmd_parse(args):
 def cmd_list(args):
     with DBSandbox(verbose=False):
         script = load_script(args.script)
-    print(f"剧本: {script.meta.get('name', '')}")
+    print(f"FEMO脚本: {script.meta.get('name', '')}")
     mods = script.modules or {}
     print(f"  modules: {sorted(mods) or '（无）'}")
     for mname, mdef in mods.items():
@@ -1454,10 +1457,10 @@ def cmd_coverage(args):
 def main(argv=None):
     ap = argparse.ArgumentParser(
         prog='femo_debugger',
-        description='Femo 调试模式：零 token 干跑剧本（FakeHost 替 AI/人类发言）')
+        description='Femo 调试模式：零 token 干跑FEMO脚本（FakeHost 替 AI/人类发言）')
     sub = ap.add_subparsers(dest='cmd', required=True)
 
-    p_run = sub.add_parser('run', help='干跑剧本（可 --module 单测模块）')
+    p_run = sub.add_parser('run', help='干跑FEMO脚本（可 --module 单测模块）')
     _add_common_args(p_run)
     p_run.add_argument('--runs', type=int, default=1, help='多轮跑（每轮换种子）')
     p_run.set_defaults(func=cmd_run)
@@ -1468,11 +1471,11 @@ def main(argv=None):
     p_cov.set_defaults(func=cmd_coverage)
 
     p_parse = sub.add_parser('parse', help='仅编译检查（不跑流程）')
-    p_parse.add_argument('script', help='.femo 剧本路径')
+    p_parse.add_argument('script', help='.femo 脚本路径')
     p_parse.set_defaults(func=cmd_parse)
 
-    p_list = sub.add_parser('list', help='列出剧本的 module / action 清单')
-    p_list.add_argument('script', help='.femo 剧本路径')
+    p_list = sub.add_parser('list', help='列出FEMO脚本的 module / action 清单')
+    p_list.add_argument('script', help='.femo 脚本路径')
     p_list.set_defaults(func=cmd_list)
 
     args = ap.parse_args(argv)
@@ -1480,7 +1483,7 @@ def main(argv=None):
 
 
 def _add_common_args(p):
-    p.add_argument('script', help='.femo 剧本路径')
+    p.add_argument('script', help='.femo 脚本路径')
     p.add_argument('--seed', type=int, default=None, help='随机种子（可复现）')
     p.add_argument('--set', action='append', default=[],
                    help='定向注入变量值 k=v / k=v1|v2（可多次；@actor 可用）')
@@ -1490,7 +1493,7 @@ def _add_common_args(p):
                         '即停，报告标「可能是无限循环」，退出码 0 非错误）')
     p.add_argument('--base-dir', default=None,
                    help='覆盖 code: 相对引用（file:"xxx.py"）的解析目录；'
-                        '缺省=剧本所在目录')
+                        '缺省=FEMO脚本所在目录')
     p.add_argument('--assign-prob', type=float, default=1.0,
                    help='赋值概率 0~1（默认 1.0 总是赋值；<1 概率沉默，'
                         '模拟 out 是权限不是义务——不赋值走引擎重试/fallback）')

@@ -1,0 +1,67 @@
+meta:
+  id = 000LuxFiat
+  name = 养在数据库的小灵魂
+  version = 1.0
+  owner = 001
+  session = 1
+
+actors:
+  ai @Eve = soul:the1stlittlesoul
+  ai @猫 = soul:littlecat
+  human @我
+
+code:
+  memfile = file:"femoBridges/MemoryExample.py"
+  ctxfile = file:"femoBridges/ContextExample.py"
+  sleep = file:"D:\myFiles\dsh\femo-plugin\femoExamples\LuxFiat\wait.py"
+
+vars:
+  stop = false
+
+action EveMove @ai(@Eve):
+  prompt: |
+    Eve请自由行动，自由说话～
+    （注意看清上下文，分清你自己的角色，只进行自己的动作和语言，不要替别的角色发言。简短一点。）
+  scope: [@Eve, @猫]
+
+action CatMove @ai(@猫):
+  prompt: |
+    你是一只小猫，请自由决定干什么或者说什么。
+    （注意看清上下文，分清你自己的角色，只进行自己的动作和语言，不要替别的角色发言。简短一点。）
+  scope: [@Eve, @猫]
+
+action input @human(@我):
+  prompt: |
+    和Eve聊点什么？
+  scope: [@Eve, @猫, @我]
+
+action wait @func(sleep.wait_30):
+
+mainflow:
+  [wait]: wait
+  [wait_2]: wait
+  [EveMove]: EveMove
+  [CatMove]: CatMove
+  [input]: input
+  [人类发言]: 
+
+  [START] -> fork:
+    -> [EveMove]
+    -> [人类发言]
+  [EveMove] -> [wait]
+  [wait] -> [CatMove]
+  [CatMove] -> [wait_2]
+  [wait_2] -> [EveMove]
+  [人类发言] -> [input]
+  [input] -> fork:
+    -> if (stop == false) -> [人类发言]
+    -> if (stop == true) -> [END]
+
+#sketch:
+#  [END] = 166, 185
+#  [wait] = 317, -10
+#  [wait_2] = 161, 88
+#  [EveMove] = 161, -10
+#  [CatMove] = 317, 88
+#  [input] = -5, 175
+#  [人类发言] = 0, 98

@@ -93,11 +93,11 @@ class ActorDef:
     soul: Optional[str] = None
     source: Optional[str] = None
     tools: List[str] = field(default_factory=list)
-    # tools: true/false 布尔开关（None = 剧本未声明，交由宿主默认决定）；
+    # tools: true/false 布尔开关（None = FEMO脚本未声明，交由宿主默认决定）；
     # tools: [name, ...] 仍走 tools 列表（白名单）。
     tools_enabled: Optional[bool] = None
     # thinking: <档位> 思考档位（词汇集见 host_manifest，解析期校验）；
-    # None = 剧本未声明 → 请求不带 reasoning_effort（剥离继承后落到
+    # None = FEMO脚本未声明 → 请求不带 reasoning_effort（剥离继承后落到
     # 部署默认档位/提供方默认，语义同宿主模型选择器的 Default 项）。
     thinking: Optional[str] = None
     is_blueprint: bool = False
@@ -115,6 +115,13 @@ class OutDef:
     out_type: OutType = OutType.STRING
     label: str = ""
     choices: Optional[str] = None
+    # required/optional 标注（2026-09-29 拍板）：out: 项写 name(required) 必须
+    # 赋值、缺赋值触发节点重试；name(optional) 或不注明（默认）则缺赋值放行。
+    required: bool = False
+    # 旧 (类型, "标签") 括号写法废除标记（2026-09-29 二刀拍板：括号里只认
+    # required/optional）。解析时命中废除写法在此存括号原文，校验段统一报错
+    # （与 InMapping.bare 同款「解析打标、校验报错带行」手法）；None=合法项。
+    banned_paren: Optional[str] = None
 
 @dataclass
 class ActionDef:
@@ -271,8 +278,11 @@ def _is_blank_or_comment(line: str) -> bool:
     s = line.strip()
     return s == '' or s.startswith('#') or s.startswith('//')
 
-def _indent_of(line: str) -> int:
-    return len(line) - len(line.lstrip())
+# ━━━ 已退役·观察期（2026-09-26 起）━━━ _indent_of：全仓零引用（双窗口交叉扫描+逐项复核），
+# 缩进计算已由别处内联取代。无报错数日后整段删除（含本注）。
+# def _indent_of(line: str) -> int:
+#     return len(line) - len(line.lstrip())
+# ━━━ 观察期退役段结束：_indent_of ━━━
 
 def _detect_type(line: str) -> str:
     s = line.strip()
@@ -543,38 +553,30 @@ def _parse_out_multi(s: str) -> List[OutDef]:
             value = m.group(3).strip()
             result.append(OutDef(var_name=f"{var_name} {op} {value}", out_type=OutType.ASSIGN, label=""))
             continue
-        # 函数调用形式（字符类含 $/@：$var(string, "标签") / dict.@key(string)）
-        pm = re.match(r'^([$\w.{}@]+)\(([^)]*)\)', item)
+        # 括号标注形式：括号里只认 required/optional（2026-09-29 二刀拍板：
+        # 旧 (类型, "标签") 写法废除——命中废除写法打 banned_paren 标，校验段
+        # 统一报错，不在此处抛（保住「解析打标、校验带行报错」的既有手法）
+        pm = re.match(r'^([$\w.{}@]+)\(([^)]*)\)(.*)$', item)
         if pm:
-            full_name, params_str = pm.group(1), pm.group(2)
+            full_name, params_str, tail = pm.group(1), pm.group(2).strip(), pm.group(3).strip()
             if '.' in full_name:
-                parts = full_name.split('.', 1)
-                var_name, dynamic_key = parts[0], parts[1]
+                var_name, dynamic_key = full_name.split('.', 1)
             else:
                 var_name, dynamic_key = full_name, None
-            out_type, label, choices = OutType.STRING, "", None
-            params = _split_br(params_str)
-            positional_idx = 0
-            for p in params:
-                p = p.strip()
-                if p.startswith('choices='):
-                    choices = p[len('choices='):].strip()
-                elif p.startswith('label='):
-                    label = p[len('label='):].strip().strip('"').strip("'")
-                else:
-                    if positional_idx == 0:
-                        try:
-                            out_type = OutType(p.lower())
-                        except:
-                            pass
-                    elif positional_idx == 1:
-                        label = p.strip().strip('"').strip("'")
-                    positional_idx += 1
+            key = params_str.strip('"\'').lower()
+            if tail or key not in ('required', 'optional'):
+                result.append(OutDef(var_name=var_name, dynamic_key=dynamic_key,
+                                     banned_paren=params_str))
+                continue
             result.append(OutDef(var_name=var_name, dynamic_key=dynamic_key,
-                                 out_type=out_type, label=label, choices=choices))
+                                 required=(key == 'required')))
             continue
-        # 纯变量名
-        result.append(OutDef(var_name=item, out_type=OutType.STRING, label=""))
+        # 纯变量名；裸点形式 dict.@key = 动态字典键（旧括号声明的替代写法）
+        if '.' in item:
+            var_name, dynamic_key = item.split('.', 1)
+            result.append(OutDef(var_name=var_name, dynamic_key=dynamic_key))
+        else:
+            result.append(OutDef(var_name=item, out_type=OutType.STRING, label=""))
     return result
     
 
@@ -1125,31 +1127,36 @@ def validate_module_flows(mod: ModuleDef, script: 'Script',
         validate_module_flows(sub, script, sub_chain_actions, sub_chain_modules)
 
 
+# ━━━ 已退役·观察期（2026-09-26 起）━━━ eval_condition：全仓零调用（双窗口交叉扫描+逐项复核），
+# 自述"供运行时和流程图解析使用"，实际两边的条件求值都走 vars/evaluator 独立求值器。
+# 作者在 docs/CompletedRoadmaps/变量与task系统重构.md 早有挂账：「核对调用点，若为死代码随收尾清出」
+# ——本次即该收尾。无报错数日后整段删除（含本注）。
 # ---- 安全条件求值 ----
-def eval_condition(expr: str, context: dict) -> bool:
-    """安全求值 Python 表达式，供运行时和流程图解析使用"""
-    safe_expr = re.sub(r'@(\w+)', r'"@\1"', expr)
-    try:
-        tree = ast.parse(safe_expr, mode='eval')
-    except SyntaxError:
-        raise SyntaxError(f"条件表达式语法错误: {expr} -> 解析为 '{safe_expr}'")
-
-    safe_builtins = {
-        'True': True, 'False': False, 'None': None,
-        'len': len, 'int': int, 'str': str, 'float': float,
-        'bool': bool, 'abs': abs, 'min': min, 'max': max,
-        'sum': sum, 'any': any, 'all': all,
-        'isinstance': isinstance, 'hasattr': hasattr,
-        'list': list, 'dict': dict, 'set': set, 'tuple': tuple,
-        'range': range, 'enumerate': enumerate,
-    }
-
-    namespace = {**safe_builtins, **context}
-    try:
-        result = eval(compile(tree, '<cond>', 'eval'), {"__builtins__": {}}, namespace)
-        return bool(result)
-    except Exception as e:
-        raise RuntimeError(f"条件表达式求值失败: '{expr}', 上下文: {list(context.keys())}, 错误: {e}")
+# def eval_condition(expr: str, context: dict) -> bool:
+#     """安全求值 Python 表达式，供运行时和流程图解析使用"""
+#     safe_expr = re.sub(r'@(\w+)', r'"@\1"', expr)
+#     try:
+#         tree = ast.parse(safe_expr, mode='eval')
+#     except SyntaxError:
+#         raise SyntaxError(f"条件表达式语法错误: {expr} -> 解析为 '{safe_expr}'")
+#
+#     safe_builtins = {
+#         'True': True, 'False': False, 'None': None,
+#         'len': len, 'int': int, 'str': str, 'float': float,
+#         'bool': bool, 'abs': abs, 'min': min, 'max': max,
+#         'sum': sum, 'any': any, 'all': all,
+#         'isinstance': isinstance, 'hasattr': hasattr,
+#         'list': list, 'dict': dict, 'set': set, 'tuple': tuple,
+#         'range': range, 'enumerate': enumerate,
+#     }
+#
+#     namespace = {**safe_builtins, **context}
+#     try:
+#         result = eval(compile(tree, '<cond>', 'eval'), {"__builtins__": {}}, namespace)
+#         return bool(result)
+#     except Exception as e:
+#         raise RuntimeError(f"条件表达式求值失败: '{expr}', 上下文: {list(context.keys())}, 错误: {e}")
+# ━━━ 观察期退役段结束：eval_condition ━━━
 
 # ---- FlowBuilder 主类 ----
 class FlowBuilder:
@@ -1652,59 +1659,63 @@ def _node_is_ai_action(node: FlowNode, actions: Dict[str, ActionDef]) -> bool:
     return is_ai
 
 
-def inject_delay_nodes(flow: FlowGraph, actions: Dict[str, ActionDef], delay_seconds: int) -> None:
-    """
-    遍历 flow 所有边，若 source 和 target 节点都绑定 AI Action，
-    在中间插入一个 delay 节点。
-
-    原始边: A --(cond)--> B
-    变成:   A --(cond)--> [delay_X] --()--> B
-
-    delay 节点 type='delay'，meta 内存 is_delay_node=True 和 delay_seconds。
-    原边 condition 跟第一段走（A→delay），第二段（delay→B）无条件。
-    """
-    print(f"[parser] ⏱️ inject_delay_nodes: 开始, delay={delay_seconds}s, 边数={len(flow.edges)}, 节点数={len(flow.nodes)}")
-
-    new_edges = []
-    delay_counter = 0
-
-    for edge in flow.edges:
-        source_node = flow.nodes.get(edge.source)
-        target_node = flow.nodes.get(edge.target)
-
-        source_is_ai = _node_is_ai_action(source_node, actions) if source_node else False
-        target_is_ai = _node_is_ai_action(target_node, actions) if target_node else False
-
-        if source_is_ai and target_is_ai:
-            delay_counter += 1
-            delay_id = f"[__delay_{edge.source}_{edge.target}_{delay_counter}__]"
-
-            delay_node = FlowNode(
-                id=delay_id,
-                type='delay',
-                label=f'delay({delay_seconds}s)',
-                meta={'is_delay_node': True, 'delay_seconds': delay_seconds},
-            )
-            flow.add_node(delay_node)
-
-            # 第一段: source -> delay, 保留原 condition
-            new_edges.append(FlowEdge(
-                source=edge.source,
-                target=delay_id,
-                condition=edge.condition,
-            ))
-            # 第二段: delay -> target, 无条件
-            new_edges.append(FlowEdge(
-                source=delay_id,
-                target=edge.target,
-                condition="",
-            ))
-            print(f"[parser] ⏱️ 注入 delay: {edge.source} --({edge.condition or '无条件'})--> {delay_id} --()--> {edge.target}")
-        else:
-            new_edges.append(edge)
-
-    flow.edges = new_edges
-    print(f"[parser] ⏱️ inject_delay_nodes: 完成, 注入 {delay_counter} 个 delay 节点, 新边数={len(flow.edges)}")
+# ━━━ 已退役·观察期（2026-09-26 起）━━━ inject_delay_nodes：全仓零调用（双窗口交叉扫描+逐项复核）。
+# 它是全仓唯一创建 delay 节点的地方——本函数退役后，runtime 里两处 delay 消费分支
+# 成为永不可达的守卫（保留不动，留作守卫无害）。无报错数日后整段删除（含本注）。
+# def inject_delay_nodes(flow: FlowGraph, actions: Dict[str, ActionDef], delay_seconds: int) -> None:
+#     """
+#     遍历 flow 所有边，若 source 和 target 节点都绑定 AI Action，
+#     在中间插入一个 delay 节点。
+#
+#     原始边: A --(cond)--> B
+#     变成:   A --(cond)--> [delay_X] --()--> B
+#
+#     delay 节点 type='delay'，meta 内存 is_delay_node=True 和 delay_seconds。
+#     原边 condition 跟第一段走（A→delay），第二段（delay→B）无条件。
+#     """
+#     print(f"[parser] ⏱️ inject_delay_nodes: 开始, delay={delay_seconds}s, 边数={len(flow.edges)}, 节点数={len(flow.nodes)}")
+#
+#     new_edges = []
+#     delay_counter = 0
+#
+#     for edge in flow.edges:
+#         source_node = flow.nodes.get(edge.source)
+#         target_node = flow.nodes.get(edge.target)
+#
+#         source_is_ai = _node_is_ai_action(source_node, actions) if source_node else False
+#         target_is_ai = _node_is_ai_action(target_node, actions) if target_node else False
+#
+#         if source_is_ai and target_is_ai:
+#             delay_counter += 1
+#             delay_id = f"[__delay_{edge.source}_{edge.target}_{delay_counter}__]"
+#
+#             delay_node = FlowNode(
+#                 id=delay_id,
+#                 type='delay',
+#                 label=f'delay({delay_seconds}s)',
+#                 meta={'is_delay_node': True, 'delay_seconds': delay_seconds},
+#             )
+#             flow.add_node(delay_node)
+#
+#             # 第一段: source -> delay, 保留原 condition
+#             new_edges.append(FlowEdge(
+#                 source=edge.source,
+#                 target=delay_id,
+#                 condition=edge.condition,
+#             ))
+#             # 第二段: delay -> target, 无条件
+#             new_edges.append(FlowEdge(
+#                 source=delay_id,
+#                 target=edge.target,
+#                 condition="",
+#             ))
+#             print(f"[parser] ⏱️ 注入 delay: {edge.source} --({edge.condition or '无条件'})--> {delay_id} --()--> {edge.target}")
+#         else:
+#             new_edges.append(edge)
+#
+#     flow.edges = new_edges
+#     print(f"[parser] ⏱️ inject_delay_nodes: 完成, 注入 {delay_counter} 个 delay 节点, 新边数={len(flow.edges)}")
+# ━━━ 观察期退役段结束：inject_delay_nodes ━━━
 
 
 def validate_actor_souls(text: str, soul_exists: Optional[Callable[[str], bool]] = None) -> None:
@@ -1712,7 +1723,7 @@ def validate_actor_souls(text: str, soul_exists: Optional[Callable[[str], bool]]
 
     报错 = 全部错误一次列出：每条含行号 + 该行原文 + soul id；末尾附可用列表
     （soul_exists 携带 _soul_ids 属性时）。soul_exists 为 None 时跳过（保持纯解析可测）。
-    裸 actor（无 soul 字段）合法——soul 非必须（用户决策：无角色设定的简单剧本可不写）。
+    裸 actor（无 soul 字段）合法——soul 非必须（用户决策：无角色设定的简单FEMO脚本可不写）。
     """
     if soul_exists is None:
         return
@@ -1877,9 +1888,13 @@ _VAR_DECL_RESERVED = frozenset([
 
 
 def _extract_cond_identifiers(cond: str) -> list:
-    """剥离字符串字面量后提取裸标识符（与前端 _extractCondIdentifiers 一致）。"""
+    """剥离字符串字面量后提取裸标识符。标识符首字符认 @/$（2026-09-28 修：
+    此前不认 $，'$x' 会被剥掉 $ 只校验裸名 x——'$' 打头的引用要不要 shared
+    声明编译期失察，运行期才报；现对齐运行期 _decl_for 语义）。前端
+    _extractCondIdentifiers 仍不认 $（剥掉 $ 校验裸名，宽松但同样能抓
+    未声明名）——两份闭环各自完整，规则正文一致、$ 的严度引擎侧更进一格。"""
     no_str = re.sub(r'"[^"]*"|\'[^\']*\'', '""', cond)
-    return re.findall(r'@?[\w]+(?:\.[\w]+)*', no_str)
+    return re.findall(r'[@$]?[\w]+(?:\.[\w]+)*', no_str)
 
 
 def _main_ident(ident: str) -> str:
@@ -1896,7 +1911,7 @@ def validate_variable_declarations(script: 'Script') -> None:
       2) if 条件表达式里的裸标识符（非字面量/保留字）必须可见
     loop_vars（循环变量，运行期绑定）在声明表之外单独放行。
     模块 flow 的 def_chain = 书写嵌套定义链（'Outer.Inner' → ('Outer','Inner')，
-    与运行期调用栈无关）；mainflow = ()（剧本级，只见 global）。
+    与运行期调用栈无关）；mainflow = ()（FEMO脚本级，只见 global）。
     """
     table = script.scope_table
     if table is None:
@@ -1946,7 +1961,25 @@ def validate_variable_declarations(script: 'Script') -> None:
                 main = _main_ident(ident)
                 if re.match(r'^\d+(\.\d+)?$', main):
                     continue
-                if main.startswith('@'):
+                if main.startswith('$'):
+                    # $ 显式引用：剥前缀查声明，且要求该名字声明为 shared
+                    # （对齐运行期 VarFacade._decl_for：$x 即显式直取全局那份，
+                    # 引用未声明为 shared 的 $x 一律报错——编译期提前拦下）
+                    bare = main[1:]
+                    decl = table.lookup(bare, def_chain)
+                    if decl is None:
+                        raise SyntaxError(
+                            f'条件 "{edge.condition}" 引用了未声明的 shared 变量 '
+                            f'"${bare}"（{ctx_name}，边 {edge.source} -> {edge.target}）。'
+                            f'所有变量须在 vars: 中声明'
+                        )
+                    if not decl.shared:
+                        raise SyntaxError(
+                            f'条件 "{edge.condition}" 引用了 "${bare}"，但 "{bare}" '
+                            f'未声明为 shared（$）变量——$ 引用要求该名字在 vars: 中'
+                            f'以 $ 声明（{ctx_name}，边 {edge.source} -> {edge.target}）'
+                        )
+                elif main.startswith('@'):
                     if not visible(main):
                         raise SyntaxError(
                             f'条件 "{edge.condition}" 引用了未声明的 actor/变量 "{main}"'
@@ -1977,7 +2010,7 @@ def validate_variable_declarations(script: 'Script') -> None:
 # ── join 在环上的编译期警告（2026-09-07）────────────────────────
 # join(all)/join(N) 的语义是"等全部（N 个）上游到齐再放行"。若 join 节点
 # 位于流程环路上（能从自己出发绕回自己），环上的 fork 会先于 join 发生、
-# 又只有 join 放行后才会再发生——等待集永远凑不齐，剧本必然无声卡死
+# 又只有 join 放行后才会再发生——等待集永远凑不齐，FEMO脚本必然无声卡死
 # （实锤：警长版被"图到文本"自动加 join(all) 后，DayPhase 永远进不去）。
 # 循环里的合流请直接用普通多线汇入（[A] -> [next] 逐条），"到即走"。
 # 不作 error：join 的代次机制在部分环形态下仍可收敛，作者知情后自行判断。
@@ -2008,7 +2041,7 @@ def validate_join_on_cycle(script) -> None:
                     script,
                     f"join 节点 [{join_id}] 位于流程环路上（从它出发能绕回它自己）。"
                     "join 会等待上游到齐，而环路里的一部分上游只有 join 放行之后才会发生，"
-                    "这会让剧本永远等待下去。请把循环里的合流改成普通多线汇入"
+                    "这会让FEMO脚本永远等待下去。请把循环里的合流改成普通多线汇入"
                     "（逐条 [A] -> [next]，到即走），不要用 join(...):。",
                     where=where,
                 )
@@ -2230,6 +2263,26 @@ def validate_action_syntax(text: str, script: 'Script') -> None:
                     f'action "{ad.name}"（{ctx}）→ out: 目标 "{target}" '
                     f'是 Python 保留字，不能用作变量名，请改名'
                 )
+        # ⑧ required 标注只支持普通变量名（2026-09-29 拍板）：动态键的"哪个键
+        # 必须赋值"说不清，拒绝而不是猜。
+        for od in (ad.outs or []):
+            if od.required and od.dynamic_key:
+                errors.append(
+                    f'action "{ad.name}"（{ctx}）→ out: 动态键 "{od.var_name}.{od.dynamic_key}" '
+                    f'不支持 required 标注。动态键的键名由运行时决定，引擎无法判定'
+                    f'"哪个键必须赋值"；required 只支持普通变量名（如 name(required)）'
+                )
+        # ⑨ 旧 (类型, "标签") 括号写法废除（2026-09-29 二刀拍板）：括号里只认
+        # required/optional，其余一律编译报错
+        for od in (ad.outs or []):
+            if od.banned_paren is not None:
+                extra = (f'；动态字典键请写裸点形式 {od.var_name}.{od.dynamic_key}'
+                         if od.dynamic_key else '')
+                errors.append(
+                    f'action "{ad.name}"（{ctx}）→ out: 项 "{od.var_name}({od.banned_paren})" '
+                    f'不支持括号标注：括号里只认 required/optional（如 name(required)），'
+                    f'直接写变量名即可{extra}'
+                )
         # ③④ scope
         if (ad.scope or '').strip():
             line, srcline = _scope_line_lookup(text, ad.scope)
@@ -2320,9 +2373,34 @@ def validate_action_syntax(text: str, script: 'Script') -> None:
     for mname, mod in (script.modules or {}).items():
         walk_flows(mod.flow, f'module {mname}')
 
+    # ⑧ module 方法出参不支持 required（2026-09-29 拍板）：memories/contexts 的
+    # out 映射是调用边界的赋值传递，不是 AI 输出，required 语义不适用。
+    def walk_method_outs(mod: 'ModuleDef', path: str):
+        for field in ('memories', 'contexts'):
+            for meth_name, meth in ((getattr(mod, field, None) or {}).items()):
+                for od in (meth.out_defs or []):
+                    if od.required:
+                        errors.append(
+                            f'module {path} 的 {field} 方法 "{meth_name}" → '
+                            f'out 映射 "{od.var_name}" 不支持 required 标注。'
+                            f'module 方法的 out 是调用边界赋值，不是 AI 输出；'
+                            f'required 只用于 action 的 out:'
+                        )
+                    if od.banned_paren is not None:
+                        errors.append(
+                            f'module {path} 的 {field} 方法 "{meth_name}" → '
+                            f'out 映射 "{od.var_name}({od.banned_paren})" '
+                            f'不支持括号标注：括号里只认 required/optional，'
+                            f'直接写变量名即可'
+                        )
+        for sub_name, sub in (mod.modules or {}).items():
+            walk_method_outs(sub, f'{path}.{sub_name}')
+    for mname, mod in (script.modules or {}).items():
+        walk_method_outs(mod, mname)
+
     if errors:
         raise SyntaxError(
-            '编译错误：剧本语法检查未通过（共 '
+            '编译错误：脚本语法检查未通过（共 '
             f'{len(errors)} 处）。\n' + '\n'.join(f'  {i}. {e}' for i, e in enumerate(errors, 1))
         )
 
@@ -2348,7 +2426,7 @@ def _collect_module_vars(mod: ModuleDef, path: str,
 # fork 与 join 完全解耦、互不干涉：fork 只管分叉（原 task 停 → 几个新 task
 # 往下跑，后面 join 不 join 与它无关）；join 只管把到达的 task 停掉汇成一个
 # 新主支继续跑（分支从哪儿来、来自几个 fork、嵌不嵌套，与它无关）。
-# 剧本作者写多嵌套多自由，编译器按规定的跑法执行即可——编译期不做任何
+# FEMO脚本作者写多嵌套多自由，编译器按规定的跑法执行即可——编译期不做任何
 # join/fork 配对限制（此前的"配对唯一 fork/禁嵌套/禁多接收端"校验已回滚）。
 # 运行期 join 协调器（步骤 3）：到达即签到，凑齐判定=沿 join 入边反向上溯
 # 图拓扑收集等待集合（详见施工清单 v3 §3.3）。
@@ -2401,10 +2479,10 @@ def parse_script(text: str, base_dir: str = ".", models: Optional[Dict[str, Any]
     # 编译期检测（2026-08-24，待议缝隙①转正）：声明了 action 却解析出空流程
     # 图——几乎必然是流程区被静默吞掉或语法没接上，绝不允许空图秒跑完假报
     # ✅（实测 notify-theater 裸名 mainflow 被 normalizer 吞成空图的实锤形态）。
-    # 无 action 的纯数据/工具剧本不在此列。
+    # 无 action 的纯数据/工具FEMO脚本不在此列。
     if script.actions and not script.flow.nodes:
         raise SyntaxError(
-            'mainflow 是空的：剧本声明了 action，但流程图没有任何节点。'
+            'mainflow 是空的：FEMO脚本声明了 action，但流程图没有任何节点。'
             '请检查 mainflow 区是否漏了 [START] 标记或连线（如 [START] -> 动作 -> [END]）。'
         )
 
@@ -2442,6 +2520,27 @@ def parse_script(text: str, base_dir: str = ".", models: Optional[Dict[str, Any]
 
     # 编译期检测：回到「多条无条件出边」的节点（分支数爆炸模式）
     validate_flow_reentry(script)
+
+    # 预定义变量 all / allAI / allHUMAN（2026-10-04 拍板）：scope: all 之外的
+    # 一切变量位统一认——all=全部角色名，allAI=全部 AI 角色，allHUMAN=全部
+    # 人类角色（各按声明序；没有对应类型就是空表，但声明照给）。落法 = parse
+    # 收尾自动补脚本级声明，与作者自己在 vars: 写同名变量完全等价——声明进了
+    # scope_table，func in: 右值 / assign 右值 / prompt 插值 / for 迭代器 /
+    # 条件裸名 / 帧取值 / 续跑补种（seed_new_declarations）全按普通声明走，
+    # 求值链零新路径。用户显式声明优先（守卫按剥 $ 后规范名判——$all 同名
+    # 不注入，防撞 build_scope_table 的同 owner 同名拦截）。
+    _declared_canon = {(key[1:] if key.startswith('$') else key)
+                       for key in (script.vars or {})}
+    _predefined_vars = {
+        'all': list(script.actors.keys()),
+        'allAI': [name for name, actor in script.actors.items()
+                  if getattr(getattr(actor, 'type', None), 'value', None) == 'ai'],
+        'allHUMAN': [name for name, actor in script.actors.items()
+                     if getattr(getattr(actor, 'type', None), 'value', None) == 'human'],
+    }
+    for _pd_name, _pd_value in _predefined_vars.items():
+        if _pd_name not in _declared_canon:
+            script.vars[_pd_name] = _pd_value
 
     # 变量声明装配（步骤 B，2026-09-04）：build_scope_table 是声明/可见域/
     # 初值的单一权威（$ 剥名/规范名冲突拦截/定义链登记全在表内）；

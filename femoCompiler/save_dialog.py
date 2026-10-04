@@ -82,29 +82,34 @@ def _do_insert_dialog(session_id, turn_id, oratio_idx, user_prompt, user_id, sou
     finally:
         conn.close()
 
-def _do_insert_ai(session_id, turn_id, step_idx, response, soul_id,
-                  user_scope, soul_scope, model_id="", cot="", tool_call="", tool_result="", **kwargs):
-    from femoCompiler.db_utils import _get_conn
-    conn = _get_conn()
-    try:
-        conn.execute("""
-            INSERT INTO react_steps
-            (session_id, turn_id, step_idx, timestamp, response, soul_id,
-             user_scope, soul_scope, cot, model_id, tool_call, tool_result)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            session_id, turn_id, step_idx,
-            int(time.time()),
-            response,
-            soul_id or '',
-            json.dumps([str(x) for x in (user_scope or [])]),
-            json.dumps([str(x) for x in (soul_scope or [])]),
-            cot, model_id,
-            tool_call, tool_result,
-        ))
-        conn.commit()
-    finally:
-        conn.close()
+# ━━━ 已退役·观察期（2026-09-26 起）━━━ _do_insert_ai：唯一调用方是 _process_item 的 'ai' 分支，
+# 而该分支唯一的入队口 enqueue_ai 的唯一调用方 save_ai_turn 已于 2026-09-18 整体注释停用
+# （转写分离 2026-08-29 后由合写取代）——整条传递性死亡（双窗口交叉扫描+逐项复核）。
+# 无报错数日后整段删除（含本注）。
+# def _do_insert_ai(session_id, turn_id, step_idx, response, soul_id,
+#                   user_scope, soul_scope, model_id="", cot="", tool_call="", tool_result="", **kwargs):
+#     from femoCompiler.db_utils import _get_conn
+#     conn = _get_conn()
+#     try:
+#         conn.execute("""
+#             INSERT INTO react_steps
+#             (session_id, turn_id, step_idx, timestamp, response, soul_id,
+#              user_scope, soul_scope, cot, model_id, tool_call, tool_result)
+#             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+#         """, (
+#             session_id, turn_id, step_idx,
+#             int(time.time()),
+#             response,
+#             soul_id or '',
+#             json.dumps([str(x) for x in (user_scope or [])]),
+#             json.dumps([str(x) for x in (soul_scope or [])]),
+#             cot, model_id,
+#             tool_call, tool_result,
+#         ))
+#         conn.commit()
+#     finally:
+#         conn.close()
+# ━━━ 观察期退役段结束：_do_insert_ai ━━━
         
         
 
@@ -144,27 +149,32 @@ def save_human_turn(session_id, turn_id, oratio_idx, user_input, actor_info, met
     return event
 
 
-def save_ai_turn(session_id, turn_id, step_idx, response, actor_info, meta_owner,
-                 model_id="", thinking="", action_scope=None, raw_action_scope=None):
-    """
-    将 AI 发言入队（后台线程写入数据库）
-    """
-    user_scope, soul_scope = _build_scope(action_scope, actor_info, meta_owner, raw_action_scope)
-    soul_id = str(actor_info['soul']) if actor_info.get('soul') else ''
-
-    event = save_queue.enqueue_ai(
-        session_id=session_id,
-        turn_id=turn_id,
-        step_idx=step_idx,
-        response=response,
-        soul_id=soul_id,
-        model_id=model_id,
-        cot=thinking,
-        user_scope=user_scope,
-        soul_scope=soul_scope,
-    )
-    print(f"[SaveDialog] 🤖 AI 发言已入队: session={session_id}, turn={turn_id}, step={step_idx}")
-    return event
+# ── 已停用（2026-09-18）：save_ai_turn 是转写分离（2026-08-29）之前的单行写法，
+# 全仓已无调用点——AI 节点现在一律走下面的 save_ai_finish 收尾合写（showprompt
+# 行 + 全部 react step 同一事务）。先注释保留、多跑几天无异常再删。
+# 注：SaveQueue.enqueue_ai 也只剩它一个调用方，同样待观察。
+#
+# def save_ai_turn(session_id, turn_id, step_idx, response, actor_info, meta_owner,
+#                  model_id="", thinking="", action_scope=None, raw_action_scope=None):
+#     """
+#     将 AI 发言入队（后台线程写入数据库）
+#     """
+#     user_scope, soul_scope = _build_scope(action_scope, actor_info, meta_owner, raw_action_scope)
+#     soul_id = str(actor_info['soul']) if actor_info.get('soul') else ''
+#
+#     event = save_queue.enqueue_ai(
+#         session_id=session_id,
+#         turn_id=turn_id,
+#         step_idx=step_idx,
+#         response=response,
+#         soul_id=soul_id,
+#         model_id=model_id,
+#         cot=thinking,
+#         user_scope=user_scope,
+#         soul_scope=soul_scope,
+#     )
+#     print(f"[SaveDialog] 🤖 AI 发言已入队: session={session_id}, turn={turn_id}, step={step_idx}")
+#     return event
 
 
 def _do_insert_group(session_id, entries):
@@ -172,6 +182,8 @@ def _do_insert_group(session_id, entries):
     要么全有要么全无，消灭「有 show 没发言」的半行。异常 rollback 后 raise
     （不吞错）。entries 元素按 kind 区分：
       dialog_show  → dialog 表 showprompt 行（femoshow-*）
+      node_prompt  → dialog 表 节点 prompt 行（femo-*；2026-09-27 收卷一拍：随
+                     发言同事务落库，不再于节点开始时提前落）
       human_input  → dialog 表 玩家输入行
       ai_step      → react_steps 表 一轮转写（cot/tool_call/tool_result 各归各位）
     """
@@ -202,6 +214,16 @@ def _do_insert_group(session_id, entries):
                      json.dumps([str(x) for x in (e['user_scope'] or [])]),
                      json.dumps([str(x) for x in (e['soul_scope'] or [])]),
                      'chat', ts))
+            elif kind == 'node_prompt':
+                conn.execute("""INSERT INTO dialog
+                    (session_id, turn_id, oratio_idx, user_prompt, user_id, soul_id,
+                     user_scope, soul_scope, work_mode, timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (session_id, e['turn_id'], e['oratio_idx'], e['text'],
+                     json.dumps([f"femo-{e['femo_id']}"]), '',
+                     json.dumps([str(x) for x in (e['user_scope'] or [])]),
+                     json.dumps([str(x) for x in (e['soul_scope'] or [])]),
+                     'chat', ts))
             elif kind == 'ai_step':
                 conn.execute("""INSERT INTO react_steps
                     (session_id, turn_id, step_idx, timestamp, response, soul_id,
@@ -224,18 +246,27 @@ def _do_insert_group(session_id, entries):
 
 
 def save_ai_finish(session_id, turn_id, showprompt, steps, actor_info, meta_owner,
-                   action_scope=None, femo_id="unknown", model_id="", raw_action_scope=None):
-    """AI 节点收尾合写（2026-08-29 转写分离配套）：showprompt 行 + 全部 react
-    step 行同一事务落库——要不然都有，要不然都没有，消灭半行。
+                   action_scope=None, femo_id="unknown", model_id="", raw_action_scope=None,
+                   node_prompt=None):
+    """AI 节点收尾合写（2026-08-29 转写分离配套；2026-09-27 收卷一拍）：prompt、
+    showprompt 与全部 react step 行同一事务落库——要不然都有，要不然都没有，
+    消灭半行。turn 号由调用方在收卷时刻现取（永远新鲜）：并行分支在等待 LLM 的
+    几十秒里会把开跑时的占位号推前，迟到的发言落旧号会被增量窗口
+    （turn > 交付游标）永久过滤（job 2613 实证）。
 
     showprompt: 渲染后的 showprompt 文本（None/空 = 无 showprompt 的节点）；
     steps: [{step, cot, reply, toolCall, toolResult}]（转写分离结构），
     空 steps 回退为单空 react 行（与旧行为对齐）。
-    prompt 行不在本组——节点开始时已落（幕后指令，节点启动痕迹）。
+    node_prompt: 渲染后的节点 prompt 文本（None/空 = 无 prompt）——收卷一拍随
+    发言落库，不再于节点开始时提前落。
     model_id: 模型标识（可空，落库 react_steps.model_id 列）。"""
     user_scope, soul_scope = _build_scope(action_scope, actor_info, meta_owner, raw_action_scope)
     soul_id = str(actor_info['soul']) if actor_info.get('soul') else ''
     entries = []
+    if node_prompt:
+        entries.append({'kind': 'node_prompt', 'turn_id': turn_id, 'oratio_idx': 0,
+                        'text': node_prompt, 'femo_id': femo_id,
+                        'user_scope': user_scope, 'soul_scope': soul_scope})
     if showprompt:
         entries.append({'kind': 'dialog_show', 'turn_id': turn_id, 'oratio_idx': 1,
                         'text': showprompt, 'femo_id': femo_id,
@@ -259,14 +290,20 @@ def save_ai_finish(session_id, turn_id, showprompt, steps, actor_info, meta_owne
 
 def save_human_finish(session_id, turn_id, showprompt, user_input, input_oratio,
                       actor_info, meta_owner, action_scope=None, femo_id="unknown",
-                      raw_action_scope=None):
-    """human 节点收尾合写（2026-08-29）：showprompt 行（本轮新增——此前 human
-    节点的 show 从未落库）+ 玩家输入行同一事务。输入为空（如超时放行）时只写
-    show 行——即「超时留痕」的自然实现：台账上留得住"这个节点等过人"。"""
+                      raw_action_scope=None, node_prompt=None):
+    """human 节点收尾合写（2026-08-29；2026-09-27 收卷一拍）：prompt、showprompt
+    与玩家输入行同一事务落库，turn 号由调用方在收卷时刻现取（永远新鲜）——
+    并行分支推号后，迟到的人类发言落旧号会被增量窗口永久过滤（job 2613 实证）。
+    输入为空（如超时放行）时仍落 prompt 行（node_prompt）——「超时留痕」语义随
+    行搬家：台账上留得住"这个节点等过人"。"""
     user_scope, soul_scope = _build_scope(action_scope, actor_info, meta_owner, raw_action_scope)
     raw_user = actor_info.get('user')
     soul_id = str(actor_info['soul']) if actor_info.get('soul') else ''
     entries = []
+    if node_prompt:
+        entries.append({'kind': 'node_prompt', 'turn_id': turn_id, 'oratio_idx': 0,
+                        'text': node_prompt, 'femo_id': femo_id,
+                        'user_scope': user_scope, 'soul_scope': soul_scope})
     if showprompt:
         entries.append({'kind': 'dialog_show', 'turn_id': turn_id, 'oratio_idx': 1,
                         'text': showprompt, 'femo_id': femo_id,
@@ -317,7 +354,7 @@ class SaveQueue:
                     # Queue 的 unfinished 计数永远 ≥1，同进程第二轮 run 的
                     # wait_empty 卡死在 queue.join() → flow_done 永不发出
                     # → 宿主 running 永远 true（「时灵时不灵」+ 新会话被
-                    # 「已有剧本在运行中」拒绝的共同根因）。
+                    # 「已有FEMO脚本在运行中」拒绝的共同根因）。
                     self._queue.task_done()
                     break
                 if len(item) == 2:
@@ -350,8 +387,11 @@ class SaveQueue:
         try:
             if typ == 'human':
                 _do_insert_dialog(**kwargs)
-            elif typ == 'ai':
-                _do_insert_ai(**kwargs)
+            # ━━━ 已退役·观察期（2026-09-26 起）━━━ 'ai' 分支随 _do_insert_ai/enqueue_ai 一并退役
+            # （唯一入队口 save_ai_turn 已于 2026-09-18 注释停用，此处永不可达）。
+            # elif typ == 'ai':
+            #     _do_insert_ai(**kwargs)
+            # ━━━ 观察期退役段结束：'ai' 分支 ━━━
             elif typ == 'group':
                 _do_insert_group(**kwargs)
         except Exception as e:
@@ -364,10 +404,14 @@ class SaveQueue:
         #print(f"[SaveQueue] enqueue_human: 任务已入队, event={event}")
         return event
 
-    def enqueue_ai(self, **kwargs):
-        event = self._enqueue_with_event('ai', kwargs)
-        #print(f"[SaveQueue] enqueue_ai: 任务已入队, event={event}")
-        return event
+    # ━━━ 已退役·观察期（2026-09-26 起）━━━ enqueue_ai：唯一调用方 save_ai_turn 已于 2026-09-18
+    # 整体注释停用（转写分离后由 enqueue_group 合写取代），全仓再无调用（双窗口交叉扫描+逐项复核）。
+    # 无报错数日后整段删除（含本注）。
+    # def enqueue_ai(self, **kwargs):
+    #     event = self._enqueue_with_event('ai', kwargs)
+    #     #print(f"[SaveQueue] enqueue_ai: 任务已入队, event={event}")
+    #     return event
+    # ━━━ 观察期退役段结束：enqueue_ai ━━━
 
     def enqueue_group(self, **kwargs):
         """合写入队（2026-08-29）：多行同一事务，event 在整组 commit 后 set"""

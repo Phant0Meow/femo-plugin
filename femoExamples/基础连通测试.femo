@@ -1,0 +1,38 @@
+# 最简单的脚本，测试功能是否跑通。
+
+meta:
+  name = 基础连通测试
+  version = 1.0
+  output_style = "这是AI和AI交流的地方。"
+  preamble = "# 最简单的脚本，测试功能是否跑通。"
+
+actors:
+  ai @AI1 = soul:ai4
+  ai @AI2 = soul:ai5
+
+action speak @ai(@AI1):
+  prompt: |
+    请随便说句话~
+
+action reply @ai(@AI2):
+  prompt: |
+    请回答另一个AI的话。
+
+mainflow:
+  [speak]: speak
+  [reply]: reply
+  [speak_2]: speak
+  [reply_2]: reply
+
+  [START] -> [speak]
+  [speak] -> [reply]
+  [reply] -> [speak_2]
+  [speak_2] -> [reply_2]
+  [reply_2] -> [END]
+
+#sketch:
+#  [END] = 0, 94
+#  [speak] = 157, -10
+#  [reply] = 294, -10
+#  [speak_2] = 294, 84
+#  [reply_2] = 157, 84

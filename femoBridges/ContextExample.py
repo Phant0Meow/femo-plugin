@@ -4,16 +4,18 @@ bridges/ContextExample.py — 默认上下文提取实现
 从数据库提取当前 session 的对话上下文，排除当前 prompt。
 代码原则：所有代码不许写try静默兜底不报错，有错必须报错。
 
-上下文拼接三种模式（2026-09-11 增量上下文立项）：
+上下文拼接三种模式（2026-09-11 增量上下文立项；2026-09-17 起点改交付游标）：
   full                        — 本条之前所有可见内容（原有行为）
-  incremental                 — 本演员上次发言→本次发言之间的可见内容；
-                                查库定起点（react_steps 按 soul_id 取 MAX(turn_id)），
+  incremental                 — 上次交付给本角色之后新增的可见内容；
+                                起点=交付游标（随 checkpoint 落盘、续跑回填，
+                                2026-09-28），游标缺失才回落查库
+                                （react_steps 按 soul_id 取 MAX(turn_id)），
                                 无既往发言=「之间」为开场到现在=等价全量
-  first_full_then_incremental — 首轮全量、之后增量（查库语义下与 incremental
+  first_full_then_incremental — 首轮全量、之后增量（与 incremental
                                 同体；独立成 def 作为 harness 侧稳定接口名）
 路由入口 build_session_context(session, actor_info, mode)。
 harness 接口决定 mode（DSH 宿主后端钉 first_full_then_incremental），
-剧本无感；直连模式等不钉的调用方吃默认 full。
+FEMO脚本无感；直连模式等不钉的调用方吃默认 full。
 """
 
 import json
@@ -23,7 +25,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from femoCompiler.db_utils import _get_conn
 from femoCompiler.FEMO_scope_resolver import parse_scope_field, ids_match_scope
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 
 # ── 上下文可见性开关（2026-08-29 转写分离配套）────────────────────────
 # 拼接上下文时各类内容的可见性：self=发言者本人（行 soul_id == 提问者），
@@ -43,26 +45,26 @@ _KNOWN_MODES = (MODE_FULL, MODE_INCREMENTAL, MODE_FIRST_FULL_THEN_INCREMENTAL)
 
 
 # ── 演员双名制显示（2026-09-11 拍板，2026-09-12 三修定稿）────────────────
-# 上下文里每个发言行显示「@戏中名（括号名）」：戏中名=@演员名（@ 保留，
+# 上下文里每个发言行显示「@角色名（括号名）」：角色名=@角色名（@ 保留，
 # 不去重——@Eve（Eve）照写）。括号名按发言行身份取（2026-09-12 拍板）：
 #   行带 soul_id          → Soul name（角色卡 soul_name）
 #   无 soul_id 的人类发言 → user id 对应的 user name（查无此人退 uid 原样）
 #   无 soul_id 的 AI 发言 → model id，仅 source:main（伪 soul 'main'）显示
 #                           'main'；其余无 soul AI 行无法认领，维持 "AI" 兜底
-# 台账行只存 soul_id/user_id，戏中名必须由调用方把剧本 actors 定义穿线进来；
+# 台账行只存 soul_id/user_id，角色名必须由调用方把FEMO脚本 actors 定义穿线进来；
 # 缺席（旧调用方/自定义 context）=空映射，渲染退回单名（原行为）。
 def _actor_role_maps(actors_def) -> tuple:
-    """从剧本 actors 定义提取「戏中名」映射（@ 保留）。
+    """从FEMO脚本 actors 定义提取「角色名」映射（@ 保留）。
 
     返回 (ai_soul_map, human_user_map, human_soul_map)：
-      ai_soul_map     soul_id → @戏中名（AI 演员，行按 soul_id 认领）；
-                      source:main 裸演员额外记 'main' 键（伪 soul，行上
+      ai_soul_map     soul_id → @角色名（AI 角色，行按 soul_id 认领）；
+                      source:main 裸角色额外记 'main' 键（伪 soul，行上
                       soul_id='main'）；
-      human_user_map  source(user_id) → @戏中名（人类演员，行按 user_id 认领）；
-      human_soul_map  soul_id → @戏中名（人类演员兜底——无 source 回退 owner 的
-                      行 user_id 是真实 uid，与戏中名对不上号，只能按行上的
+      human_user_map  source(user_id) → @角色名（人类角色，行按 user_id 认领）；
+      human_soul_map  soul_id → @角色名（人类角色兜底——无 source 回退 owner 的
+                      行 user_id 是真实 uid，与角色名对不上号，只能按行上的
                       soul_id 认亲，如 `human @玩家 = soul:human` 的玩家行）。
-    同键多演员取先声明者。"""
+    同键多角色取先声明者。"""
     ai_soul, human_user, human_soul = {}, {}, {}
     if not actors_def:
         return ai_soul, human_user, human_soul
@@ -90,7 +92,7 @@ def _actor_role_maps(actors_def) -> tuple:
 
 
 def _dual_name(role: str, display: str) -> str:
-    """双名拼装：`@戏中名（Soul name）`；缺一退单名（不去重，2026-09-11
+    """双名拼装：`@角色名（Soul name）`；缺一退单名（不去重，2026-09-11
     二次拍板——同名双写 @Eve（Eve）正是用户要的结构统一）。"""
     display = str(display or '').strip()
     role = str(role or '').strip()
@@ -224,7 +226,7 @@ def _last_speech_turn(session_id: int, soul_id: str) -> Optional[int]:
     """查库：该 soul 在本 session 的最后一次 AI 发言所在 turn（无发言→None）。
 
     增量模式的唯一起点事实源——不经参数、不查内存，谁拼增量谁查询。
-    注意：裸演员 soul_id 落库为 ''，共享命名空间（另案处理）。"""
+    注意：裸角色 soul_id 落库为 ''，共享命名空间（另案处理）。"""
     conn = _get_conn()
     try:
         row = conn.execute(
@@ -246,7 +248,7 @@ def _render_context(records: List[Dict[str, Any]], soul_ids: List[str],
     按 (turn_id, soul_id) 分组、VISIBILITY 拼装（cot/tool 剥离在此）、排序。
 
     as_json=False（缺省）：文本形态——「[名字]：\\n内容」按序拼接（原行为）。
-    名字走双名制「@戏中名（Soul name）」（不去重），actors_def 缺席时退回
+    名字走双名制「@角色名（Soul name）」（不去重），actors_def 缺席时退回
     单名（原行为）。
 
     as_json=True：结构化形态——发言条目列表的 JSON 串（ensure_ascii=False）。
@@ -296,8 +298,8 @@ def _render_context(records: List[Dict[str, Any]], soul_ids: List[str],
         if source == "human":
             uid = _parse_first_id(record.get("user_id"))
             row_soul = _parse_first_id(record.get("soul_id", ""))
-            # 戏中名：先按行 user_id 认领（source 落库行），再按行 soul_id 兜底
-            # （无 source 回退 owner 的行）——人类演员自己的行两种键都可能带。
+            # 角色名：先按行 user_id 认领（source 落库行），再按行 soul_id 兜底
+            # （无 source 回退 owner 的行）——人类角色自己的行两种键都可能带。
             role = (human_user_map.get(uid) if uid else None) \
                 or (human_soul_map.get(row_soul) if row_soul else None)
             if not uid and not row_soul:
@@ -320,13 +322,13 @@ def _render_context(records: List[Dict[str, Any]], soul_ids: List[str],
         else:  # ai
             sid = _parse_first_id(record.get("soul_id"))
             if not sid:
-                # 裸演员行（无 soul 无 source:main，落库 soul_id=''）：无键可认领，
+                # 裸角色行（无 soul 无 source:main，落库 soul_id=''）：无键可认领，
                 # 维持 "AI" 兜底
                 return "AI"
             if sid == 'main':
                 # source:main 裸天使伪 soul（无角色卡）：括号名=model id 'main'
                 # （2026-09-12 拍板："如果是main就显示main"）；戏中名按 actors_def
-                # 的 source:main 声明认领。投影窗 speaker 行走宿主 ai_name，不受此影响
+                # 的 source:main 声明认领。投影窗 speaker 行走宿主 actor_name，不受此影响
                 return _dual_name(ai_soul_map.get('main'), "main")
             if sid not in name_cache:
                 soul = get_soul_by_id(sid)
@@ -427,23 +429,142 @@ def _render_context(records: List[Dict[str, Any]], soul_ids: List[str],
 
 # ═══ 三种拼接模式（只写拼接过程，工具全走上面的公共函数）════════════════
 
-def _fetch_visible(session_id: int, actor_info: dict, mode: str):
-    """按模式取本演员可见记录（full/incremental/JSON 形态共用的取数口）。
+# ── 交付游标（2026-09-17 宿主补课/统一增量锚点）────────────────────────
+# 「上下文发到哪一条了」：(session_id, soul_id) → 已交付的最大 turn_id。
+# 规则全员统一（普通 AI/main/人类一视同仁，无单独链路）：
+#   ①增量锚点=游标（缺键惰性查库初始化=自己最近发言——仅剩档案也无游标的
+#     极端回落；正常续跑由 checkpoint 回填 restore_delivery_cursors 接续，
+#     2026-09-28：游标不落盘时进程重启即回落旧行为，收卷一拍后回落锚点=
+#     收卷号，会吞掉「收到节点提醒→说完落账」之间别人的发言）；
+#   ②窗口一律剔除自己（自己说过的话不算「发给他」：两窗之间那一轮自己的发言
+#     不重发；main 的暗聊补课同理不重发自己登台词）；
+#   ③增量交付后推游标=max(本次发到的最后一行, 原游标)。full 模式保持原有
+#     行为（从头全量、不含游标语义）。
+# 红利（并发正确性）：兄弟节点在自己拼装之后、落库之前发言的行，旧查库锚点
+# （跳到本人 MAX(turn)）会把它永久吞掉；游标语义下下一窗自动补上。
+_DELIVERY_CURSORS: Dict[Tuple[int, str], int] = {}
 
-    full=从头全量；incremental/FFTI=上次本人发言之后（查库定起点，无既往
-    发言=从头）。返回 (records, soul_ids)。"""
+
+def _delivery_cursor(session_id: int, soul_id: str) -> Optional[int]:
+    """读交付游标；缺键惰性初始化=自己最近发言（查库，与旧锚点同源同值）。
+    正常续跑走 checkpoint 回填（restore_delivery_cursors），查库回落只剩
+    「档案里也没有游标」的极端情形（旧档案/手动清档）。"""
+    key = (session_id, str(soul_id or ''))
+    cur = _DELIVERY_CURSORS.get(key)
+    if cur is None:
+        cur = _last_speech_turn(session_id, soul_id)
+        if cur is not None:
+            _DELIVERY_CURSORS[key] = cur
+    return cur
+
+
+def export_delivery_cursors(session_id: int) -> Dict[str, int]:
+    """导出本场次全部交付游标（{soul_id: turn}）——checkpoint 落盘用。
+
+    游标只活在内存，进程重启即丢；随断点存进 Job 档案、续跑回填，增量窗口
+    才能从「上次交付处」接续，而不是回落到「自己最近发言 turn」（收卷一拍
+    后=收卷号，会把「收到节点提醒→说完落账」之间别人的发言永久吞掉）。"""
+    sid = int(session_id)
+    return {str(soul): int(turn)
+            for (s, soul), turn in _DELIVERY_CURSORS.items() if s == sid}
+
+
+def restore_delivery_cursors(session_id: int, cursors: Dict[str, int]) -> None:
+    """续跑回填：checkpoint 快照里的交付游标写回内存。同键只升不降（取 max）
+    ——同进程续跑时现值可能比快照新（快照拍到上一个节点门口，之后兄弟分支
+    又交付过），旧值盖新值=把窗口拨回去重发已交付内容。"""
+    sid = int(session_id)
+    for soul, turn in (cursors or {}).items():
+        try:
+            t = int(turn)
+        except (TypeError, ValueError):
+            continue
+        key = (sid, str(soul))
+        if t > _DELIVERY_CURSORS.get(key, -1):
+            _DELIVERY_CURSORS[key] = t
+
+
+def _row_uid(record: dict) -> str:
+    """行上的第一个 user_id（只有 dialog 行带；react 行为空）。"""
+    raw = record.get("user_id")
+    if isinstance(raw, list):
+        return str(raw[0]) if raw else ""
+    s = str(raw or "").strip()
+    if s.startswith("[") and s.endswith("]"):
+        try:
+            arr = json.loads(s)
+        except Exception:
+            return ""
+        if isinstance(arr, list) and arr:
+            return str(arr[0])
+        return ""
+    return s
+
+
+def _is_node_trace(record: dict, prompt_turns: set) -> bool:
+    """节点开场痕迹行——**不参与推交付游标**（2026-09-18 Job1778 漏台词修正）。
+
+    起因：一个 turn 有两次落库时刻。节点开始时先落 prompt 行（oratio_idx=0,
+    uid=femo-*，渲染时因认不出名字被丢），节点收尾才合写 showprompt 行 +
+    全部 react step（save_ai_finish → _do_insert_group，单事务）。若让先到的
+    prompt 行推游标，游标就被推到该 turn；随后落库的发言 turn_id == 游标，
+    被 `turn_id > after_turn` 永久过滤——实测漏掉整条台词（看图梗 turn16、
+    猫猫 turn17、老李 turn60）。
+
+    showprompt 行（uid=femoshow-*）与同 turn 的发言是一整块、同事务落库，
+    从不单独先到，同样不作为交付锚点。
+    例外：@notice 节点的公告行也是 femoshow-*，但它**独占一个 turn**（没有
+    prompt 行）——那是真正的交付内容，照常推游标，否则公告会在每个窗口重发。
+    """
+    if record.get("source") != "human":
+        return False
+    uid = _row_uid(record)
+    if uid.startswith("femoshow-"):
+        return (int(record.get("turn_id") or 0)) in prompt_turns
+    return uid.startswith("femo-")
+
+
+def _fetch_visible(session_id: int, actor_info: dict, mode: str):
+    """按模式取本角色可见记录（full/incremental/JSON 形态共用的取数口）。
+
+    full=从头全量（原有行为，不动游标不剔除自己）；incremental/FFTI=交付
+    游标之后（缺键查库定起点，无既往发言=从头），窗口剔除自己、交付后推
+    游标。返回 (records, soul_ids)。"""
     user_ids, soul_ids = _actor_scope_ids(actor_info)
-    after_turn = None
-    if mode in (MODE_INCREMENTAL, MODE_FIRST_FULL_THEN_INCREMENTAL):
-        ask_soul = soul_ids[0] if soul_ids else ''
-        after_turn = _last_speech_turn(session_id, ask_soul)
+    ask_soul = soul_ids[0] if soul_ids else ''
+    track = mode in (MODE_INCREMENTAL, MODE_FIRST_FULL_THEN_INCREMENTAL)
+    after_turn = _delivery_cursor(session_id, ask_soul) if track else None
     records = _get_records_visible_to(
         user_ids=user_ids if user_ids else None,
         soul_ids=soul_ids if soul_ids else None,
         session_id=session_id,
         include_ai=True,
         max_turns=999999,  # 足够大的数，取所有记录
+        after_turn=after_turn,  # 增量窗口=交付游标（2026-09-16 修：算了没传=增量恒全量）
     )
+    if not track:
+        return records, soul_ids
+    # 剔除自己（口径同渲染 _is_self：行 soul_id ∈ 提问者 soul_ids）——
+    # 自己说过的话不需要再「发给他」，游标也不被自己的发言推着走。
+    own = {str(s) for s in soul_ids}
+    if own:
+        records = [r for r in records if str(r.get("soul_id") or "") not in own]
+    # 交付即推游标：**只由真正交付出去的行推进**（2026-09-18 Job1778 修正）。
+    # 节点开场痕迹（prompt 行 / 同 turn 的 showprompt 行）不推——它们先于同
+    # turn 的发言落库，推了游标就会把随后落库的发言永久过滤掉。判定见
+    # _is_node_trace；@notice 公告行独占 turn，不受影响、照常推。
+    if records:
+        key = (session_id, str(ask_soul or ''))
+        prompt_turns = {int(r.get("turn_id") or 0) for r in records
+                        if r.get("source") == "human"
+                        and _row_uid(r).startswith("femo-")
+                        and not _row_uid(r).startswith("femoshow-")}
+        deliverable = [r for r in records
+                       if not _is_node_trace(r, prompt_turns)]
+        if deliverable:
+            newest = max(int(r.get("turn_id") or 0) for r in deliverable)
+            if newest > _DELIVERY_CURSORS.get(key, -1):
+                _DELIVERY_CURSORS[key] = newest
     return records, soul_ids
 
 
@@ -456,10 +577,11 @@ def full(session_id: int, actor_info: dict, actors_def: dict = None) -> str:
 
 
 def incremental(session_id: int, actor_info: dict, actors_def: dict = None) -> str:
-    """增量：本演员上次发言→本次发言之间的可见内容（AI 人类 showprompt）。
+    """增量：上次交付给本角色之后新增的可见内容（AI 人类 showprompt）。
 
-    起点查库定（react_steps 按 soul_id 取 MAX(turn_id)）；无既往发言时
-    「之间」= 开场到现在 = 等价全量。AI 发言不带 cot/tool（VISIBILITY）。"""
+    起点=交付游标（上次给本角色拼料包那一刻已交付到的 turn；随 checkpoint
+    落盘、续跑回填）；游标缺失才回落查库（本 soul 上次发言 turn）。
+    无游标无既往发言时=开场到现在=等价全量。AI 发言不带 cot/tool（VISIBILITY）。"""
     records, soul_ids = _fetch_visible(session_id, actor_info, MODE_INCREMENTAL)
     ask_soul = soul_ids[0] if soul_ids else ''
     if not records:
@@ -485,7 +607,7 @@ def build_session_context(session_id: int, actor_info: dict,
     """上下文拼接路由入口：按 mode 分发到三种拼接方案。
 
     mode 由调用方（harness 接口/直连）传入；未知 mode 硬报错。
-    actors_def 可选（剧本 actors 定义，双名制显示用）——block_collector
+    actors_def 可选（FEMO脚本 actors 定义，双名制显示用）——block_collector
     默认路由传入；不传=单名渲染（原行为），自定义 context 老调用方零感知。"""
     if mode == MODE_FULL:
         return full(session_id, actor_info, actors_def)
@@ -498,7 +620,7 @@ def build_session_context(session_id: int, actor_info: dict,
 
 
 def resolve_context_mode(session_id: int, actor_info: dict, mode: str) -> str:
-    """FFTI 落地裁决：该演员查库无既往发言 = 本拍按 full（首次），否则
+    """FFTI 落地裁决：该角色查库无既往发言 = 本拍按 full（首次），否则
     incremental。其余 mode 原样返回。block_collector 用它决定 system 层
     blocks（basic_safety/basic_output/soul/user_info）是否随包——首次全量
     带 system 层，之后增量只带增量面（2026-09-13 上下文 JSON 化配套）。"""
@@ -545,11 +667,14 @@ def get_session_context(
     return _render_context(records, soul_ids or [], actors_def)
 
 
-def findThisSession(
-    session: int,
-    actor_info: dict,
-    actors_def: dict = None,
-) -> str:
-    """默认 context 提取入口（兼容壳 = full 模式）"""
-    context = build_session_context(session, actor_info, MODE_FULL, actors_def)
-    return context
+# ━━━ 已退役·观察期（2026-09-26 起）━━━ findThisSession：全仓零引用（双窗口交叉扫描+逐项复核），
+# 本体只是 build_session_context 的 full 模式兼容壳，从没有人来"兼容"。无报错数日后整段删除（含本注）。
+# def findThisSession(
+#     session: int,
+#     actor_info: dict,
+#     actors_def: dict = None,
+# ) -> str:
+#     """默认 context 提取入口（兼容壳 = full 模式）"""
+#     context = build_session_context(session, actor_info, MODE_FULL, actors_def)
+#     return context
+# ━━━ 观察期退役段结束：findThisSession ━━━

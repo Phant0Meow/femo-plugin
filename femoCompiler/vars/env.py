@@ -34,7 +34,7 @@ from femoCompiler.vars.model import (
 # 实时返回 runner 属性，写报只读（对齐拍板：消除 turn_count 被写提升分裂）。
 BUILTIN_NAMES = ('session_id', 'turn_count')
 
-SCRIPT_FRAME = '__script__'   # 剧本级 global+context 变量的帧
+SCRIPT_FRAME = '__script__'   # FEMO脚本级 global+context 变量的帧
 
 
 # ── WorldStore：$ 变量唯一存储 ───────────────────────────────
@@ -79,7 +79,7 @@ class WorldStore:
     def seed_missing(self, declared: frozenset, initials: Dict[str, Any]) -> list:
         """断点续跑 vars 增删容差（2026-09-06 用户拍板）：新剧本声明了而
         快照世界没有的 shared 变量——声明集并入 + 按声明初值补种，返回补种
-        名列表。孤儿（快照有、新剧本已删）不在此处理：无人读即无害。"""
+        名列表。孤儿（快照有、新脚本已删）不在此处理：无人读即无害。"""
         added = frozenset(declared) - self._shared_names
         if added:
             self._shared_names = frozenset(self._shared_names | added)
@@ -258,6 +258,19 @@ class TaskLedger:
     def mark_dead(self, task_id: str) -> None:
         self._require(task_id).alive = False
 
+    def revive(self, task_id: str) -> None:
+        """账面复活（2026-09-19 活死人修复）：fork gather 收场后母协程继续
+        主线（fork-in-module 场景——模块走线在 fork 处收尾、_run_module 返回
+        后 mainflow 接着走），fork_branches 却已把母 task 记死——此后主线的
+        一切 checkpoint 都落在「全员死亡、envs 空」的幽灵世界上，续跑直启
+        判定 env 缺失全跳过=秒跑完（j1789/1785-1788 实锤）。重新记活，
+        fork_id 血统保留；未登记过则按 root 补册。"""
+        info = self._tasks.get(task_id)
+        if info is None:
+            self._tasks[task_id] = TaskInfo(fork_id=None)
+        else:
+            info.alive = True
+
     def sign_in(self, task_id: str) -> None:
         self._require(task_id).signed_in = True
 
@@ -291,7 +304,7 @@ class TaskLedger:
 class TaskEnv:
     """单 task 的 context 变量环境（维度 A 的 task 私有侧）。
     frames: {frame_key: {规范名: 值}}
-      frame_key：'__script__'=剧本级 global+context；模块完整路径=模块 local；
+      frame_key：'__script__'=FEMO脚本级 global+context；模块完整路径=模块 local；
       循环网关 id=循环变量（拍板 1：join 收口删帧豁免 merge）。
     纯数据（不持有 table/world/runner 引用），可 deepcopy、可 JSON 序列化。"""
 
@@ -303,7 +316,7 @@ class TaskEnv:
 
     @classmethod
     def create_root(cls, task_id: str, global_initials: Dict[str, Any]) -> 'TaskEnv':
-        """root task 装配：剧本级初值进 '__script__' 帧。
+        """root task 装配：FEMO脚本级初值进 '__script__' 帧。
         （替代 FEMORunner.__init__ 的 VarManager(script.vars) + ast.literal_eval
         二段求值——初值求值合并到装配点一次完成。）"""
         return cls(task_id=task_id, frames={SCRIPT_FRAME: dict(global_initials or {})},
@@ -357,7 +370,7 @@ class VarFacade:
 
     名字解析（两段式）：
     1. 声明合法性 = ScopeTable.lookup(name, def_chain)——词法，拍板 6；
-       查不到 → 未声明响亮报错（@名 在 actor_names 的静态演员引用除外）。
+       查不到 → 未声明响亮报错（@名 在 actor_names 的静态角色引用除外）。
     2. 值定位 = 沿帧栈从顶向下找第一个含此名的帧（运行期 shadowing：
        循环帧 > 模块帧 > __script__）；栈中无 → 声明 owner 帧取声明初值。
     写定位：栈帧命中改之（循环变量 SET VARIABLE 改循环帧、模块内写母变量
@@ -388,8 +401,11 @@ class VarFacade:
             return ()
         return self._table.module_def_chain(self._mod_stack[-1])
 
-    def _decl(self, root: str):
-        return self._table.lookup(root, self.def_chain)
+    # ━━━ 已退役·观察期（2026-09-26 起）━━━ _decl：全仓零调用（双窗口交叉扫描+逐项复核），
+    # 声明解析的正身是下方 _decl_for。无报错数日后整段删除（含本注）。
+    # def _decl(self, root: str):
+    #     return self._table.lookup(root, self.def_chain)
+    # ━━━ 观察期退役段结束：_decl ━━━
 
     def _decl_for(self, root: str):
         """引用入口的声明解析：'$x' 前缀引用剥前缀查声明，且要求该名字
@@ -448,7 +464,7 @@ class VarFacade:
         decl = self._decl_for(p.root)
         if decl is None:
             if p.root in self._actor_names and not p.keys:
-                return p.root            # 静态演员引用：返回名字本身（旧语义）
+                return p.root            # 静态角色引用：返回名字本身（旧语义）
             raise FEMOVariableError(
                 f"变量 '{p.root}' 未声明。所有变量必须在 vars: 中预先声明。")
         if decl.shared:
@@ -465,8 +481,12 @@ class VarFacade:
         except FEMOVariableError:
             return False
 
-    def _has(self, name: str) -> bool:     # 兼容旧内部调用点（_exec_assign 等）
-        return self.has(name)
+    # ━━━ 已退役·观察期（2026-09-26 起）━━━ _has：全仓零调用（双窗口交叉扫描+逐项复核）。
+    # 注释自述"兼容旧内部调用点（_exec_assign 等）"，那些调用点已不存在；正身是 self.has。
+    # 无报错数日后整段删除（含本注）。
+    # def _has(self, name: str) -> bool:     # 兼容旧内部调用点（_exec_assign 等）
+    #     return self.has(name)
+    # ━━━ 观察期退役段结束：_has ━━━
 
     # ── 键下钻 ──
     def _resolve_key(self, key) -> Any:
@@ -518,7 +538,7 @@ class VarFacade:
             raise FEMOVariableError("变量路径为空，无法赋值")
         if path in BUILTIN_NAMES:
             raise FEMOVariableError(
-                f"'{path}' 是引擎管理的内建只读变量，剧本不可赋值。")
+                f"'{path}' 是引擎管理的内建只读变量，FEMO脚本不可赋值。")
         p = parse_var_path(path)
         decl = self._decl_for(p.root)
         if decl is None:
@@ -661,6 +681,51 @@ class VarFacade:
                           if k != SCRIPT_FRAME and k not in self._mod_stack)
         return tuple(self._mod_stack), loop_keys
 
+    @staticmethod
+    def drop_own_loop_frames(loop_frames, flow) -> list:
+        """剔掉「属于 flow 自己的」循环帧（该 flow 的 for/par 网关）。
+
+        【2026-09-19 续跑栈修复】续跑（直启/join 变身）时恢复快照里的
+        loop_frames，其中可能带着「当前正要执行的那张 flow 自己的循环帧」：
+        - join 变身：全员 par 分支在分支 env 里都带 par 网关帧（fork_branches
+          构造期直接放帧，不走 push_loop_frame），签到者的 export_stack 把
+          它一并导出 → 恢复后落在变身者栈顶。变身者随后走到模块 [OUT]，
+          exit_module 校验栈顶发现是 '__par_fork_N__'，报「模块退出时栈顶不是
+          其帧——循环帧未平衡」（谁是卧底 1856 场实锤：模块内 par，断点续跑
+          后 投票 模块退出即炸）；
+        - 直启重放：重放的起点若在 for 循环体内，该 for 帧已经恢复在栈上，
+          流程再走到 for 网关时 push_loop_frame 撞「循环帧已存在」（最小复现
+          FEMO脚本实锤）。
+        两者都是同一件事：**进入这个 flow 就会重新 push 的帧，不该由恢复
+        预置**（快照带的是"那一刻栈上有什么"，不是"栈上该有什么"）。
+        故只剔本 flow 的网关帧，跨 flow 的母帧（模块外层的 for）原样保留。
+        """
+        own = set()
+        nodes = getattr(flow, 'nodes', None) or {}
+        for nid, node in nodes.items():
+            if (getattr(node, 'meta', None) or {}).get('gw_kind') in (
+                    'for', 'par', 'fork'):
+                own.add(nid)
+        return [gw for gw in (loop_frames or []) if gw not in own]
+
+    def drop_own_loop_frames_inplace(self, flow) -> list:
+        """就地摘掉栈上属于 flow 自己的网关帧（其余帧序不动），返回摘掉的键。
+
+        与 drop_own_loop_frames 同一判据（纯函数版），服务「帧已经压在栈上」
+        的场景：join 迟到者/变身者收场前要把本 flow 的网关帧摘掉，否则模块
+        出口的 exit_module 栈顶校验必炸（详见 drop_own_loop_frames）。"""
+        own = set()
+        nodes = getattr(flow, 'nodes', None) or {}
+        for nid, node in nodes.items():
+            if (getattr(node, 'meta', None) or {}).get('gw_kind') in (
+                    'for', 'par', 'fork'):
+                own.add(nid)
+        removed = [k for k in self._stack_frames if k in own]
+        if removed:
+            self._stack_frames = [k for k in self._stack_frames
+                                  if k not in own]
+        return removed
+
     def restore_stack(self, mod_stack, loop_frames) -> None:
         """按给定模块栈+循环帧栈重建（服务幸运者变身与断点直启）。
         - 模块帧必须已存在于 env.frames（变身场景 merged env 含模块帧数据；
@@ -674,7 +739,7 @@ class VarFacade:
         for gw in loop_frames:
             if gw == SCRIPT_FRAME or gw in mod_stack:
                 raise FEMOVariableError(
-                    f"restore_stack: 循环帧键 '{gw}' 与模块栈/剧本帧冲突")
+                    f"restore_stack: 循环帧键 '{gw}' 与模块栈/FEMO脚本帧冲突")
             if gw not in self._env.frames:
                 self._env.frames[gw] = {}
         self._mod_stack = list(mod_stack)

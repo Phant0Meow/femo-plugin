@@ -12,8 +12,6 @@
  */
 
 const FEMO_STREAM_CSS = `
-.femo-stream-root{display:flex;flex-direction:column;margin:2px 0 10px}
-.femo-stream-toolline{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:var(--dsw-alias-label-tertiary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:2px 0}
 /* ── 官方工具行（2026-08-30 V6.1）：ui-tool ToolRow.module.css 逐属性转写
    （femo-toolrow-* 前缀）。骨架件 DisclosureRow/StateDot/图标是 primitives
    真件（external→shell 同实例，自带样式），此处只补行级几何与状态样式。
@@ -37,14 +35,8 @@ const FEMO_STREAM_CSS = `
 .femo-toolrow-iotext{min-width:0;white-space:pre-wrap;word-break:break-word;color:var(--dsw-alias-label-secondary)}
 .femo-toolrow-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 /* 2026-08-26 拆除自绘闪烁光标（.femo-stream-caret/femo-caret-blink）：官方流式
-   输出无 caret 装饰，Deep diving 状态行已承担"进行中"信号（猫猫裁定）。 */
-/* 官方 ChatView TurnStatus 同款转写（2026-08-26）：品牌蓝流光 "Deep diving..."
-   （rc.2 ChatView.module.css .turnStatus/.turnStatusClock 逐属性重放，类名换
-   femo- 前缀——构建链不注入插件侧 css module，沿用 style 元素路线）。 */
-.femo-turn-status{align-self:flex-start;flex:none;display:inline-flex;align-items:center;height:26px;font:var(--dsw-font-s-strong-14);white-space:nowrap;background:linear-gradient(90deg,var(--dsw-static-deepseek-500) 0%,var(--dsw-static-deepseek-500) 40%,var(--dsw-static-deepseek-200) 50%,var(--dsw-static-deepseek-500) 60%,var(--dsw-static-deepseek-500) 100%);background-position:100% 0;background-size:250% 100%;background-clip:text;color:transparent;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:femo-turn-status-shimmer 1.8s linear infinite}
-.femo-turn-status-clock{margin-left:8px;font:var(--dsw-font-xs-13);font-weight:400;font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-caption);-webkit-text-fill-color:var(--dsw-alias-label-caption)}
-@keyframes femo-turn-status-shimmer{to{background-position:0 0}}
-@media (prefers-reduced-motion:reduce){.femo-turn-status{background-position:0 0;background-size:100% 100%;animation:none}}
+   输出无 caret 装饰。原"Deep diving"流光状态行（.femo-turn-status-* 四规则）
+   已随断供直播链退役（刀⑧-3，渲染件 femo-stream-live 同批移除）。 */
 .femo-rr-root{display:flex;flex-direction:column}
 .femo-rr-row{position:relative;overflow:hidden}
 .femo-rr-root[data-state='running'] .femo-rr-row::after{content:'';position:absolute;inset-block:0;left:0;width:300px;background:linear-gradient(90deg,transparent 0%,color-mix(in srgb,var(--dsw-alias-bg-base,#fff) 60%,transparent) 55%,transparent 100%);animation:femo-rr-sweep 2.6s ease-out infinite;pointer-events:none}
@@ -156,6 +148,8 @@ export function ensureFemoStreamStyles(): void {
   if (document.getElementById('femo-stream-style') !== null) return
   const el = document.createElement('style')
   el.id = 'femo-stream-style'
+  // 0.1.6 加载器认领无主 <style> 并在其他插件热替换时连坐删除——必须自报家门。
+  el.setAttribute('data-plugin', 'femo-plugin')
   el.textContent = FEMO_STREAM_CSS + FEMO_COMPOSER_CSS
   document.head.appendChild(el)
 }

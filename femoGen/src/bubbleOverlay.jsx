@@ -174,6 +174,7 @@ function FuncAssignSection({ ns, action, accent }) {
   );
 }
 
+/* ═══ 已退役（观察期起 2026-09-26 死代码排查，全仓零引用；观察无误后连块删除）：BubbleSection（定义+导出外全仓零引用，气泡区走 BubbleOverlay 内联实现） ═══
 function BubbleSection({ title, content, streaming }) {
   if (!content && !streaming) return null;
   return (
@@ -205,6 +206,7 @@ function BubbleSection({ title, content, streaming }) {
     </div>
   );
 }
+═══ 已退役块结束 ═══ */
 
 function HumanInputSection({ nodeId, onSubmit, outVars, inputError }) {
   const [chatText, setChatText] = useState('');
@@ -393,7 +395,7 @@ function BubbleOverlay({ bubbleOverlay, nodes, nodeStates, humanWaits, actionSto
   // 同一 mind 画布节点被 par 多实例（AI+人类混合）并行时，所有实例事件同名，
   // AI 实例的 node_start/ai_token 会把共享 nodeStates[nodeId] 的 status/type
   // 覆盖成 ai_streaming——旧实现按 ns.status 渲染输入框，导致人类输入框
-  // 「闪一下就被 AI 气泡取代」。账本里的等待只有 human_done/提交成功/本场
+  // 「闪一下就被 AI 气泡取代」。账本里的等待只有 human_done/提交成功/本次
   // 终态才撤下，AI 实例事件碰不到 → 输入面板常驻。
   const hw = humanWaits?.[node.id] || null;
   // mind 节点按运行时 node_type 判断（node_start 事件写入 ns.type）：
@@ -463,7 +465,7 @@ function BubbleOverlay({ bubbleOverlay, nodes, nodeStates, humanWaits, actionSto
           transform: 'translate(-50%, -50%)',
           width: Math.min(window.innerWidth * 0.6, 640),
           maxHeight: '80vh',
-          background: 'var(--femo-surface)',
+          background: 'var(--femo-modal-bg)',
           borderRadius: 'var(--femo-radius-xl)',
           boxShadow: '0 24px 64px var(--femo-shadow-lg)',
           border: `var(--femo-border-w-selected) solid ${c}`,
@@ -596,7 +598,7 @@ function BubbleOverlay({ bubbleOverlay, nodes, nodeStates, humanWaits, actionSto
               {showAI && (
                 <div>
                   <div style={{ fontWeight: 700, marginBottom: 4 }}>
-                    [{ns.ai_name || 'AI'}]:
+                    [{ns.actor_name || 'AI'}]:
                   </div>
                   {ns.status === 'ai_streaming' ? (
                     <div style={{ whiteSpace: 'pre-wrap' }}>
@@ -657,7 +659,7 @@ function BubbleOverlay({ bubbleOverlay, nodes, nodeStates, humanWaits, actionSto
               {showAI && (
                 <div>
                   <div style={{ fontWeight: 700, marginBottom: 4 }}>
-                    [{ns.ai_name || 'AI'}]:
+                    [{ns.actor_name || 'AI'}]:
                   </div>
                   {isStreaming ? (
                     <div style={{ whiteSpace: 'pre-wrap' }}>
@@ -698,4 +700,4 @@ function BubbleOverlay({ bubbleOverlay, nodes, nodeStates, humanWaits, actionSto
   );
 }
 
-export { BubbleOverlay, HumanInputSection, BubbleSection };
+export { BubbleOverlay, HumanInputSection }; // 已注释死导出（观察期 2026-09-26 死代码排查）：BubbleSection（全仓零引用）

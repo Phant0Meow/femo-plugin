@@ -40,9 +40,9 @@ _SAFE_BUILTINS = {
 
 
 class Evaluator:
-    """统一求值器。actors = 剧本演员表（@名 → ActorDef-like，鸭子类型）；
+    """统一求值器。actors = FEMO脚本角色表（@名 → ActorDef-like，鸭子类型）；
     code_modules = PythonBridge.modules（evaluator 的函数调用分支用，
-    可 None——无 code: 区的剧本不需要）。"""
+    可 None——无 code: 区的脚本不需要）。"""
 
     def __init__(self, actors: Optional[Dict[str, Any]] = None,
                  code_modules: Optional[Dict[str, Any]] = None):
@@ -74,7 +74,7 @@ class Evaluator:
                 return actor_type
             raise FEMOVariableError(f"变量 '{type_match.group(1)}' 的值 '{val}' 不是 actor 引用")
 
-        # @ 引用（静态演员 → 名字本身；@变量 → 帧路由取值；不在此追链——
+        # @ 引用（静态角色 → 名字本身；@变量 → 帧路由取值；不在此追链——
         # 执行者解析的追链走 resolve_actor_ref）
         if expr.startswith('@'):
             if expr in self._actors:
@@ -223,7 +223,12 @@ class Evaluator:
                 i += 1
                 continue
             j = i
-            while j < n and (expr[j].isalnum() or expr[j] in '_@'):
+            while j < n and (expr[j].isalnum() or expr[j] in '_@$'):
+                # '$' 属词字符（2026-09-28 修）：$x/$@x 是条件里的合法引用
+                # （语法文档 §3.1：$ 显式直取全局那份；门面 _decl_for 本就支持
+                # $ 前缀查询）——此前 $ 不在词字符集，含 $ 的条件当场抛
+                # 「无法识别的字符」（AI群聊 job 2617/2618 实锤）。此前任何
+                # 能跑通的条件都不可能含 $（含即抛错），补字符零回归。
                 j += 1
             if j > i:
                 tokens.append(expr[i:j])
@@ -355,7 +360,7 @@ class Evaluator:
 
     # ── actor 链与属性（委托 actor_resolver，逻辑一字不动） ──
     def resolve_actor_ref(self, ref: str, facade) -> str:
-        """@引用 → 真实演员名（追链最多 10 层）。"""
+        """@引用 → 真实角色名（追链最多 10 层）。"""
         try:
             return resolve_actor_var(facade, self._actors, ref)
         except ValueError as e:
@@ -415,7 +420,7 @@ class Evaluator:
                 if val is None:
                     raise FEMOVariableError(f"Prompt 动态键 {{{var_path}}} 的值为 None。")
                 return str(val)
-        # 3. @ 开头且不是静态演员 → 帧路由取值
+        # 3. @ 开头且不是静态角色 → 帧路由取值
         if var_path.startswith('@') and var_path not in self._actors:
             if facade.has(var_path):
                 val = facade.get(var_path)

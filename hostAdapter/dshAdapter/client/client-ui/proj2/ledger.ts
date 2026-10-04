@@ -20,7 +20,7 @@
  * baseTurn 会有多条 turn/start（多个子 turn 映射到同一轮），它们绝不能再当
  * start。
  *
- * 【步1 范围】只接管 AI 演员轮；'human' / 'main' 两类轮的接入见步3（同池排序
+ * 【步1 范围】只接管 AI 角色轮；'human' / 'main' 两类轮的接入见步3（同池排序
  * 已在本文件的 kind/orderSeq 里预留）。
  */
 
@@ -66,8 +66,8 @@ export interface Femo2TurnEvent {
   readonly actor?: string
   /** 开轮锚点的主 Agent 标记（god 窗的主会话轮）。 */
   readonly main?: boolean
-  /** 开轮锚点的戏内下场标记（main:true 且非导演——god 窗的主模型下场轮、
-   *  stage/角色窗的下场锚）。定位走演员轮公式，与戏外主会话轮分开。 */
+  /** 开轮锚点的FEMO内参与运行标记（main:true 且非主Agent——god 窗的主模型参与轮、
+   *  stage/角色窗的参与锚）。定位走角色轮公式，与FEMO外主会话轮分开。 */
   readonly scene?: boolean
   readonly showprompt?: string
   readonly error?: string
@@ -96,9 +96,9 @@ const BODY_EVENT_TYPES = new Set([
  * 不能含 step/start、tool/*。原因：上帝窗里 `user/message` 的镜像是**后写**的
  * （实测 seq：锚2397 → turn/start2398 → step/start2399 → **user/message2400**
  * → assistant/message2401），而官方把 assistant 内容渲染在 2401 那个位置。
- * 用 step/start 算锚（2398.5）会落到用户消息(2400)前面 ⇒ 症状"导演名字行在
+ * 用 step/start 算锚（2398.5）会落到用户消息(2400)前面 ⇒ 症状"主Agent名字行在
  * 用户气泡上面"；改用 assistant/message 算（2400.5）即得正确顺序：
- * 你的消息 → 导演 → 我的回复。演员轮轮内没有 user 消息，仍按最早落地事件贴。 */
+ * 你的消息 → 主Agent → 我的回复。角色轮轮内没有 user 消息，仍按最早落地事件贴。 */
 const ANSWER_EVENT_TYPES = new Set([
   'assistant/message', 'assistant/chunk',
 ])
@@ -202,7 +202,7 @@ export function femo2TurnStart(match: ConversationMatch): Femo2TurnState {
   return {
     turn: shape?.turn ?? 0,
     actor: shape?.actor ?? '',
-    // 开轮锚点带 main 标记 ⇒ 主 Agent 轮（god 窗的主会话轮）；否则 AI 演员轮。
+    // 开轮锚点带 main 标记 ⇒ 主 Agent 轮（god 窗的主会话轮）；否则 AI 角色轮。
     kind: shape?.main === true ? 'main' : 'ai',
     orderSeq: match.event.seq,
     landed: false,
@@ -256,15 +256,15 @@ export function femo2TurnUpdate(
  * 头锚：本轮已落地内容的首个事件 seq − 0.5（恒在本段所有官方节点之前）。
  *
  * 【v9.4 2026-09-11 Job 2945 用户拍板：戏内 / 戏外分开定位】
- *  · 戏内下场轮（scene:true，main:true 且非导演）→ **演员轮公式贴段首**
+ *  · FEMO内参与轮（scene:true，main:true 且非主Agent）→ **角色轮公式贴段首**
  *    （firstBody −0.5）。god 窗实测：锚在开场 user 消息之前的节点会被官方
  *    turn-process 呈现逻辑提升到"用户气泡之后、思考/工具过程行之前"
  *    （openingHumanAnchor 提升，rank2 按原始锚点稳定排序）——正是想要的
- *    「上场注入 → @戏内名 → 已思考 → 回答」。
- *  · 戏外主会话轮 → 保持 v9.2 已验收公式（首个回答 −0.5），一字不动：
+ *    「参与注入 → @FEMO内名 → 已思考 → 回答」。
+ *  · FEMO外主会话轮 → 保持 v9.2 已验收公式（首个回答 −0.5），一字不动：
  *    物理顺序是 锚→turn/start→step/start→user→assistant，用 step/start 算锚
  *    会把名字顶到用户气泡上面（v9.2 已修过的坑，别退回去）。
- *  · AI 演员轮轮内没有 user 消息，仍按最早落地事件贴。
+ *  · AI 角色轮轮内没有 user 消息，仍按最早落地事件贴。
  * 流式期（本段还没落盘）→ orderSeq + 0.5（贴窗底、在直播尾之前）。
  */
 export function femo2TurnHeadAnchor(context: ConversationNodeContext<Femo2TurnState>): number {
@@ -280,7 +280,7 @@ export function femo2TurnHeadAnchor(context: ConversationNodeContext<Femo2TurnSt
 }
 
 /**
- * 直播尾锚：1e12 + orderSeq —— 恒在窗内一切已落盘内容之后，且多名并发演员
+ * 直播尾锚：1e12 + orderSeq —— 恒在窗内一切已落盘内容之后，且多名并发角色
  * 按**激活顺序**（开轮锚点 seq）排列，互不穿插。
  */
 export function femo2TurnLiveAnchor(context: ConversationNodeContext<Femo2TurnState>): number {
@@ -296,7 +296,7 @@ export function femo2TurnHeadVisible(state: Femo2TurnState | undefined): boolean
   if (state.kind === 'main') {
     // 【v9.4 Job 2945】已收口但连一个非骨架内容事件都没有 = 自动开合的空轮
     // （实测 turn=2：turn/start 与 turn/end 之间什么都没有）——名字行永不露面，
-    // 否则就是"剧本已开始后多出来的孤立导演行"。landed 兜底保留给
+    // 否则就是"FEMO 已开始后多出来的孤立主Agent行"。landed 兜底保留给
     // "有内容但无 assistant/message"的轮（纯工具轮）。
     return state.firstAnswerSeq !== undefined || (state.landed && state.firstContentSeq !== undefined)
   }

@@ -58,7 +58,8 @@ def process_election_votes(votes, candidates, alive):
     """
     统计警长竞选投票。
     只有警下存活玩家的投票有效，且只能投给警上玩家。
-    平票则无人当选。
+    唯一最高票 → 当选（@sherif）；平票 → 进入平票 PK（is_pk=True，
+    $pk_candidates=平票候选人名单），暂无人当选，由 pk_decide_election 重投裁决。
     """
     from collections import Counter
 
@@ -75,30 +76,33 @@ def process_election_votes(votes, candidates, alive):
     }
 
     if not valid_votes:
-        return ""
+        return {"@sherif": "", "is_pk": False, "$pk_candidates": [], "election_route": "done"}
 
     counter = Counter(valid_votes.values())
     max_votes = max(counter.values())
     winners = [p for p, c in counter.items() if c == max_votes]
 
     if len(winners) == 1:
-        return winners[0]
+        return {"@sherif": winners[0], "is_pk": False, "$pk_candidates": [],
+                "election_route": "done"}
 
-    return ""
+    return {"@sherif": "", "is_pk": True, "$pk_candidates": sorted(winners),
+            "election_route": "pk"}
 
 
 
-def resolve_night(kill_target, save, poison_target, alive_players, has_antidote, has_poison, wolves):
+def resolve_night(kill_target, save, poison_target, alive_players, has_antidote, has_poison, wolves, god=""):
     """夜晚结算：
     - 刀：目标必须在场；女巫用解药（且有药、目标在场）则救下，否则死亡。
     - 毒：规则每晚最多一瓶——解药生效当晚毒药作废；毒目标必须在场才生效。
     - 用药实际生效才扣瓶。
-    - 同步维护 wolves / wolf_room：死掉的狼剔出夜间名单（防幽灵之刀）。
+    - 同步维护 wolves / wolf_room：死掉的狼剔出夜间名单（防幽灵之刀），上帝照旧坐镇（god 参数，如剧本 @上帝）。
     返回 dead_tonight / alive / wolves / wolf_room / witch_has_antidote / witch_has_poison。"""
     kill_target = _as_name(kill_target)
     poison_target = _as_name(poison_target)
     alive_players = list(alive_players or [])
     wolves = list(wolves or [])
+    god = _as_name(god)
     dead = []
     poison_used = False
 
@@ -120,7 +124,7 @@ def resolve_night(kill_target, save, poison_target, alive_players, has_antidote,
         "dead_tonight": dead,
         "alive": new_alive,
         "wolves": new_wolves,
-        "wolf_room": ["@小灵"] + new_wolves,
+        "wolf_room": ([god] if god else []) + new_wolves,
         "witch_has_antidote": (False if saved else has_antidote),
         "witch_has_poison": (False if poison_used else has_poison),
     }
@@ -233,12 +237,13 @@ def collect_vote(votes, voter_name, target):
     return votes
 
 
-def process_votes_and_end(votes, alive_players, roles_dict, wolves, sheriff):
+def process_votes_and_end(votes, alive_players, roles_dict, wolves, sheriff, god=""):
     """计票 -> 放逐 -> 判胜负（屠边制）。
 
     普通玩家投票权重为1，警长投票权重为1.5。
     只统计投给存活玩家的票；空串/场外名字视为弃票。
-    平票=无人出局。
+    平票→进入平票 PK：本轮无人出局，is_pk=True、$pk_candidates=并列最高者名单，
+    由 pk_decide_votes 在 PK 重投后裁决（参考《谁是卧底》的平票 PK 流程）。
     不清空票箱：announce_vote 还要念票，次日由 DayPhase.init 清空。
     同步维护 wolves / wolf_room。
     """
@@ -247,6 +252,9 @@ def process_votes_and_end(votes, alive_players, roles_dict, wolves, sheriff):
     roles_dict = roles_dict or {}
     wolves = list(wolves or [])
     sheriff = _as_name(sheriff)
+    god = _as_name(god)
+    is_pk = False
+    pk_candidates = []
 
     clean = {}
     for voter, target in (votes or {}).items():
@@ -269,7 +277,15 @@ def process_votes_and_end(votes, alive_players, roles_dict, wolves, sheriff):
         max_votes = max(counts.values())
         top = [name for name, v in counts.items() if v == max_votes]
 
-        eliminated_today = top[0] if len(top) == 1 else "无人"
+        if len(top) > 1:
+            # 平票 → 平票 PK：本轮无人出局，谁都不走，交给 PK 重投裁决
+            eliminated_today = "无人"
+            is_pk = True
+            pk_candidates = top
+        else:
+            eliminated_today = top[0]
+            is_pk = False
+            pk_candidates = []
 
     if eliminated_today == "无人":
         new_alive = list(alive_players)
@@ -293,17 +309,27 @@ def process_votes_and_end(votes, alive_players, roles_dict, wolves, sheriff):
         "eliminated_today": eliminated_today,
         "alive": new_alive,
         "wolves": new_wolves,
-        "wolf_room": ["@小灵"] + new_wolves,
+        "wolf_room": ([god] if god else []) + new_wolves,
         "game_over": game_over,
         "winner": winner,
+        "is_pk": is_pk,
+        "$pk_candidates": pk_candidates,
+        "vote_route": ("pk" if is_pk else
+                       ("transfer" if (sheriff and sheriff not in new_alive) else "out")),
     }
 
 
-def assign_roles():
-    """上帝 @小灵 是主持人不参与；6 名玩家全员盲抽（@人 也在池里）。
-    wolf_room = 上帝 + 全体狼人（上帝坐镇夜间狼人房）。"""
-    players = ["@Eve", "@小猫咪", "@AI助手", "@Portia", "@人", "@小机"]
-    role_pool = ["狼人", "狼人", "预言家", "女巫", "村民", "村民"]
+def assign_roles(players, god=""):
+    """按传入的玩家名单全员盲抽发牌——名单直接吃剧本的 alive 变量，场上玩家随便改不用动这里。
+    牌型按人数动态铺：固定 2 狼 + 预言家 + 女巫，其余全是村民；不足 5 人（4 人局连村民都凑不出）响亮报错。
+    god 是主持人（如剧本 @上帝），不参与、不发牌，坐镇夜间狼人房：wolf_room = 上帝 + 全体狼人。
+    @村民1/@村民2 只记录前两位村民（剧本就这两个变量），完整名单以 roles 为准。"""
+    players = [_as_name(p) for p in (players or []) if _as_name(p)]
+    if len(set(players)) != len(players):
+        raise ValueError(f"玩家名单有重复：{players}")
+    if len(players) < 5:
+        raise ValueError(f"玩家至少要 5 人才能开局（当前 {len(players)} 人：{players}）——牌型固定 2狼+预言家+女巫，其余村民。")
+    role_pool = ["狼人", "狼人", "预言家", "女巫"] + ["村民"] * (len(players) - 4)
     random.shuffle(role_pool)
     roles = dict(zip(players, role_pool))
 
@@ -311,14 +337,216 @@ def assign_roles():
     seer = next(p for p, r in roles.items() if r == "预言家")
     witch = next(p for p, r in roles.items() if r == "女巫")
     villagers = [p for p, r in roles.items() if r == "村民"]
-    villager1, villager2 = villagers[0], villagers[1]
+    god = _as_name(god)
 
     return {
         "roles": roles,
         "wolves": wolves,
-        "wolf_room": ["@小灵"] + wolves,
+        "wolf_room": ([god] if god else []) + wolves,
         "@预言家": seer,
         "@女巫": witch,
-        "@村民1": villager1,
-        "@村民2": villager2,
+        "@村民1": villagers[0] if villagers else "",
+        "@村民2": villagers[1] if len(villagers) > 1 else "",
     }
+
+
+# ---------------------------------------------------------------- 平票 PK（2026-09-22 新增，参考《谁是卧底》的平票 PK）
+def _alive_minus(alive_players, exclude):
+    """存活名单 − 排除名单（全部归一化为名字字符串后过滤）。"""
+    excl = {_as_name(x) for x in (exclude or []) if _as_name(x)}
+    return [a for a in (_as_name(p) for p in (alive_players or []))
+            if a and a not in excl]
+
+
+def pk_announce(pk_candidates, alive_players, sheriff, day):
+    """白天放逐投票平票 PK 的公开播报。
+    PK 重投的合法投票人 = 存活玩家 − 平票候选人；警长若存活且非候选人，
+    照常参与重投且按 1.5 票计（pk_decide_votes 同口径）。
+    返回 {"announce_text": 播报, "$pk_voters": 重投票人名单}——
+    两个 key 都必须在剧本 out: 中声明。"""
+    cands = [_as_name(c) for c in (pk_candidates or []) if _as_name(c)]
+    voters = _alive_minus(alive_players, cands)
+    cand_str = "、".join(cands)
+    sheriff = _as_name(sheriff)
+    right_note = (f"警长{sheriff}的重投票按 1.5 票计。"
+                  if sheriff and sheriff in voters else "")
+    announce = (
+        f"—— 第 {day} 天 · 平票 PK ——\n"
+        f"放逐投票平票的是：{cand_str}，本轮暂无人出局。\n"
+        f"现在进入 PK 环节：{cand_str} 每人再说一句话为自己申辩；"
+        f"然后由其余 {len(voters)} 位（{'、'.join(voters)}）在平票的玩家里重投，"
+        f"得票多者被放逐。{right_note}\n"
+        f"若再次平票，今日无人出局，夜晚照常降临。"
+    )
+    return {"announce_text": announce, "$pk_voters": voters}
+
+
+def pk_decide_votes(votes, pk_candidates, alive_players, roles_dict, wolves, sheriff, day=0, god=""):
+    """平票 PK 重投计票 -> 放逐 -> 判胜负（屠边制）。
+    有效票三条件：投票者存活、投票者不是平票候选人、目标在平票名单里。
+    警长票按 1.5 计（在场且非候选人时）。
+    再次平票或无有效票 → 今日无人出局（狼人杀惯例：平票不放逐，入夜继续）。
+    票箱已在剧本 pk_init 节点清空（第一轮的票已由 announce_vote 念过，之后无人再用），
+    本函数只认 PK 重投的票，并生成只含 PK 票的公告 announce_text（明细与计票同口径）。
+    同步维护 wolves / wolf_room。"""
+    alive_players = list(alive_players or [])
+    roles_dict = roles_dict or {}
+    wolves = list(wolves or [])
+    sheriff = _as_name(sheriff)
+    god = _as_name(god)
+    cand_set = {_as_name(c) for c in (pk_candidates or []) if _as_name(c)}
+    voters_ok = [a for a in (_as_name(a) for a in alive_players)
+                 if a and a not in cand_set]
+
+    clean = {}
+    for voter, target in (votes or {}).items():
+        v, t = _as_name(voter), _as_name(target)
+        if v in voters_ok and t in cand_set:
+            clean[v] = t
+
+    counts = {}
+    for voter, target in clean.items():
+        weight = 1.5 if voter == sheriff else 1
+        counts[target] = counts.get(target, 0) + weight
+
+    if not counts:
+        eliminated_today = "无人"
+    else:
+        max_votes = max(counts.values())
+        top = [name for name, v in counts.items() if v == max_votes]
+        eliminated_today = top[0] if len(top) == 1 else "无人"
+
+    # 公告文案：明细只含本次 PK 重投的票（与 clean 同口径），弃权如实标注。
+    parts = []
+    for v in voters_ok:
+        t = clean.get(v)
+        t_raw = _as_name((votes or {}).get(v))
+        if t:
+            parts.append(f"{v}→{t}")
+        elif t_raw:
+            parts.append(f"{v}→{t_raw}（无效票）")
+        else:
+            parts.append(f"{v}→弃权")
+    detail = ("PK 投票明细：" + "、".join(parts)) if parts else "PK 投票明细：（无有资格投票人）"
+    note = ("PK 计票：" + "、".join(f"{n} {c} 票" for n, c in
+             sorted(counts.items(), key=lambda kv: -kv[1]))
+            if counts else "PK 计票：无人投出有效票")
+    if counts and sheriff and sheriff in voters_ok and clean.get(sheriff):
+        note += "（警长票按1.5计）"
+
+    if eliminated_today != "无人":
+        reason = f"{eliminated_today} 在平票 PK 重投中得票最多，被放逐。"
+    elif counts:
+        reason = "、".join(top) + " 再次平票——今日无人出局，夜晚照常降临。"
+    else:
+        reason = "PK 重投无有效票——今日无人出局，夜晚照常降临。"
+
+    announce = (f"—— 第 {day} 天 · 平票 PK 结果 ——\n"
+                f"{detail}\n{note}\n{reason}")
+
+    if eliminated_today == "无人":
+        new_alive = list(alive_players)
+    else:
+        new_alive = [a for a in alive_players if a != eliminated_today]
+
+    new_wolves = [w for w in wolves if w in new_alive]
+
+    alive_wolves = [a for a in new_alive if roles_dict.get(a) == "狼人"]
+    alive_gods = [a for a in new_alive if roles_dict.get(a) in ("预言家", "女巫")]
+    alive_villagers = [a for a in new_alive if roles_dict.get(a) == "村民"]
+
+    if not alive_wolves:
+        game_over, winner = True, "好人阵营"
+    elif not alive_gods or not alive_villagers:
+        game_over, winner = True, "狼人阵营"
+    else:
+        game_over, winner = False, ""
+
+    return {
+        "eliminated_today": eliminated_today,
+        "alive": new_alive,
+        "wolves": new_wolves,
+        "wolf_room": ([god] if god else []) + new_wolves,
+        "game_over": game_over,
+        "winner": winner,
+        "vote_route": ("transfer" if (sheriff and sheriff not in new_alive) else "out"),
+        "announce_text": announce,
+    }
+
+
+def pk_announce_election(pk_candidates, candidates, alive_players):
+    """警长竞选平票 PK 的公开播报。
+    PK 重投的合法投票人 = 警下玩家（存活 − 全部上警候选人，与首轮竞选投票同权）。
+    返回 {"announce_text": 播报, "$pk_voters": 重投票人名单}。"""
+    cands = [_as_name(c) for c in (pk_candidates or []) if _as_name(c)]
+    all_candidates = [_as_name(c) for c in (candidates or []) if _as_name(c)]
+    voters = _alive_minus(alive_players, all_candidates)
+    cand_str = "、".join(cands)
+    announce = (
+        f"—— 警长竞选 · 平票 PK ——\n"
+        f"警长竞选中平票的是：{cand_str}，暂无人当选警长。\n"
+        f"平票的候选人每人再说一句话为自己拉票；"
+        f"然后由警下玩家（{len(voters)} 位：{'、'.join(voters)}）"
+        f"在平票的候选人里重投，得票多者当选警长。\n"
+        f"若再次平票，本轮无人当选警长，今日白天按无警长进行。"
+    )
+    return {"announce_text": announce, "$pk_voters": voters}
+
+
+def pk_decide_election(votes, pk_candidates, candidates, alive):
+    """警长竞选 PK 重投计票。
+    有效票：投票者是警下存活玩家（存活 − 全部上警候选人）、目标在平票名单里。
+    得票多者当选；再次平票或无有效票 → 无人当选（@sherif 返回空串）。
+    票箱已在剧本 竞选pk重置 节点清空，公告 announce_text 只含 PK 重投的票
+    （明细与计票同口径，弃权如实标注）。"""
+    from collections import Counter
+
+    candidates = list(candidates or [])
+    alive = list(alive or [])
+    candidate_set = set(candidates)
+    voter_set = set(alive) - candidate_set
+    cand_set = {_as_name(c) for c in (pk_candidates or []) if _as_name(c)}
+
+    valid_votes = {
+        _as_name(v): _as_name(t)
+        for v, t in (votes or {}).items()
+        if _as_name(v) in voter_set and _as_name(t) in cand_set
+    }
+
+    # 公告文案：明细只含本次 PK 重投的票（与 valid_votes 同口径），弃权如实标注。
+    voter_order = [p for p in (_as_name(a) for a in alive) if p in voter_set]
+    parts = []
+    for v in voter_order:
+        t = valid_votes.get(v)
+        t_raw = _as_name((votes or {}).get(v))
+        if t:
+            parts.append(f"{v}→{t}")
+        elif t_raw:
+            parts.append(f"{v}→{t_raw}（无效票）")
+        else:
+            parts.append(f"{v}→弃权")
+    detail = ("PK 投票明细：" + "、".join(parts)) if parts else "PK 投票明细：（无警下投票人）"
+
+    if not valid_votes:
+        announce = ("—— 警长竞选 · 平票 PK 结果 ——\n"
+                    f"{detail}\n"
+                    "PK 计票：无人投出有效票。本轮无人当选警长，今日白天按无警长进行。")
+        return {"@sherif": "", "election_route": "done", "announce_text": announce}
+
+    counter = Counter(valid_votes.values())
+    max_votes = max(counter.values())
+    winners = [p for p, c in counter.items() if c == max_votes]
+    note = ("PK 计票：" + "、".join(f"{p} {c} 票" for p, c in
+            sorted(counter.items(), key=lambda kv: -kv[1])))
+
+    if len(winners) == 1:
+        announce = ("—— 警长竞选 · 平票 PK 结果 ——\n"
+                    f"{detail}\n{note}\n"
+                    f"{winners[0]} 在 PK 重投中得票最多，当选警长。")
+        return {"@sherif": winners[0], "election_route": "done", "announce_text": announce}
+
+    announce = ("—— 警长竞选 · 平票 PK 结果 ——\n"
+                f"{detail}\n{note}\n"
+                + "、".join(winners)
+                + " 再次平票——本轮无人当选警长，今日白天按无警长进行。")
+    return {"@sherif": "", "election_route": "done", "announce_text": announce}

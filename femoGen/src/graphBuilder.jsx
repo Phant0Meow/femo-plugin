@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 
-import { nid, eid, mid, actionId, getNodeSize, makeDefaultNodes, SPW, SPH } from './common';
+import { nid, eid, mid, actionId, SPW, SPH } from './common'; // 已注释死导入（观察期 2026-09-26）：getNodeSize, makeDefaultNodes（未使用）
 
 // ═══ Convert parsed FEMO to internal graph state ═══
 function parsedToGraph(parsed, currentMode, currentModName) {
@@ -96,7 +96,7 @@ function parsedToGraph(parsed, currentMode, currentModName) {
       flowMode = 'module';
     } else {
       throw new Error(
-        `FEMO 脚本中未找到名为 "${currentModName}" 的 module 定义。请确认 module 名称拼写正确`
+        `FEMO脚本中未找到名为 "${currentModName}" 的 module 定义。请确认 module 名称拼写正确`
       );
     }
   } else {

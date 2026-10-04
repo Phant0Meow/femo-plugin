@@ -9,7 +9,11 @@
   场上因此有三张不同的牌在走——平民要靠"谁跟谁对不上"抓两个人。白板仍是 1 人。
 """
 
+import json
+import os
 import random
+import re
+from datetime import datetime
 
 # ---------------------------------------------------------------- 词库
 # 每对 (平民词, 卧底词)。双卧底局里卧底词有两个：优先从本对取，再从不含平民词的
@@ -102,7 +106,8 @@ def _second_undercover_word(deck, civilian_word, first_word):
 
 
 # ---------------------------------------------------------------- 发牌
-def deal_cards(players, deck=None, n_undercover=None):
+def deal_cards(players, deck=None, n_undercover=None,
+               civilian_word=None, undercover_word=None):
     """发牌：平民共用一个词 + n 个卧底（**同拿一个相近词**）+ 1 个白板（无词）。
 
     参数：
@@ -111,6 +116,10 @@ def deal_cards(players, deck=None, n_undercover=None):
         n_undercover: 卧底人数；**缺省 None = 按人数自动定**
                       （pick_undercover_count：≤7 人 1 个、≥8 人 2 个）。
                       传具体数字可覆盖——老剧本显式传 2 时行为不变。
+        civilian_word / undercover_word:
+                      **出题官现场出的词**（2026-09-16 加）。两个都给了且不相同
+                      就用它；缺一个、相等或为空 → 退回 deck 抽（_pick_text），
+                      所以老剧本不传这两个参数时行为和以前一字不差。
     返回字典（key 与剧本 out: 声明一一对应）：
         roles       {玩家名: "平民"/"卧底"/"白板"}
         words       {玩家名: 该玩家拿到的词}
@@ -137,7 +146,12 @@ def deal_cards(players, deck=None, n_undercover=None):
     undercovers = shuffled[:n_uc]
     blank = shuffled[n_uc]
 
-    civilian_word, undercover_word = _pick_text(deck)
+    # 词面：优先用出题官现场出的那对，没给/不合法才回落到固定题库。
+    cw = _quiz_clean(civilian_word) if civilian_word else ""
+    uw = _quiz_clean(undercover_word) if undercover_word else ""
+    if not (cw and uw and cw != uw):
+        cw, uw = _pick_text(deck)
+    civilian_word, undercover_word = cw, uw
     # 【2026-09-13 猫猫拍板：双卧底同词】旧实现给第二名卧底另抽一个"其它对"里的词
     # （实测抽到「凉鞋」配平民「公交车」）——那不是相近词，是另一个词：拿它的人
     # 第一次发言就必然穿帮，"抓卧底"直接退化成"抓傻子"。现在所有卧底共用对子里
@@ -480,6 +494,27 @@ def pk_voters(pk_candidates, alive_players):
             if a and a not in cands]
 
 
+def vote_scope_note(pk_candidates):
+    """投票节点的「该投谁」说明文本——供剧本 [投票] prompt 用 {u.vote_scope_note($pk_candidates)} 引用。
+
+    常规轮次 pk_candidates 为空（$pk_candidates 初值 []）→ 全体存活玩家都可投；
+    PK 重投时 pk_candidates 是平票名单 → 只有这几位能投，投别人算无效票。
+
+    【2026-09-23 干跑修正】[投票] 是常规轮与 PK 重投共用的节点，此前 prompt 一律写
+    「只能填存活玩家名单里真实存在的名字」，跟 PK 公告「在平票的人里重投」打架。
+    干跑（谁是卧底3·八人双卧底，seed=808928）第 3 轮 PK 的 4 张票全是无效票
+    （@小机→@老李、@猫猫→@小机、@老李→@小机，@Eve 自投），pk_decide 收不到有效票，
+    只能走「僵局兜底」优先送走卧底/随机送人——PK 环节形同虚设、结果与票型无关。
+    现在由本函数按轮次类型给出准确的投票范围。
+    """
+    cands = [_as_name(c) for c in (pk_candidates or []) if _as_name(c)]
+    if not cands:
+        return "投票对象：本轮所有存活玩家（除了你自己）。"
+    return ("投票对象：本次是【平票 PK 重投】，你只能在平票的这几位里二选一／多选一："
+            + "、".join(cands)
+            + "。投给其他任何人（哪怕他还活着、哪怕你觉得他更可疑）都算无效票。")
+
+
 def pk_prompt(pk_candidates, alive_players, round_no):
     """PK 环节的公开播报（申辩与重投的提示词写在剧本节点里）。
 
@@ -681,3 +716,252 @@ def verdict(eliminated, roles, words, alive_players, winner, deck_word=None,
 
     text = "\n".join(lines)
     return {"verdict_text": text, "announce_text": text}
+
+
+# ================================================================ 出题官（LLM 现场出题）
+# 【2026-09-16 猫猫提出】固定题库只有 20 对，玩两局就撞词。改成 @出题官 现场出：
+#   quiz_seed() 每局现算一张"题签"（日期/星期/时刻 + 随机校验码 + 随机方向/关系/
+#   角度 + 禁用词表 + 最近用过的词）喂给出题官 → 它出词 → check_quiz() 硬校验 →
+#   不合格就把理由连同"退回记录"喂回去重出。
+# 为什么要三保险：LLM 的默认档位就是"牛奶/豆浆"——光在 prompt 里写"别重复"没用。
+#   随机种子（换脑子）+ 禁用表（堵老路）+ 跨局已用记录（记住历史），三样一起上，
+#   才真的每局不重样。
+# 为什么不要"备用卧底词"：双卧底按 2026-09-13 的裁决是**同词**（deal_cards 里
+#   uc_words = [undercover_word] * n_uc），所以只需要一对词，多问一个只会给出题官
+#   多一个写歪的机会。
+
+_QUIZ_DIR = os.path.dirname(os.path.abspath(__file__))
+QUIZ_USED_FILE = os.path.join(_QUIZ_DIR, "quiz_used.json")
+QUIZ_USED_KEEP = 30          # 跨局已用记录保留多少对（也是喂回 prompt 的上限）
+
+# 出题方向：每局随机抽 3 个，第 1 个是硬性主方向，后两个是备选
+QUIZ_AREAS = [
+    "厨房灶台", "日用小物", "文具办公", "通勤交通", "零食饮料", "洗漱护理",
+    "家用电器", "衣服配饰", "鞋子袜子", "宠物用品", "手机数码", "学校教室",
+    "菜市场", "运动健身", "出门旅游", "客厅家具", "床上用品", "儿童玩具",
+    "雨天用品", "过年过节", "理发店", "小卖部", "车里", "医院药房",
+]
+
+# 词对关系：决定"相近"是哪种相近，避免每局都是同一款近义词
+QUIZ_STYLES = [
+    "同场景姊妹物：两样东西总在同一个地方出现，但不是同一个东西",
+    "同类不同做法：同一个用途，两种做法／两种口味／两种规格",
+    "新老两代：一个老物件和一个新物件，干的是同一件事",
+    "长得像、用处不同：摆在一起像亲兄弟，用起来完全两回事",
+    "一件事的两副面孔：同一件事的两种说法，或者它的两个阶段",
+    "贴身搭档：总是配套出现，少了另一个就不完整",
+]
+
+# 灵感角度：给出题官一个偏门的"从哪儿想起"的入口
+QUIZ_ANGLES = [
+    "从一个十岁小孩的眼睛里能看见的",
+    "搬家时最先装箱的",
+    "你妈会唠叨你少碰的东西",
+    "深夜还醒着的东西",
+    "第一次去别人家做客会注意到的",
+    "摸起来手感差别最大的",
+    "拆快递时会一起拿出来的",
+    "下雨天忽然变得很重要的",
+    "买的时候要挑半天、买回来又不太用的",
+    "能塞进兜里的",
+]
+
+# 额外禁用：不在 DECK 里、但太烂大街的词（一提到近义词对，人人先想到这些）
+QUIZ_BANNED_EXTRA = [
+    "苹果", "香蕉", "西瓜", "手机", "电脑", "电视", "椅子", "水杯", "纸巾",
+    "牙刷", "毛巾", "书包", "眼镜", "手表", "月饼", "粽子", "饺子", "米饭",
+]
+
+_REJECT_LOG = []   # 本轮被打回的词对（下一次出题时喂回去，堵住它拿同一对再试）
+
+# 占位词垃圾：干跑（femo-debug）时 AI 节点由调试器合成替答，它会照着 prompt 里的
+# 「<<civilian_word = 平民词>>」直接抄出"平民词"/"卧底词"这种东西。这些不是真词对，
+# 一旦写进跨局禁用表，下次正式开局就会拿它们当"已用过的词"（还会把真词表冲淡）。
+# 所以这类词只在"记入已用表"时丢掉，校验/出题流程本身不受影响。
+QUIZ_JUNK_WORDS = {"平民词", "卧底词", "备用卧底词", "词", "词面", "答案",
+                   "debug", "test", "示例", "空", "?", "？？？"}
+
+
+def _quiz_junk(*words):
+    return any(str(w).strip() in QUIZ_JUNK_WORDS for w in words)
+
+
+def _quiz_load_used():
+    """读跨局已用词对：[["平民词","卧底词"], ...]。读不到就当空表。"""
+    try:
+        with open(QUIZ_USED_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return []
+    out = []
+    if isinstance(data, list):
+        for item in data:
+            if isinstance(item, (list, tuple)) and len(item) >= 2:
+                if _quiz_junk(item[0], item[1]):
+                    continue          # 干跑合成出来的占位词，丢掉
+                out.append([str(item[0]), str(item[1])])
+    return out
+
+
+def _quiz_save_used(pair):
+    """把一对词记进跨局已用表，供以后的局禁用。写盘失败不影响牌局，静默放过。"""
+    try:
+        if _quiz_junk(pair[0], pair[1]):
+            return
+        used = _quiz_load_used()
+        pair = [str(pair[0]), str(pair[1])]
+        if pair not in used:
+            used.append(pair)
+        used = used[-QUIZ_USED_KEEP:]
+        with open(QUIZ_USED_FILE, "w", encoding="utf-8") as f:
+            json.dump(used, f, ensure_ascii=False, indent=1)
+    except Exception:
+        pass
+
+
+def _quiz_banned(deck=None):
+    """禁用词集合 = 内置题库全部词 + 烂大街词 + 跨局已用过的词。"""
+    banned = set(QUIZ_BANNED_EXTRA)
+    for pair in (deck or DECK):
+        try:
+            banned.update(_as_name(w) for w in pair)
+        except TypeError:
+            pass
+    for pair in _quiz_load_used():
+        banned.update(pair)
+    banned.discard("")
+    return banned
+
+
+def quiz_seed(deck=None):
+    """现算本局的"题签"文本（喂给出题官的那个 prompt 块）。
+
+    每局必不相同：时刻精确到秒 + 随机校验码 + 随机抽的方向/关系/角度 + 禁用表 +
+    最近用过的词 + 本轮被打回过的词。返回 {"quiz_seed_text": str}，key 与剧本 out 对齐。
+    """
+    rnd = random.SystemRandom()
+    now = datetime.now()
+    weekday = "一二三四五六日"[now.weekday()]
+    areas = rnd.sample(QUIZ_AREAS, 3)
+    style = rnd.choice(QUIZ_STYLES)
+    angle = rnd.choice(QUIZ_ANGLES)
+    codes = [f"{rnd.randint(0, 0xFFFF):04X}"]
+    codes += [str(rnd.randint(1, 9999)) for _ in range(3)]
+    n_lo, n_hi = rnd.choice([(2, 3), (2, 4), (3, 4)])
+
+    banned = sorted(_quiz_banned(deck))
+    used = _quiz_load_used()
+    used_words = []
+    for pair in used[-QUIZ_USED_KEEP:]:
+        used_words.extend(pair)
+    used_words = sorted(set(w for w in used_words if w))
+
+    lines = [
+        "—— 本局题签（开局现算，别拿这些数字当题目）——",
+        f"此刻：{now.strftime('%Y年%m月%d日')} 周{weekday} "
+        f"{now.strftime('%H:%M:%S')}",
+        "随机校验码：" + " / ".join(codes),
+        f"【本次指定方向】{areas[0]}（备选：{areas[1]}、{areas[2]}）",
+        f"【本次指定关系】{style}",
+        f"【本次指定角度】{angle}",
+        f"【词长】平民词和卧底词都控制在 {n_lo}–{n_hi} 个字",
+    ]
+    if used_words:
+        lines.append("【最近几局已经用过，禁止再用】" + "、".join(used_words))
+    lines.append("【烂大街、禁止再出】" + "、".join(sorted(set(QUIZ_BANNED_EXTRA))))
+    lines.append("【内置题库里的老题，禁止再出】"
+                 + "、".join(sorted(set(w for p in DECK for w in p))))
+    if _REJECT_LOG:
+        lines.append("【刚才被系统打回的词，禁止再出现】" + "；".join(_REJECT_LOG))
+        lines.append(f"（这已经是第 {len(_REJECT_LOG) + 1} 次出题，"
+                     "别再绕着同一对词打转，换一套完全不同的东西。）")
+    return {"quiz_seed_text": "\n".join(lines)}
+
+
+def _quiz_clean(w):
+    """把 LLM 可能带出来的包装剥干净：标签前缀、「」引号、括号注释、句末标点。
+
+    出题官多半会写成「平民词=牛奶」或者「牛奶（早上喝的）」，这里统一还原成裸词。
+    """
+    s = "" if w is None else str(w)
+    s = s.strip().splitlines()[0].strip() if s.strip() else ""
+    if not s:
+        return ""
+    for tag in ("平民词", "卧底词", "备用卧底词", "答案", "词面", "词汇", "词"):
+        for sep in ("=", "＝", ":", "：", "是", "为"):
+            if s.startswith(tag + sep):
+                s = s[len(tag) + len(sep):].strip()
+                break
+    s = re.sub(r"[（(【\[][^）)】\]]*[）)】\]]", "", s)      # 括号注释
+    s = s.strip(" 　\"'“”‘’《》〈〉【】[]（）()·,，。.、;；:：!！?？-—~～*")
+    return s.strip()
+
+
+def check_quiz(civilian_word, undercover_word, attempt=1, max_attempt=4, deck=None):
+    """校验出题官给的这对词。返回 {"quiz_ok", "quiz_problem", "civilian_word",
+    "undercover_word", "quiz_note"}，key 与剧本 out 对齐。
+
+    硬校验（都是"必须重出"的硬伤）：非空、两词不同、谁也不包含谁、词长 2–8 字、
+    不在禁用表里。
+    软校验没法做——"这两个词到底近不近"只有语义能判断，交给出题官自己，Python
+    不越权猜。连错 max_attempt 次就换内置题库，保证牌局一定开得起来。
+    """
+    global _REJECT_LOG
+    cw = _quiz_clean(civilian_word)
+    uw = _quiz_clean(undercover_word)
+    banned = _quiz_banned(deck)
+
+    def _reject(reason):
+        global _REJECT_LOG
+        pair_txt = f"平民「{cw or '空'}」/ 卧底「{uw or '空'}」"
+        _REJECT_LOG.append(f"{pair_txt}——{reason}")
+        # 兜底判据用 attempt（剧本里 quiz_try 自增的那次），不用日志长度——
+        # 日志长度会被上一局的残留污染（2026-09-16 自测踩到：连打三次 attempt=1
+        # 就直接触发了兜底）。
+        try:
+            tried = max(1, int(attempt))
+        except (TypeError, ValueError):
+            tried = 1
+        if tried >= max(1, int(max_attempt)):
+            # 兜底：换回内置题库，牌局照样能开（词会出现在赛后复盘里）
+            fcw, fuw = _pick_text(deck)
+            _quiz_save_used([fcw, fuw])
+            _REJECT_LOG = []
+            return {
+                "quiz_ok": True,
+                "quiz_problem": f"出题官连续 {attempt} 次没出合格题（最后一次：{reason}），"
+                                "已改用内置备用题库。",
+                "civilian_word": fcw,
+                "undercover_word": fuw,
+                "quiz_note": "本局题目来自备用题库（出题官本局失手）。",
+            }
+        return {
+            "quiz_ok": False,
+            "quiz_problem": f"第 {attempt} 次出题被打回：{reason}（{pair_txt}）",
+            "civilian_word": cw,
+            "undercover_word": uw,
+            "quiz_note": "",
+        }
+
+    if not cw or not uw:
+        return _reject("有一个词是空的，两个都必须填")
+    if cw == uw:
+        return _reject("两个词一模一样，卧底会当场露馅")
+    if cw in uw or uw in cw:
+        return _reject("一个词包含了另一个，太容易一眼分清")
+    if not (2 <= len(cw) <= 8) or not (2 <= len(uw) <= 8):
+        return _reject("词长不在 2–8 字之间")
+    for w in (cw, uw):
+        if w in banned:
+            return _reject(f"「{w}」在禁用表里（最近用过或太烂大街）")
+
+    _quiz_save_used([cw, uw])
+    _REJECT_LOG = []
+    return {
+        "quiz_ok": True,
+        "quiz_problem": "",
+        "civilian_word": cw,
+        "undercover_word": uw,
+        "quiz_note": "本局题目由 @出题官 现场所出，不是题库里的老题。",
+    }
+

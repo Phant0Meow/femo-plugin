@@ -115,7 +115,7 @@ export function createReporter() {
       if (errs.length === 0) return;
       const head = header
         ? (errs.length > 1 ? `${header}（共 ${errs.length} 处）：` : `${header}：`)
-        : (errs.length > 1 ? `剧本语法检查未通过（共 ${errs.length} 处）：` : '');
+        : (errs.length > 1 ? `脚本语法检查未通过（共 ${errs.length} 处）：` : '');
       throw new FEMOSyntaxError(errs, head);
     },
   };

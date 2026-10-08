@@ -17,7 +17,7 @@ actors:
   human @人类 = soul:human
 
 code:
-  WAIT = file:"D:\myFiles\dsh\femo-plugin\femoExamples\AI聊天室\random_wait_time.py"
+  WAIT = file:"random_wait_time.py"
 
 vars:
   $shutdown = false

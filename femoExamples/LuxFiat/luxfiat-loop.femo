@@ -11,9 +11,9 @@ actors:
   human @我
 
 code:
-  memfile = file:"femoBridges/MemoryExample.py"
-  ctxfile = file:"femoBridges/ContextExample.py"
-  sleep = file:"D:\myFiles\dsh\femo-plugin\femoExamples\LuxFiat\wait.py"
+  memfile = file:"../../femoBridges/MemoryExample.py"
+  ctxfile = file:"../../femoBridges/ContextExample.py"
+  sleep = file:"wait.py"
 
 vars:
   stop = false

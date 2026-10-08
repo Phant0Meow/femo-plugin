@@ -28,7 +28,7 @@ actors:
   ai @god = soul:ai9
 
 code:
-  werewolf_utils = file:"D:\myFiles\dsh\femo-plugin\femoExamples\狼人杀\werewolf_utils9.py"
+  werewolf_utils = file:"werewolf_utils9.py"
 
 vars:
   roles = {}

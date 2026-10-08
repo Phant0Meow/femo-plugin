@@ -34,5 +34,5 @@
 
 - 模块守则：仓库根与四模块的 `AGENTS.md`（地图见根文件 §1.1）
 - 各宿主适配器说明：`hostAdapter/{dsh,zcode}Adapter/README.md、hostAdapter/autoclawAdapter/readme.md`
-- dsh 对 DSH 本体的 fork 改动笔记：`hostAdapter/dshAdapter/dshPatch/MEOW_MODIFICATIONS.md`（私有开发日志，绝不进公开镜像与 npm 包）
+- dsh 对 DSH 本体的 fork 改动笔记：`hostAdapter/dshAdapter/dshPatch/MEOW_MODIFICATIONS.md`（私有开发日志，2026-10-08 起连私有源仓 git 也不再跟踪——文件本体留盘，不进任何镜像与 npm 包）
 - 对外门面：仓库根 `README.md`（项目介绍）与 `语法文档.md`（.femo 语言规范，兼作运行时 AI 手册）

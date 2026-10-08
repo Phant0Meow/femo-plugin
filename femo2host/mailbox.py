@@ -72,7 +72,20 @@ def _save(box):
     tmp = MAILBOX_FILE + '.tmp'
     with open(tmp, 'w', encoding='utf-8') as f:
         json.dump(box, f, ensure_ascii=False, indent=1)
-    os.replace(tmp, MAILBOX_FILE)
+    # 2026-10-08 装甲：os.replace 带 Windows 共享冲突小重试——交卷入柜这最后
+    # 一步撞机器级间歇锁（同步盘/杀毒/索引器咬刚写完的 tmp，j2726 实锤：GLM
+    # 台词 737 字收齐，post_speech 在这步 WinError 5 整轮哑火，引擎在
+    # ai_[AI发言]_24 上干等）。成例=femoCompiler/job_manager._os_replace_retry
+    # （09-16 场册写侧同款）：0.05/0.1/0.2s 退避共 ~0.35s，仍败原样抛出——
+    # 上游投递装甲（退回重投/响亮死信）接得住，这里不吞。
+    for attempt in range(4):
+        try:
+            os.replace(tmp, MAILBOX_FILE)
+            return
+        except PermissionError:
+            if attempt == 3:
+                raise
+            time.sleep(0.05 * (2 ** attempt))
 
 
 @contextmanager

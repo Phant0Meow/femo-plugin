@@ -25,3 +25,6 @@ com.femo.web_launcher.json
 web-launcher.exe
 node.path
 已退役-*
+# dsh 私有运行数据（2026-10-08 实证 npm 1.0.3 曾把 298 个 data 文件发出去了，此后挡住）；
+# dshPatch 需求书与补丁脚本按 2026-09-14 拍板照常公开（「dshPatch 要进，modification 不进」，MEOW_MODIFICATIONS.md 已在上方挡住）
+hostAdapter/dshAdapter/data/

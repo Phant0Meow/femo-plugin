@@ -13582,7 +13582,7 @@ function WatchView({ jobId, meta, graph, mirror, transport, fixed, onExit, onTog
   (0, import_react19.useEffect)(() => {
     setPan({ x: 40, y: 30 });
   }, [flowKey]);
-  const shell = embedded ? { position: "relative", flex: 1, minHeight: 0 } : fixed ? { position: "fixed", inset: 0, zIndex: 3e3 } : { position: "absolute", inset: 0, zIndex: 40 };
+  const shell = embedded ? { position: "absolute", inset: 0 } : fixed ? { position: "fixed", inset: 0, zIndex: 3e3 } : { position: "absolute", inset: 0, zIndex: 40 };
   return /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(
     "div",
     {

@@ -276,21 +276,42 @@ export function createEventCore({ board, sid = 'femo-main', send, dispatch = 'of
   }
 
   // ── 回传（统一寄 speech 信：系统要回答、客户发件——引擎对 AI/人类/主Agent
-  //    不分家；桥轮询出站喂引擎）─────────────────────────────────────────
+  //    不分家；桥轮询出站喂引擎）─────────────────────────────────────
+  /** 交卷重试（2026-10-08 用户拍板「一切发言都需要重试，不用区分人类 AI」）：
+   *  机器级间歇锁（杀毒/索引器扫刚写完的文件）会把 post_speech 在 daemon
+   *  侧打成 daemon error，交卷一次失败即哑火（j2726 实锤：GLM 737 字收齐
+   *  却整轮丢失）。重试只认「投递类故障」的锁咬签名；语义拒收（已收口/
+   *  不在跑/信封词汇错位）不重试——宁重交不误交，引擎对多余交卷记死信
+   *  响亮不回炉（既有裁决），真重复无害。daemon-client 的连接类失败
+   *  （daemon_unreachable）已自带重发现重试，这里不管。 */
+  const SUBMIT_RETRY_DELAYS_MS = [200, 500, 1000];
+  const TRANSIENT_LOCK_RE = /WinError 5|拒绝访问|PermissionError|Errno 13/;
+  async function sendSpeechWithRetry(cmd, args, timeoutMs, label) {
+    for (let i = 0; ; i++) {
+      try {
+        return await send(cmd, args, timeoutMs);
+      } catch (e) {
+        const s = String(e?.detail ?? e?.message ?? e);
+        if (i >= SUBMIT_RETRY_DELAYS_MS.length || !TRANSIENT_LOCK_RE.test(s)) throw e;
+        log(`交卷重试 ${label} 第${i + 1}/${SUBMIT_RETRY_DELAYS_MS.length}次（锁咬/瞬时故障）：${s.slice(0, 120)}`);
+        await new Promise(r => setTimeout(r, SUBMIT_RETRY_DELAYS_MS[i]));
+      }
+    }
+  }
   /** 交卷：主Agent台词 / 子代理后端的角色结果（执行体信封，词汇收口 speech-core）。
    *  modelId（2026-10-02 存储层贯通）：本轮实际响应模型标识，落账 react_steps.model_id
    *  ——登记制不校验格式（dsh/zcode=provider/model，web=web:<站点名>，main 固定
    *  'main'；宿主取不到就不传，引擎落空串）。位置在第 6 参（soul 之后），旧调用方
    *  零改动。 */
   function submitOutput(jobId, waitKey, output, steps, soul = 'main', modelId) {
-    return send('post_speech', executorSpeechArgs({ jobId, waitKey, soul, output, steps,
-      ...(modelId === undefined ? {} : { modelId }) }), 30_000);
+    return sendSpeechWithRetry('post_speech', executorSpeechArgs({ jobId, waitKey, soul, output, steps,
+      ...(modelId === undefined ? {} : { modelId }) }), 30_000, `${soul} ${waitKey}`);
   }
   /** 人类席交卷（人类信封 body={chat_text, variables}，与 dsh projection-input
    *  同一份词汇）。引擎人类节点只读 chat_text/variables——{output} 会被读成
    *  空台词（2026-09-21 zcode 网关由此改道本动词，见 speech-core 头注）。 */
   function submitHumanOutput(jobId, waitKey, output, soul, variables) {
-    return send('post_speech', humanSpeechArgs({ jobId, waitKey, soul, text: output, variables }), 30_000);
+    return sendSpeechWithRetry('post_speech', humanSpeechArgs({ jobId, waitKey, soul, text: output, variables }), 30_000, `${soul || 'human'} ${waitKey}`);
   }
   /** 人类玩家输入落角色窗（提词器/网关回传时调用；角色名=执行者）。 */
   function projectUserLine(actorName, text, scope) {

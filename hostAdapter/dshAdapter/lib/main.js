@@ -5747,18 +5747,32 @@ function createEventCore({ board, sid = "femo-main", send, dispatch = "off", log
   function pendingDirectiveCount() {
     return directiveQueue.filter((x) => x.kind === "directive").length;
   }
+  const SUBMIT_RETRY_DELAYS_MS = [200, 500, 1e3];
+  const TRANSIENT_LOCK_RE = /WinError 5|拒绝访问|PermissionError|Errno 13/;
+  async function sendSpeechWithRetry(cmd, args, timeoutMs, label) {
+    for (let i = 0; ; i++) {
+      try {
+        return await send(cmd, args, timeoutMs);
+      } catch (e) {
+        const s = String(e?.detail ?? e?.message ?? e);
+        if (i >= SUBMIT_RETRY_DELAYS_MS.length || !TRANSIENT_LOCK_RE.test(s)) throw e;
+        log(`\u4EA4\u5377\u91CD\u8BD5 ${label} \u7B2C${i + 1}/${SUBMIT_RETRY_DELAYS_MS.length}\u6B21\uFF08\u9501\u54AC/\u77AC\u65F6\u6545\u969C\uFF09\uFF1A${s.slice(0, 120)}`);
+        await new Promise((r) => setTimeout(r, SUBMIT_RETRY_DELAYS_MS[i]));
+      }
+    }
+  }
   function submitOutput(jobId, waitKey, output, steps, soul = "main", modelId) {
-    return send("post_speech", executorSpeechArgs({
+    return sendSpeechWithRetry("post_speech", executorSpeechArgs({
       jobId,
       waitKey,
       soul,
       output,
       steps,
       ...modelId === void 0 ? {} : { modelId }
-    }), 3e4);
+    }), 3e4, `${soul} ${waitKey}`);
   }
   function submitHumanOutput(jobId, waitKey, output, soul, variables) {
-    return send("post_speech", humanSpeechArgs({ jobId, waitKey, soul, text: output, variables }), 3e4);
+    return sendSpeechWithRetry("post_speech", humanSpeechArgs({ jobId, waitKey, soul, text: output, variables }), 3e4, `${soul || "human"} ${waitKey}`);
   }
   function projectUserLine(actorName, text, scope) {
     chat(text, "role", { actor: actorName }, scope);

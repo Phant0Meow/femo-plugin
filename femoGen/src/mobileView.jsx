@@ -333,6 +333,7 @@ function MobileTitleBar({
                 <button
                   onClick={() => onNavigatePath(['mainflow'])}
                   title="回到主画布"
+                  data-femo-crumb-path="mainflow"
                   style={crumbChip(false)}
                 >
                   <span style={ellipsis}>{projName || 'FEMO Flow'}</span>
@@ -363,6 +364,7 @@ function MobileTitleBar({
                     <button
                       onClick={() => onNavigatePath(locationPath.slice(0, depth + 1))}
                       title={isCurrent ? `当前所在模块 ${seg}` : `定位到模块 ${seg}`}
+                      data-femo-crumb-path={locationPath.slice(0, depth + 1).join('/')}
                       style={crumbChip(isCurrent)}
                     >
                       <span style={ellipsis}>{seg}</span>
@@ -2176,6 +2178,10 @@ drag, setDrag, conn, setConn, isPanning, setNodes,
   // Module 子画布导航（2026-09-06 手机端补齐）：双击节点分发 / 返回上级 /
   // 属性面板「进入子画布」。
   onNodeDoubleTap, onNavigatePath, onEnterModuleNode,
+  // 仓库 → 面包屑挪 action（2026-10-05 手机端补齐）：长按仓库 action 卡拖到
+  // 标题栏面包屑芯片上松手，把该 action 定义挪到那个画布的仓库（桌面 HTML5
+  // 拖放同款语义）。签名 moveActionToCanvas(action对象, targetPath)。
+  onMoveLibAction,
 }) {
   const [femoVisible, setFemoVisible] = useState(false);
   const [bottomTab, setBottomTab] = useState('library');
@@ -2217,6 +2223,9 @@ const { dragReady } = useMobileCanvasGesture({
   // round49：item 对象经 ref 解析（lib 数组常变，避免闭包陈旧）
   const libRef = useRef(lib);
   useEffect(() => { libRef.current = lib; }, [lib]);
+  // 仓库挪 action（2026-10-05）：拖拽途中被点亮的面包屑芯片——悬停高亮按
+  // round47 纪律直写 DOM（不进 React 状态），松手/取消时亲手擦掉。
+  const crumbHotRef = useRef(null);
 
   // 面板级 touchstart（passive，绝不 preventDefault）：
   // 找拖拽候选并启动长按武装计时；非候选落点零干预。
@@ -2276,6 +2285,34 @@ const { dragReady } = useMobileCanvasGesture({
     libTimerRef.current = setTimeout(tryArm, LIB_LONG_PRESS_MS);
   }, []);
 
+  // 面包屑芯片悬停命中：elementFromPoint 找 data-femo-crumb-path（ghost
+  // pointerEvents:none 能穿透）。命中变化时才动 DOM：旧芯片擦光、新芯片点亮。
+  // 拖着的 action 已住在目标画布时不当投放点（放下=原地不动，与桌面同判）；
+  // draggedItem 由调用方显式传入（touchend 会先清 libDragRef 再判落点）。
+  const crumbHitAt = useCallback((x, y, draggedItem) => {
+    const hit = document.elementFromPoint(x, y);
+    const crumb = hit?.closest?.('[data-femo-crumb-path]') || null;
+    let target = null;
+    if (crumb && draggedItem) {
+      const key = crumb.getAttribute('data-femo-crumb-path');
+      const dp = (draggedItem.path || ['mainflow']).join('/');
+      if (dp !== key) target = crumb;
+    }
+    if (target !== crumbHotRef.current) {
+      if (crumbHotRef.current) crumbHotRef.current.style.boxShadow = '';
+      crumbHotRef.current = target;
+      if (target) target.style.boxShadow = '0 0 0 2px var(--femo-primary)';
+    }
+    return target;
+  }, []);
+
+  const clearCrumbHot = useCallback(() => {
+    if (crumbHotRef.current) {
+      crumbHotRef.current.style.boxShadow = '';
+      crumbHotRef.current = null;
+    }
+  }, []);
+
   // 面板级 touchmove（非 passive）：
   // drag 相位才 preventDefault；pending 相位只记账，≥8px 即承诺滚动并永久放手。
   const handleLibTouchMove = useCallback((e) => {
@@ -2289,6 +2326,10 @@ const { dragReady } = useMobileCanvasGesture({
         ghostRef.current.style.left = `${t.clientX - 50}px`;
         ghostRef.current.style.top = `${t.clientY - 20}px`;
       }
+      // 只有 action 卡能挪仓库；悬停高亮直写 DOM（round47 纪律：手势帧不进 React 状态）
+      if (st.type === 'action' && onMoveLibAction) {
+        crumbHitAt(t.clientX, t.clientY, st.item);
+      }
       return;
     }
     // pending：零拦截记账。任一轴累计 ≥LIB_SCROLL_COMMIT_PX → 判滚动意图，
@@ -2301,26 +2342,42 @@ const { dragReady } = useMobileCanvasGesture({
       clearTimeout(libTimerRef.current);
       libDragRef.current = null;
     }
-  }, []);
+  }, [crumbHitAt, onMoveLibAction]);
 
   const handleLibTouchCancel = useCallback((e) => {
     // 浏览器接管手势（原生滚动/系统语义），JS 事件流到此终止——全量复位
     clearTimeout(libTimerRef.current);
     if (ghostRef.current) ghostRef.current.style.display = 'none';
+    clearCrumbHot(); // 悬停高亮是直写 DOM 的，复位要亲手擦
     setLibArmedKey(null);
     setLibDragActive(false);
     libDragRef.current = null;
-  }, []);
+  }, [clearCrumbHot]);
 
   const handleLibTouchEnd = useCallback((e) => {
     clearTimeout(libTimerRef.current);
     setLibArmedKey(null); // 无论放置/取消，抓起态视觉必须回落
     setLibDragActive(false);
     if (ghostRef.current) ghostRef.current.style.display = 'none';
+    clearCrumbHot();
     const st = libDragRef.current;
     libDragRef.current = null;
     if (!st || st.phase !== 'drag') return;
     const t = e.changedTouches[0];
+    // ── 仓库挪 action（2026-10-05）：松手在标题栏面包屑芯片上 → 把该 action
+    // 定义挪到那个画布的仓库。先于画布命中判断（标题栏在画布区外，互不干扰）；
+    // 只有 action 卡接此语义，module/特殊节点卡照旧走画布投放/丢弃。
+    if (st.type === 'action' && onMoveLibAction) {
+      const crumb = crumbHitAt(t.clientX, t.clientY, st.item);
+      clearCrumbHot();
+      if (crumb) {
+        const targetPath = (crumb.getAttribute('data-femo-crumb-path') || '')
+          .split('/')
+          .filter(Boolean);
+        if (targetPath.length) onMoveLibAction(st.item, targetPath);
+        return;
+      }
+    }
     // 判断落点是否在画布区域内
     const cvRect = cvRef.current?.getBoundingClientRect();
     if (!cvRect) return;
@@ -2335,7 +2392,7 @@ const { dragReady } = useMobileCanvasGesture({
     else if (type === 'module') onAddModule(item, worldX, worldY);
     else if (type === 'special') onAddSpecial(item, worldX, worldY);  // item 此时是字符串如 'OUT'
     else if (type === 'position') onAddPosition(worldX, worldY);       // position 不需要 item
-  }, [pan, scale, cvRef, onAdd, onAddModule, onAddSpecial, onAddPosition]);
+  }, [pan, scale, cvRef, onAdd, onAddModule, onAddSpecial, onAddPosition, crumbHitAt, clearCrumbHot, onMoveLibAction]);
 
   // 当前选中实体
   const selNode = sel?.type === 'node' ? nodes.find((n) => n.id === sel.id) : null;

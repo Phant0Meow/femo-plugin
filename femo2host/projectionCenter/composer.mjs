@@ -9,15 +9,22 @@
  */
 import { S } from './state.mjs';
 import { render, seatForSeg } from './render.mjs';
-import { fitTextarea } from './util.mjs';
+import { fitTextarea, loadDraftStore, saveDraftStore, pruneDraftStore } from './util.mjs';
 import * as HRC from '/host/hub-render-core.mjs';
 
 const elTl = document.getElementById('tl');   // 主轨（节点更新/流式增量在这里重绘）
 const elDock = document.getElementById('dock');   // 停靠席（人类输入席住这里，2026-10-03 起与主轨分容器，见 render.mjs elDock 注）
 
-// 席位清单变更：按 wait_key 对账草稿——新席立新草稿、离席草稿作废（含收麦/
-// 暂停清场）、在席重推不重置（同键原位更新：续跑世代键修正的重推不得把
-// 「已寄出」锁误开）。render 全量重绘不丢草稿不丢焦点（状态全在内存）。
+// 草稿的 sessionStorage 镜像（抗刷新，2026-10-08 用户拍板）：正身仍是内存里的
+// S.ihumanDrafts，镜像只存 {wait_key → {text, vars}}，刷新后新页面按它接回。
+// busy 不进镜像：刷新即解锁可重发，重复信引擎侧死信无害（hub 既有裁决）。
+const draftStore = loadDraftStore(sessionStorage);
+function persistDrafts() { saveDraftStore(sessionStorage, draftStore); }
+
+// 席位清单变更：按 wait_key 对账草稿——新席立新草稿（镜像里有半截话就原样
+// 接回）、离席草稿作废（含收麦/暂停清场，镜像同步撤不留僵尸）、在席重推不
+// 重置（同键原位更新：续跑世代键修正的重推不得把「已寄出」锁误开）。render
+// 全量重绘不丢草稿不丢焦点（状态全在内存）。
 function syncDrafts() {
   const live = new Set();
   for (const seat of S.waitingSeats) {
@@ -26,12 +33,26 @@ function syncDrafts() {
     live.add(wk);
     if (!S.ihumanDrafts[wk]) {
       S.ihumanDrafts[wk] = { wk, expanded: false, text: '', varsOpen: false,
-                             vars: {}, err: '', busy: false, _focus: false };
+                             vars: {}, err: '', busy: false, _focus: false,
+                             _tries: 0, _ackAt: 0 };
+      const saved = draftStore[wk];
+      if (saved) {
+        S.ihumanDrafts[wk].text = String(saved.text || '');
+        if (saved.vars && typeof saved.vars === 'object' && !Array.isArray(saved.vars)) {
+          S.ihumanDrafts[wk].vars = { ...saved.vars };
+        }
+      }
     }
   }
   for (const wk of Object.keys(S.ihumanDrafts)) {
     if (!live.has(wk)) delete S.ihumanDrafts[wk];
   }
+  const pruned = pruneDraftStore(draftStore, live);
+  let changed = false;
+  for (const k of Object.keys(draftStore)) {
+    if (!pruned[k]) { delete draftStore[k]; changed = true; }
+  }
+  if (changed) persistDrafts();
 }
 // 等待态变化（新一轮/收麦/快照/换视角）的同步入口。输入席本身的显隐与画法
 // 归 render（doingHtml 每轮按席位+视角现判，停靠也归它），本函数只管对账
@@ -46,18 +67,70 @@ function draftOf(target) {
   const seat = seatForSeg(host.getAttribute('data-seg'));
   return seat ? (S.ihumanDrafts[seat.wait_key] || null) : null;
 }
-function submitHumanText(seat, draft, raw, variables) {
+
+// ── 寄出帧重发（2026-10-08）────────────────────────────────────────────
+// 页面→hub 一跳此前零冗余：帧在 hub 慢活（心跳全城扫描等）后面排队、或连接
+// 被静默拆掉时，信不进柜、席位永久卡「已寄出」。现按回执判据重发：发出 2s
+// 没等到 human-input-result 就重发同一帧（至多 5 次），线没开就等下一拍——
+// 重连后自动补发。重发的安全性由 hub 幂等闸兜底（同 wait_key 在柜未捞的信
+// 不叠第二封，mailbox.pending_out_by_ref）。到顶仍无回执=响亮解锁还稿可手发。
+const SEND_ACK_MS = 2000;
+const SEND_RETRY_MAX = 5;
+let sendWatch = null;
+
+function sendFrame(seat, draft) {
+  if (!S.ws || S.ws.readyState !== 1) return false;
+  const c = HRC.composeHumanSubmission(draft.text, draft.vars);
+  if (c.error) return false;
+  // 结构化 variables 仍随信走——引擎直取路径不变；text 里是拼好 SET VARIABLE
+  // 行的完整发言（显示与文本解析双保险，拼装在公共层）。
+  S.ws.send(JSON.stringify({ ctrl: 'human-input', wait_key: seat.wait_key, text: c.text, variables: c.variables }));
+  return true;
+}
+
+function ensureSendWatch() {
+  if (sendWatch) return;
+  sendWatch = setInterval(() => {
+    const now = Date.now();
+    let pending = false, dirty = false;
+    for (const wk of Object.keys(S.ihumanDrafts)) {
+      const d = S.ihumanDrafts[wk];
+      if (!d.busy) continue;
+      pending = true;
+      const seat = S.waitingSeats.find(x => x.wait_key === wk);
+      if (!seat) continue;                       // 席位已撤：对账清场，不替它发
+      if (d._ackAt && now - d._ackAt < SEND_ACK_MS) continue;   // 回执未逾期
+      if (d._tries >= SEND_RETRY_MAX) {          // 到顶：响亮还稿（正文保留可手发）
+        d.busy = false;
+        d._ackAt = 0;
+        d.expanded = true;
+        d.err = '重发 ' + SEND_RETRY_MAX + ' 次没等到回执，先还给你（可再点寄出）';
+        dirty = true;
+        continue;
+      }
+      if (sendFrame(seat, d)) {
+        d._tries += 1;
+        d._ackAt = now;
+      }
+    }
+    if (dirty) render();
+    if (!pending && sendWatch) { clearInterval(sendWatch); sendWatch = null; }
+  }, 1000);
+}
+
+function submitHumanText(seat, draft, raw) {
   if (!seat || !draft || draft.busy) return;
   // 拼装判据唯一活在公共层 hub-render-core.composeHumanSubmission（2026-09-29
   // 收编：投影中心/dsh 投影窗/web 人类席三处各写的 SET VARIABLE 拼行与只收
   // 非空口径归一）。全空=静默不寄（召唤条不点开寄不了，这里只兜住展开席）。
-  const c = HRC.composeHumanSubmission(raw, variables);
-  if (c.error || !S.ws || S.ws.readyState !== 1) return;
+  const c = HRC.composeHumanSubmission(raw, draft.vars);
+  if (c.error) return;
   draft.busy = true;   // 该席提交锁：已寄出未收账禁双投（doingHtml 翻「已寄出」态）
   draft.err = '';
-  // 结构化 variables 仍随信走——引擎直取路径不变；text 里是拼好 SET VARIABLE
-  // 行的完整发言（显示与文本解析双保险，拼装在公共层）。
-  S.ws.send(JSON.stringify({ ctrl: 'human-input', wait_key: seat.wait_key, text: c.text, variables: c.variables }));
+  draft._tries = 0;
+  draft._ackAt = 0;    // 0=还没出门；线开着当场首发，没开就等巡检补发
+  if (sendFrame(seat, draft)) { draft._tries = 1; draft._ackAt = Date.now(); }
+  ensureSendWatch();
   render();   // 该席立即翻到「已寄出」态
 }
 
@@ -74,7 +147,7 @@ function ihumanVarsConfirm(draft) {
     if (v) vals[n] = v;
   }
   if (Object.keys(vals).length === 0) { draft.varsOpen = false; render(); return; }
-  submitHumanText(seat, draft, draft.text, vals);
+  submitHumanText(seat, draft, draft.text);
 }
 
 // 席位输入区委托：主轨与停靠席两根容器都挂（挂点不随重绘生死；输入席控件只
@@ -106,6 +179,8 @@ elRoot.addEventListener('input', (e) => {
     if (!d) return;
     d.text = ta.value;   // 草稿进内存：render 重绘后原样接回
     d.err = '';
+    if (draftStore[d.wk]) draftStore[d.wk].text = d.text;   // 镜像跟写（抗刷新）
+    persistDrafts();
     fitTextarea(ta);     // 单行起步随内容长高（2026-10-02 人类席拍板）
     return;
   }
@@ -113,7 +188,11 @@ elRoot.addEventListener('input', (e) => {
   if (vi) {
     const d = draftOf(vi);
     const n = vi.getAttribute('data-varname') || '';
-    if (d && n) d.vars[n] = vi.value;
+    if (d && n) {
+      d.vars[n] = vi.value;
+      if (draftStore[d.wk]) draftStore[d.wk].vars = { ...d.vars };   // 镜像跟写
+      persistDrafts();
+    }
   }
 });
 // 失焦收起（2026-10-02 用户拍板，Esc 收起退役）：焦点离开输入框就收回召唤行；
@@ -149,7 +228,10 @@ elRoot.addEventListener('keydown', (e) => {
   const ta = e.target.closest('.ihuman-text');
   if (!ta) return;
   if (e.isComposing || e.keyCode === 229) return;   // 中文 IME：选词回车不算寄出
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ihumanSend(draftOf(ta)); return; }
+  // Enter/Shift+Enter 都不拦——textarea 默认行为就是换行；只有 Ctrl+Enter 寄出
+  // （2026-10-05 用户拍板）。手机没有 Ctrl，虚拟键盘回车（长短按=同一颗 Enter）
+  // 一律换行，发送只认页面上的寄出钮。
+  if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); ihumanSend(draftOf(ta)); return; }
   // Esc 收起退役（2026-10-02 用户拍板）：失焦即收，Esc 不再管输入席。
 });
 }
@@ -170,10 +252,17 @@ export function applyWaiting(list) {
 export function applyInputResult(j) {
   const d = j && j.wait_key ? S.ihumanDrafts[String(j.wait_key)] : null;
   if (!d) return;
+  d._ackAt = 0;   // 回执到了（受理/拒绝都算）：重发巡检对这席收工
+  d._tries = 0;
   if (j.ok) {
     d.text = '';   // 已受理：就地草稿与赋值浮层功成身退（失败才保留重试）
     d.varsOpen = false;
     d.vars = {};
+    if (draftStore[d.wk]) {   // 镜像同清：已受理的半截话不该在刷新后还魂
+      draftStore[d.wk].text = '';
+      draftStore[d.wk].vars = {};
+      persistDrafts();
+    }
   } else {
     d.busy = false;   // 解锁可重试
     d.err = '寄出失败：' + (j.error || '未知') + '（可重试）';

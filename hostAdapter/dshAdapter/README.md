@@ -26,7 +26,9 @@ mytrashbin，最后的开发工具 dev-bridge-test.py 2026-09-27 移 mytrashbin�
   `bridge.ts`（常驻引擎直连，daemon-client 组合模式）、`bridge-supervisor.ts`
   （C1 自愈：暴毙清账 + respawn + 熔断）、`job-index.ts`（断电索引重建）、
   `http.ts`（readBody/writeJson/SSE 广播）、`verbs.ts`（喊话动词）、`sse.ts`
-  （SSE 插座）、`preset-install.ts`（预设双制供给：镜像 + 注册表）
+  （SSE 插座）、`femoIdentity.ts`（会话身份轴：有戏有账即 FEMO 会话，
+  2026-10-07 去预设后的唯一尺子）、`femo-skill.ts`（把 FEMO 教条注册成全局
+  skill `/femo`，另挂 femo:root 与 femo:tips 两段全局系统提示）
 - **events/ — 事件调度**：`engine-events.ts`（运行中总调度：记账/黑板/终态清场
   走公共分诊台，本地只剩 dsh 物理动词）、`pre-step-gate.ts`（轮首门卫裁决，
   纯函数单独立件）、`mailbox-push.ts`（驿站收件口：按信分流——主演唤醒 /
@@ -98,9 +100,10 @@ mytrashbin，最后的开发工具 dev-bridge-test.py 2026-09-27 移 mytrashbin�
   femo2host / user_data）在仓库根——config.ts 的 femoRoot / engineRoot 负责
   向上指回，仍可被 dsh 配置显式覆盖。
 - `developer/tests/` 里打 dshAdapter 源文件的单测（safe-steer / pre-step-gate /
-  main-delivery-queue / preset-declare / debug-log）用 esbuild 直接打包
+  main-delivery-queue / debug-log）用 esbuild 直接打包
   `host/` 源文件跑，改路径记得同步——`main-actor.ts` 等再导出壳就是为它们
-  保留的。
+  保留的。`已退役-preset-declare.test.mjs` 随「去预设」退役（缺件即安静跳过，
+  件在 mytrashbin），留在 tests/ 当那段历史的档案。
 - 干跑（debug-run）走一次性子进程 CLI（spawn 公共层 `femoToolcall/
   femo_debugger.py`），不走常驻引擎：要能被 terminate 不留僵尸、与生产引擎
   结构性隔离——干跑沙盒永不碰生产引擎，常驻引擎死了编译/干跑也得活着。

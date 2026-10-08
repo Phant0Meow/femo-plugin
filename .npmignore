@@ -14,3 +14,14 @@ developer/
 user_data/
 .wrangler/
 .git/
+# 2026-10-08 webAdapter/zcodeAdapter 进镜像/npm 包后连带排除：
+# zcode 调试沙盒、web 本机数据沙盒、zcode 机器部署缓存（装机时另行整包拷贝）、
+# web 宿主本机产物（注册清单含本机绝对路径、exe 装机现编译、node.path 本机改写）、
+# 退役观察件不随发布出门。
+.tmp/
+.femo-data/
+femo-zcode-dist/
+com.femo.web_launcher.json
+web-launcher.exe
+node.path
+已退役-*

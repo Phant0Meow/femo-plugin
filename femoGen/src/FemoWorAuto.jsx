@@ -34,6 +34,12 @@ import { FemoPreview } from './femoPreview';
 import { MobileLayout, useMobile } from './mobileView';
 import { FEMO_THEMES } from './themes';
 import { FaPalette, FaUserPlus, FaTerminal, FaPlay, FaStop, FaForward, FaFolderOpen, FaFloppyDisk, FaSpinner } from './faIcons';
+// 【画布直连引擎·刀2（2026-10-05）】引擎直连客户端（公共层浏览器版）、观演
+// 镜像（纯计算件）与观演视图组件——画布成为常驻引擎一等客户端的三件套。
+import { createEngineClient, discoverEngine, pickFollowJob, pickJob, sameScriptText } from '../../femo2host/femoGenConnector/engine-client.mjs';
+import { createWatchState, applyWatchEvent } from './watchMirror';
+import { WatchView, ViewSwitcher, buildWatchGraph, STATUS_COLOR, STATUS_TEXT } from './engineWatch';
+import { createPortal } from 'react-dom';
 
 // 前端日志采集（2026-09-11）：模块加载即装钩子——femoGen 两种入口（插件内嵌经
 // editor-page 引入本模块 / 独立 vite 经 main.jsx）都会走到这里，等于"页面一加载
@@ -1456,6 +1462,11 @@ const parOutNodeMap = useMemo(() => {
     } else {
       // 无FEMO脚本：无可恢复画布，恢复视为完成（缓冲事件直接放行）。
       restoreDoneRef.current = true;
+      // 【刀2】恢复完成（空稿也算落定）：补做挂起的引擎校准。
+      if (pendingCalibrateRef.current) {
+        pendingCalibrateRef.current = false;
+        void engineCalibrate();
+      }
     }
     if (initialCheckpoint) {
       setFlowStatus('paused'); // 按钮显示「继续」= 断点续跑（host 代理的
@@ -1463,9 +1474,9 @@ const parOutNodeMap = useMemo(() => {
       // 前端不再给"必假继续"）
     }
     if (initialRunning) {
-      // 会话已在运行（比如对话窗先启动的）：立即接入实时流，按钮显示运行态。
+      // 会话已在运行（比如对话窗先启动的）：按钮显示运行态。【刀2】流连接
+      // 已上移到挂载即连的引擎直连（connectEngine）——这里只校按钮态。
       setFlowStatus('running');
-      connectSse();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plugin, sessionStateLoaded, initialScript, initialCheckpoint, initialRunning]);
@@ -1969,7 +1980,8 @@ if (specialType === 'FOR') {
           await onRun(femo, runOpts);
         }
         setRunId(null);
-        connectSse();
+        // 【刀2】connectSse 调用点已拔：引擎直连常驻（挂载即连），开跑后事件
+        // 由观察者流送达；新场 flow_start 触发重新校准跟随。
         return;
       }
       // 1. 发送 FEMO脚本到后端，启动运行（独立模式）
@@ -1979,7 +1991,7 @@ if (specialType === 'FOR') {
           'Content-Type': 'application/json',
           'X-API-Key': userApiKey,
           'X-API-Provider': userApiProvider,
-          'X-API-Model': apiModelInput, 
+          'X-API-Model': apiModelInput,
           'X-API-Url': userApiUrl,
         },
         body: JSON.stringify({ femo: femo }),
@@ -1991,35 +2003,10 @@ if (specialType === 'FOR') {
       const newRunId = data.run_id;
       setRunId(newRunId);
 
-      // 2. 连接 SSE 流
-      const es = new EventSource(
-        getBackendBaseUrl() + `/api/run/${newRunId}/stream`
-      );
-      eventSourceRef.current = es;
-
-es.onmessage = (event) => {
-  let evt;
-  try {
-    evt = JSON.parse(event.data);
-  } catch (e) {
-    console.error('SSE parse error:', e);
-    return;
-  }
-  if (evt.type === 'heartbeat') return;
-
-  console.log('[SSE onmessage]', event.data);
-  handleWorkflowEvent(evt);
-};
-
-      es.onerror = (event) => {
-        console.error('[SSE] 连接出错或关闭', event);
-        console.log('[SSE] readyState:', es.readyState, '(0=CONNECTING, 1=OPEN, 2=CLOSED)');
-        es.close();
-        eventSourceRef.current = null;
-        setFlowStatus('idle');
-        // 清空所有活跃节点（SSE 意外断开时安全清空）
-        setActiveNodeIds(new Set());
-      };
+      // 2. 连接 SSE 流 ——【已退役-观察期（刀2，2026-10-05）】按场事件流退役：
+      // 画布开机即直连引擎（mount effect 的 connectEngine），自己的场与别家的
+      // 场同走一条观察者流，run-scoped 流成了第二份（双吃禁止）。运行态由
+      // 直连帧回填（flow_start 已在飞行路上）。
     } catch (err) {
       console.error('Failed to start workflow:', err);
       setFlowStatus('idle');
@@ -2064,25 +2051,20 @@ const handlePauseWorkflow = useCallback(async () => {
     lastActionAtRef.current = Date.now();
     clearPauseConfirmTimer();
     try {
-      let data;
-      if (plugin) {
-        // 显式带当前 Job 号（宿主按引擎档案 host_refs 字典裁决归属——旧档
-        // 回退 host_ref；镜像滞后也能暂停）。onPause 失败会 throw（不再吞成
-        // undefined）。
-        if (typeof onPause === 'function') {
-          data = await onPause(pluginJobId ?? undefined);
-        } else {
-          const qs = new URLSearchParams({ sessionId });
-          if (pluginJobId !== null && pluginJobId !== undefined) qs.set('jobId', String(pluginJobId));
-          const resp = await fetch(`/femo-plugin/pause?${qs.toString()}`, { method: 'POST' });
-          data = await resp.json().catch(() => ({}));
-          if (!resp.ok) throw new Error(data?.error ?? `pause HTTP ${resp.status}`);
-        }
-      } else {
-        const resp = await fetch(getBackendBaseUrl() + `/api/run/${runId}/pause`, { method: 'POST' });
-        data = await resp.json().catch(() => ({}));
-        if (!resp.ok) throw new Error(data?.error ?? `pause HTTP ${resp.status}`);
-      }
+      // 【刀2 直发引擎】停止=引擎命令直发（不再经宿主回调/宿主路由转手）。
+      // 目标场次：插件模式跟当前 Job 号；独立模式 runId 即 Job 号。
+      // 【观演原位版 2026-10-08】正在观看某场时，停止/继续的作用对象=当前
+      // 观看的场（header 别变的另一半：按钮在原位，但服务于看到的场）。
+      const client = engineClientRef.current;
+      const watchedId = activeViewRef.current !== 'edit'
+        ? Number(String(activeViewRef.current).slice(4)) : NaN;
+      const target = (Number.isFinite(watchedId) && watchedId > 0) ? watchedId
+        : (pluginJobId ?? runId);
+      if (!client) throw new Error('引擎直连未就绪（引擎离线或伺候方未给地址）');
+      if (!target) throw new Error('没有可暂停的 Job（未知场次号）');
+      const body = await client.pause(target);
+      if (!body?.ok) throw new Error(body?.detail || body?.error || '引擎拒绝暂停');
+      const data = body.result ?? {};
       if (data && data.paused === false) {
         // 宿主说没有可暂停的活跃执行体：按引擎回执校准按钮（2026-09-20 挂起态
         // 暂停键常驻后，幂等按压的落点）——引擎说 suspended=保持挂起态（继续键
@@ -2128,27 +2110,34 @@ const handlePauseWorkflow = useCallback(async () => {
       // 请求失败=动作被拒：红条可见报错（宿主侧同款已进错误面板），按钮不回退。
       showPauseNotice('error', `暂停失败：${err?.message ?? err}`);
     }
-  }, [runId, plugin, onPause, sessionId, pluginJobId, showPauseNotice, clearPauseConfirmTimer]);
+  }, [runId, plugin, pluginJobId, showPauseNotice, clearPauseConfirmTimer]);
 
   // ── 继续工作流 ──
+  // 【刀2 直发引擎（2026-10-05）】继续=三步走直发引擎命令（投影中心继续钮
+  // 同款）：档案取剧本原文快照 → job_resume（六关裁决全在引擎侧，改稿对不上
+  // 指纹的错误按引擎原话上浮）。旧路（宿主 onRun 转手/独立模式 /api 路由）
+  // 随直连退役。
   const handleResumeWorkflow = useCallback(async () => {
     lastActionAtRef.current = Date.now();
-    if (plugin) {
-      // 插件模式：续跑 = 重新发起 run，带显式 reset:false → host 走 job_resume
-      // 六关续跑（断点归引擎 runs 档案）。reset 显式给死（2026-09-11 按钮恒定
-      // 定型）：这枚「继续」键的调用与 flowStatus 无关。显式带当前 Job 号——
-      // 宿主 currentJobId 可能仍指向别的场次（续跑旧 Job 场景）。
-      await handleRunWorkflow(undefined, 'human', { resumeJobId: pluginJobId ?? undefined, reset: false });
-      return;
-    }
-    if (!runId) return;
+    const client = engineClientRef.current;
+    // 【观演原位版 2026-10-08】继续同停止：正在观看某场时服务当前观看的场。
+    const watchedIdR = activeViewRef.current !== 'edit'
+      ? Number(String(activeViewRef.current).slice(4)) : NaN;
+    const target = (Number.isFinite(watchedIdR) && watchedIdR > 0) ? watchedIdR
+      : (pluginJobId ?? runId);
+    if (!client) { pushDebug('error', '继续', '引擎直连未就绪（引擎离线或伺候方未给地址）'); return; }
+    if (!target) { pushDebug('error', '继续', '没有可续跑的 Job（未知场次号）'); return; }
     try {
-      await fetch(getBackendBaseUrl() + `/api/run/${runId}/resume`, { method: 'POST' });
+      const full = await client.getJobState(target);
+      if (!full || !full.script_text) throw new Error('档案读不到剧本快照（该 Job 不存在？）');
+      const body = await client.resume(target, full.script_text);
+      if (!body?.ok) throw new Error(body?.detail || body?.error || '引擎拒绝续跑');
       setFlowStatus('running');
     } catch (err) {
       console.error('继续失败:', err);
+      pushDebug('error', '继续', `续跑失败：${err?.message ?? err}`);
     }
-  }, [runId, plugin, handleRunWorkflow, pluginJobId]);
+  }, [runId, plugin, pluginJobId, pushDebug]);
 
   // ── 零 token 调试干跑（2026-09-08）：「🐞 调试」按钮 ──
   // femo_debugger FakeHost 替 AI/human 发言，引擎真实链路干跑FEMO脚本；
@@ -2430,6 +2419,26 @@ const handleWorkflowEvent = useCallback((evt) => {
       const sum = summarizeDebugEvent(type, data);
       if (Array.isArray(sum)) sum.forEach((s) => pushDebug(s.level, type, s.text));
       else if (sum) pushDebug(sum.level, type, sum.text);
+    }
+    // ═══ 引擎直连·观演路由（刀2，2026-10-05）═══
+    // 直连帧不带宿主章（sid），天然全局；按场分派：跟随场=编辑稿这一版 →
+    // 既有链路原样走（return false 放行）；不是 → 喂观演镜像（编辑现场零
+    // 触碰）；别家的场 → 只进过上面的调试窗，这里安静丢弃。引擎脸没接通时
+    // 路由不接管（一切照旧——过渡期宿主转播帧继续走老路）。
+    {
+      const route = engineRouteRef.current;
+      if (route && route(type, data, evt)) return;
+    }
+    // 直连原生 checkpoint 帧（不经宿主 Variable API 翻译的正身形状，与
+    // variable_record brief 同名字段）：断点标签→编辑图亮点，运行中=当前
+    // 节点、挂起后留在原地=断点。观演路线已在上面分派走。
+    if (type === 'checkpoint') {
+      const label = mainCheckpointLabel(data?.checkpoints);
+      if (label) {
+        const node = findNodeByLabel(label);
+        if (node) setActiveNodeIds(new Set([node.id]));
+      }
+      return;
     }
     // 【2026-09-24 假 warn 消音（用户点名）】ai_request（料包走 mailbox 后只剩
     // 记账价值）与 femo_actor_usage（宿主角色占用圆环旁路帧）画布均无消费者
@@ -2950,6 +2959,9 @@ case 'node_retry': {
   }, [closeRunScopedSse, clearPauseConfirmTimer, pushDebug, findNodeByLabel]);
 
   // 连接插件 SSE 广播（运行中打开标签页也实时接入；已连接则先关闭重连）。
+  // 【已退役-观察期（刀2，2026-10-05）】宿主 SSE 转播订阅退役——画布改直连
+  // 引擎（connectEngine，观察者身份全收）；按会话裁剪的耳朵换成引擎全场。
+  // 函数保留观察，调用点已拔；观察期无回归后随批次删除。
   const connectSse = useCallback(() => {
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
@@ -3017,14 +3029,298 @@ case 'node_retry': {
     }
   }, []);
 
-  // 【2026-08-30 状态实时化】插件模式挂载即连 SSE：编辑器页是常驻单例，
-  // 别处（电脑端/AI/另一设备）开跑/暂停/结束时本页必须实时跟进——host
-  // /events 连接建立即重放最近引擎事件（含 flow_start），恢复真实状态；
-  // 此后常驻（结束事件只关独立模式 run 流），页面生命周期内场次事件全直达。
+  // ═══ 引擎直连（画布直连引擎·刀2，2026-10-05）═══
+  // 画布成为常驻引擎的一等客户端：事件流/开机校准/观演直连引擎 HTTP 面，
+  // 宿主退回「告诉地址 + 远程时当透明管子」。显示面全走引擎；控制面边界
+  // 不动——运行=宿主回调（守卫/record/挂载是宿主职责），停止/继续=引擎命令
+  // 直发，人类输入=引擎命令直发（wait_key 引擎自己裁决）。
+  const engineClientRef = useRef(null);
+  const engineEventsRef = useRef(null);
+  const engineWatchdogRef = useRef(null);
+  const engineOfflineTimerRef = useRef(null);
+  const engineFailRef = useRef(0);
+  const pendingCalibrateRef = useRef(false);
+  // 通路状态：直连（本机）| 转发（远程后备）| 重连中 | 离线——观演头与状态灯显示
+  const [engineTransport, setEngineTransport] = useState('离线');
+  const engineTransportRef = useRef('离线');
+  engineTransportRef.current = engineTransport;
+  const engineDirectRef = useRef(false);          // 引擎脸接通即 true（路由接管开关）
+  // ── 视图登记制（多 job 下拉的铺垫）：当前视图 id + 登记表，切换机制只有一套 ──
+  const [activeViewId, setActiveViewId] = useState('edit');   // 'edit' | 'job:<N>'
+  const activeViewRef = useRef('edit');
+  activeViewRef.current = activeViewId;
+  const [watchJobId, setWatchJobId] = useState(null);          // 当前跟随的场
+  const watchJobRef = useRef(null);   // 同步权威：engineCalibrate 直写（flush 同拍路由靠它，不等渲染）
+  const [editMatchesJob, setEditMatchesJob] = useState(true);  // 跟随场=编辑稿这一版？
+  const editMatchesJobRef = useRef(true);
+  editMatchesJobRef.current = editMatchesJob;
+  const [watchViews, setWatchViews] = useState({});            // 登记表 {'<jobId>': 观演条目}
+  const watchViewsRef = useRef(watchViews);
+  watchViewsRef.current = watchViews;
+  const watchExitedRef = useRef(null);            // 用户手动退出的场：该场不自动再进（新场重置）
+  const femoTextRef = useRef('');
+  femoTextRef.current = femoText;
+  const handleWorkflowEventRef = useRef(null);
+  handleWorkflowEventRef.current = handleWorkflowEvent;
+  const engineRouteRef = useRef(null);            // handleWorkflowEvent 的直连分派（渲染期赋值）
+  // 校准竞态闸（2026-10-05 夹具实测抓到）：SSE 一开帧就到，而校准（清单→档案）
+  // 要两个往返——这窗口里的帧既不能投编辑图（还没判「是不是同一版」）也没处投
+  // 观演（登记表还没建）。照恢复期同款纪律：宁可排队，校准落定后按序重放。
+  const engineCalibratedRef = useRef(false);
+  const enginePendingRef = useRef([]);
+
+  /** 观演视图登记（剧本与编辑稿不一致才建）：档案剧本→图解析一次，mirror 随事件涨。 */
+  function ensureWatchView(job) {
+    setWatchViews((prev) => {
+      if (prev[job.job_id]) return prev;
+      const next = { ...prev, [job.job_id]: {
+        jobId: job.job_id,
+        meta: { scriptName: job.script_name || '', hostRefs: job.host_refs || {} },
+        graph: buildWatchGraph(job.script_text),
+        mirror: { ...createWatchState(), status: job.state || 'idle' },
+      } };
+      // 登记表不封顶（2026-10-08 用户拍板「有多少收多少」）：runners 有几场
+      // 登记几场；终局条目由用户手动切走（历史定格还在，不自动挤掉）。
+      return next;
+    });
+  }
+
+  /** 开机/重连校准：健康口(runners) → 清单 → 挑跟随场 → 档案。显示面的
+   *  权威全在引擎内存真相——盘上台账的 running 会有大量僵尸（没人收尸的账），
+   *  跟随只认 runners（2026-10-08 用户拍板「应该盯 runners，有多少收多少」）；
+   *  老引擎/健康口没答=退回旧台账口径，零回归。 */
+  async function engineCalibrate() {
+    const client = engineClientRef.current;
+    if (!client) return;
+    const [jobs, h] = await Promise.all([
+      client.listJobs().catch(() => []),
+      client.health().catch(() => false),
+    ]);
+    const runners = (h && Array.isArray(h.runners)) ? h.runners : null;
+    const target = runners ? pickFollowJob(runners, jobs, { hostGrid: '' })
+                           : pickJob(jobs, { hostGrid: '' });
+    if (!target) {
+      // 引擎空闲：跟随目标摘除（观演登记表保留——历史定格还在）
+      setWatchJobId(null);
+      watchJobRef.current = null;
+      setEditMatchesJob(true); editMatchesJobRef.current = true;
+      engineDirectRef.current = true;
+      if (activeViewRef.current !== 'edit') setActiveViewId('edit');
+      engineCalibratedRef.current = true;
+      const queued0 = enginePendingRef.current;
+      enginePendingRef.current = [];
+      for (const f of queued0) handleWorkflowEventRef.current?.({ type: f.type, data: f.data, replay: f.replay });
+      return;
+    }
+    const full = await client.getJobState(target.job_id).catch(() => null);
+    if (!full || full.state === undefined) {
+      // 档案读不到（引擎刚散场/瞬时故障）：按未跟随放行（退化=旧行为），
+      // 不让帧无限期压在缓冲里。
+      watchJobRef.current = null;
+      engineCalibratedRef.current = true;
+      const queuedE = enginePendingRef.current;
+      enginePendingRef.current = [];
+      for (const f of queuedE) handleWorkflowEventRef.current?.({ type: f.type, data: f.data, replay: f.replay });
+      return;
+    }
+    setWatchJobId(target.job_id);
+    watchJobRef.current = target.job_id;   // 同步直写：flush 就在同一拍，路由立刻认场
+    const matches = sameScriptText(full.script_text, femoTextRef.current);
+    setEditMatchesJob(matches); editMatchesJobRef.current = matches;
+    engineDirectRef.current = true;
+    if (matches) {
+      // 这场戏就是编辑稿这一版：校准编辑图按钮与断点亮点（与宿主快照校准同口径）
+      setFlowStatus(full.state === 'running' ? 'running' : full.state === 'suspended' ? 'paused' : 'idle');
+      const label = mainCheckpointLabel(full.checkpoint_labels || {});
+      if (label) {
+        const node = findNodeByLabel(label);
+        if (node) setActiveNodeIds(new Set([node.id]));
+      }
+      if (activeViewRef.current !== 'edit') setActiveViewId('edit');
+    } else {
+      // 别家开的场/画的不是这一版：观演登记 + 自动进入（已拍板；手动退出过的场不扰）
+      ensureWatchView(full);
+      if (watchExitedRef.current !== target.job_id) setActiveViewId(`job:${target.job_id}`);
+    }
+    // runners 全量登记（2026-10-08「有多少收多少」）：除跟随目标外的每一场
+    // 真在跑的戏都进观演下拉——只登记不抢屏；已登记的不重拉档案；拉不到的
+    // 下轮校准（新场 flow_start 也触发）再来。老引擎无 runners 口=跳过。
+    if (runners) {
+      for (const rid of runners) {
+        const ridN = Number(rid);
+        if (!Number.isFinite(ridN) || ridN === Number(target.job_id)) continue;
+        if (watchViewsRef.current[ridN]) continue;
+        const f = await client.getJobState(ridN).catch(() => null);
+        if (f && f.state !== undefined) ensureWatchView(f);
+      }
+    }
+    // 校准落定：重放竞态窗里排队的帧（此刻「是不是同一版/登记表」都已就位，
+    // 帧会按 routing 各归各家——观演进镜像，编辑稿的场走既有链路）
+    engineCalibratedRef.current = true;
+    const queued = enginePendingRef.current;
+    enginePendingRef.current = [];
+    for (const f of queued) handleWorkflowEventRef.current?.({ type: f.type, data: f.data, replay: f.replay });
+  }
+
+  /** 校准就绪闸：插件模式等画布从会话快照恢复完（编辑稿落定才判「是不是同一版」）。 */
+  function engineCalibrateWhenReady() {
+    if (!plugin || restoreDoneRef.current) { void engineCalibrate(); return; }
+    pendingCalibrateRef.current = true;
+  }
+
+  /** 事件流接线（直连失败自动切伺候方透明转发——管子换人，协议还是引擎的）。 */
+  function attachEngineEvents(client, disc, state) {
+    return client.openEvents({
+      onOpen: () => {
+        state.opened = true;
+        engineFailRef.current = 0;
+        engineDirectRef.current = true;
+        setEngineTransport(client.isRelay() ? '转发' : '直连');
+        engineCalibrateWhenReady();
+        // 兜底校准（恢复竞态双保险，幂等）
+        setTimeout(() => engineCalibrateWhenReady(), 1500);
+      },
+      onFrame: (frame) => { handleWorkflowEventRef.current?.(frame); },
+      onError: () => {
+        // 浏览器自动重连管断线；「从没开过就一直错」=直连被拦（CSP/网络）——
+        // 有转发路就切过去重连，语义不变（门0 的后备半场）。
+        if (!state.opened && !client.isRelay() && disc.relay) {
+          client.useRelay();
+          engineEventsRef.current?.close();
+          engineEventsRef.current = attachEngineEvents(client, disc, state);
+        }
+      },
+    });
+  }
+
+  /** 连引擎：发现 → 客户端 → 观察者订阅 → 健康看门狗。显示面绝不代拉引擎。 */
+  async function connectEngine() {
+    clearTimeout(engineOfflineTimerRef.current);
+    const disc = await discoverEngine();
+    if (!disc) {
+      engineDirectRef.current = false;
+      setEngineTransport('离线');
+      // 伺候方没给地址（引擎离线/无宿主伺候）：周期重问——任何宿主客户端的
+      // 探活会顺手把引擎代拉回来，这里只等地址。
+      engineOfflineTimerRef.current = setTimeout(() => { void connectEngine(); }, 15000);
+      return;
+    }
+    const client = createEngineClient({
+      base: disc.base, relay: disc.relay,
+      onLog: (m) => pushDebug('info', '引擎', m),
+    });
+    engineClientRef.current = client;
+    engineCalibratedRef.current = false;   // 新连接=重新校准（地址都可能换了）
+    engineEventsRef.current?.close();
+    const state = { opened: false };
+    engineEventsRef.current = attachEngineEvents(client, disc, state);
+    // 健康看门狗（投影页欠账判据的画布版）：问过没回×3=管道实死 → 重新发现
+    // （引擎代拉重生可能换端口）+ 换新线。不用「多久没听到帧」——浏览器把
+    // 后台页计时器冻到一分钟一拍，墙钟静默是假证据（投影页实测教训）。
+    clearInterval(engineWatchdogRef.current);
+    engineWatchdogRef.current = setInterval(async () => {
+      const h = await client.health();
+      if (!h) {
+        engineFailRef.current += 1;
+        if (engineFailRef.current >= 3) {
+          engineFailRef.current = 0;
+          engineDirectRef.current = false;
+          setEngineTransport('重连中');
+          engineEventsRef.current?.close();
+          void connectEngine();
+        }
+        return;
+      }
+      engineFailRef.current = 0;
+      if (engineTransportRef.current === '重连中') setEngineTransport(client.isRelay() ? '转发' : '直连');
+      // 帧龄自愈（2026-10-08）：引擎心跳已是 JS 可见的 ping 数据帧（15s 一拍），
+      // 健康口活着却长期无帧=直播线半死（TCP 无声断开，onerror 永不来）——
+      // 关旧线原地重订（地址没变，不必重新发现）。判据是「同一条管子有没有
+      // 帧」而非「多久没听到戏」：戏间歇本是常态，ping 不间歇；90s=连续六拍
+      // 无帧，远超正常节拍又远短于「用户发现画布凉了」。老引擎心跳是注释行
+      // （JS 看不见），健康口无 ssePing 标记就不启用，防误杀空转管道。
+      if (h.ssePing && state.opened) {
+        const lastAt = client.lastEventAt();
+        if (lastAt > 0 && Date.now() - lastAt > 90000) {
+          pushDebug('info', '引擎', '直播线 90 秒无帧（管道半死）——换新线重订');
+          engineEventsRef.current?.close();
+          engineEventsRef.current = attachEngineEvents(client, disc, state);
+        }
+      }
+    }, 20000);
+  }
+
+  function engineTeardown() {
+    clearInterval(engineWatchdogRef.current);
+    clearTimeout(engineOfflineTimerRef.current);
+    engineEventsRef.current?.close();
+    engineEventsRef.current = null;
+  }
+
+  // 直连分派（handleWorkflowEvent 每帧问一次；返回 true=已接管）。规则：
+  // 跟随场=编辑稿这一版 → 既有链路直走；不是 → 喂观演镜像（编辑现场零触碰）；
+  // 别家的场 → 只进调试窗（喂食在分派之前），这里丢弃。新场 flow_start →
+  // 重新校准（观演登记表自动长出/翻面）。
+  engineRouteRef.current = (type, data, evt) => {
+    if (!engineDirectRef.current) return false;   // 引擎脸没接通：一切照旧
+    if (!engineCalibratedRef.current) {
+      // 校准未落定：入缓冲（追平帧也照收——重放环可能正好在这窗口里补历史）
+      if (enginePendingRef.current.length >= 400) enginePendingRef.current.shift();
+      enginePendingRef.current.push({ type, data, replay: evt?.replay === true });
+      return true;
+    }
+    const jid = Number(data?.job_id);
+    const known = Number.isFinite(jid) && jid > 0;
+    // 【观演原位版 2026-10-08】帧喂给登记表里对上号的观演条目（有登记才喂）：
+    // 跟随场与其余 runners 的镜像都保持新鲜——切换视图零缺帧，不用等重连重放。
+    const feedRegistered = () => {
+      if (!known) return;
+      setWatchViews((prev) => {
+        const v = prev[jid];
+        if (!v) return prev;
+        return { ...prev, [jid]: { ...v, mirror: applyWatchEvent(v.mirror, type, data, { replay: evt?.replay === true }) } };
+      });
+    };
+    if (editMatchesJobRef.current) {
+      if (!known || jid === watchJobRef.current) return false;   // 编辑稿这一版 → 编辑图链路
+      feedRegistered();
+      return true;
+    }
+    if (watchJobRef.current == null) {
+      feedRegistered();
+      return known;
+    }
+    if (known && jid !== watchJobRef.current) {
+      if (type === 'flow_start' && evt?.replay !== true) void engineCalibrate();
+      feedRegistered();
+      return true;
+    }
+    feedRegistered();
+    return true;
+  };
+
+  // 【画布直连（刀2）】两种形态开机即连引擎。插件模式替换宿主 SSE 转播
+  // （connectSse 退役观察——按会话裁剪的耳朵换成引擎全场观察者）；独立模式
+  // 替换「点运行才连」的按场流（别处开的场从此也能看，刷新也没用的一抹黑
+  // 就此了账）。
   useEffect(() => {
-    if (!plugin) return;
-    connectSse();
-  }, [plugin, connectSse]);
+    void connectEngine();
+    return () => engineTeardown();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 后台切回体检（2026-10-08）：后台页计时器被浏览器冻结（实测一分钟一拍），
+  // 帧龄看门狗在后台跑不动；切回前台这一拍立即重新校准——后台期间错过的
+  // 新场开演由 runners 全量登记补上，半死的直播线由看门狗帧龄判死换线。
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (engineDirectRef.current) engineCalibrateWhenReady();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 【刷新恢复·补放（2026-09-06）】画布恢复完成后的首次 nodes/flowStore
   // 提交时，按序补放恢复期间缓冲的 SSE 节点事件——运行中的节点状态
@@ -3037,6 +3333,11 @@ case 'node_retry': {
     pendingReplayRef.current = [];
     console.log('[FEMOEditor] 恢复完成，补放缓冲事件:', queued.length);
     for (const evt of queued) handleWorkflowEvent(evt);
+    // 【刀2】恢复完成=编辑稿落定：补做挂起的引擎校准（判「跟随场是不是这一版」）
+    if (pendingCalibrateRef.current) {
+      pendingCalibrateRef.current = false;
+      void engineCalibrate();
+    }
   }, [plugin, nodes, flowStore, handleWorkflowEvent]);
 
   // ═══ 接通快照 → 浮层（2026-09-11 v9）═══
@@ -3103,11 +3404,6 @@ const submitHumanInput = useCallback(
     };
     const hasChat = chatText && chatText.trim();
     const hasVars = assignments && Object.keys(assignments).length > 0;
-    // runId 守卫只约束独立模式：插件模式 runId 恒 null（运行由 host 驱动，
-    // handleRunWorkflow 显式 setRunId(null)）——旧写法 `!runId ||` 让插件模式
-    // 的气泡输入永远在第一行静默返回。与 handlePauseWorkflow 的
-    // `!runId && !plugin` 同款口径（2026-09-06 修复）。
-    if (!plugin && !runId) return fail('提交失败：运行未启动（独立模式缺 runId）。');
     if (!hasChat && !hasVars) return false;
 
     // 直接从独立账本取（par 并发下 nodeStates[nodeId] 可能已被 AI 实例事件
@@ -3119,28 +3415,17 @@ const submitHumanInput = useCallback(
       return fail('提交失败：引擎等待状态未同步（缺 wait_key）。请回到对话窗口输入，或重新运行。');
     }
 
-    const payload = {
-      sessionId,
-      wait_key: waitKey,
-      chat_text: chatText || '',
-      variables: assignments || {},
-    };
-    console.log('[submitHumanInput] payload:', JSON.stringify(payload));
-
+    // 【刀2 直发引擎（2026-10-05）】人类席交卷=引擎命令直发（信封词汇=公共层
+    // speech-core 人类席形状 {chat_text, variables?}，wait_key 对不对得上由
+    // 引擎裁决——不盲投）。旧路（宿主路由/独立模式 /api 转手）随直连退役。
+    const client = engineClientRef.current;
+    const targetJob = watchJobRef.current ?? pluginJobId ?? runId;
+    if (!client) return fail('提交失败：引擎直连未就绪（引擎离线）。');
+    if (!targetJob) return fail('提交失败：未知场次号（Job 未登记）。');
     try {
-      const resp = await fetch(plugin ? '/femo-plugin/human-input' : getBackendBaseUrl() + `/api/run/${runId}/human-input`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await resp.json().catch(() => null);
-      if (!resp.ok) {
-        return fail(`提交失败：HTTP ${resp.status}${data?.error ? ` ${data.error}` : ''}`);
-      }
-      // host 回执 delivered:false = B6 拦截（无活跃 Job/等待态已失效）——
-      // 此前被当成功误标 human_done，引擎实际没收到。
-      if (data && data.delivered === false) {
-        return fail(`提交未送达引擎（${data.note || 'no active job'}）。可回对话窗口输入，或重试。`);
+      const body = await client.humanInput(targetJob, waitKey, chatText || '', assignments || {});
+      if (!body?.ok) {
+        return fail(`提交未送达引擎（${body?.detail || body?.error || '未知拒绝'}）。可回对话窗口输入，或重试。`);
       }
     } catch (err) {
       return fail(`提交失败：${String(err?.message ?? err)}`);
@@ -3420,13 +3705,104 @@ const submitHumanInput = useCallback(
     setActionStore((prev) => prev.map((a) => (a.id === actionId ? { ...a, ...patch } : a)));
   }
 
+  // ═══ 仓库 → 面包屑拖拽：跨画布仓库挪 action（2026-10-05）═══
+  // 模块子画布里把仓库的 action 卡拖到 header 的「主流程/上级模块」芯片上松手，
+  // 该 action 定义就挪进那个画布的仓库。拖拽进行中的条目记在 ref 里：
+  // dataTransfer 的数据在 dragover 阶段读不到（浏览器安全限制），类型判断只能
+  // 靠 dragstart 记账；window 级 dragend/drop 清账——Esc 取消、落到无效区、
+  // 正常投放都能归零，防陈旧账目让下一次无关拖拽误亮/误挪。
+  const libDragItemRef = useRef(null);
+  const [crumbDropHover, setCrumbDropHover] = useState(null); // 悬停中的投放目标 key（path.join('/')）
+  useEffect(() => {
+    const clear = () => {
+      libDragItemRef.current = null;
+      setCrumbDropHover(null);
+    };
+    window.addEventListener('dragend', clear);
+    window.addEventListener('drop', clear);
+    return () => {
+      window.removeEventListener('dragend', clear);
+      window.removeEventListener('drop', clear);
+    };
+  }, []);
+
   // Drag from library
   function handleLibDragStart(e, type, idOrType) {
     e.dataTransfer.setData(
       'application/femo-item',
       JSON.stringify({ type, id: idOrType })
     );
-    e.dataTransfer.effectAllowed = 'copy';
+    // copyMove：画布投放=copy（复制节点实例），面包屑投放=move（挪仓库）。
+    // effectAllowed 若锁死 'copy'，面包屑 dragover 里 dropEffect='move' 会被
+    // 浏览器判成不可投放（拖过去直接显示禁止光标）。
+    e.dataTransfer.effectAllowed = 'copyMove';
+    libDragItemRef.current = { type, id: idOrType };
+  }
+
+  // 把 action 定义挪到另一个画布的仓库：改 path 一处，下游全自动跟随——
+  // 生成端 emitAction 按 path 决定落脚本级还是模块内，planAutoVars 按新 path
+  // 重新规划变量声明；结构签名含 actionStore，run 守卫照常看见「图被修改」。
+  // 名字全域唯一（ActionModal 以 allNames 查重），挪动不产生重名；引用它的
+  // 节点 label 不动。挪进更深的模块而外部画布仍有引用时，断引用交给语法
+  // 检查/编译器报错（报错纪律：能跑的挪法不拦，断引用不兜底）。
+  function moveActionToCanvas(action, targetPath) {
+    if (!action || !Array.isArray(targetPath) || !targetPath.length) return;
+    const ap = action.path || ['mainflow'];
+    const same =
+      ap.length === targetPath.length && ap.every((s, i) => s === targetPath[i]);
+    if (same) return; // 已住这个画布，原地不动
+    setActionStore((prev) =>
+      prev.map((a) => (a.id === action.id ? { ...a, path: [...targetPath] } : a))
+    );
+    const toName =
+      targetPath.length === 1
+        ? '主流程'
+        : `模块「${targetPath[targetPath.length - 1]}」`;
+    showExportToast(`✓ 已把「${action.name}」挪到 ${toName}的仓库`);
+  }
+
+  // 面包屑芯片的投放接线（桌面 HTML5 拖放）：只有 action 卡能挪仓库，
+  // module/特殊节点/POSITION 卡不接（dragover 不 preventDefault=浏览器
+  // 原生禁止光标，drop 也不会来）。拖着的 action 已住在目标画布时也不亮
+  // 不接——放下本来就是原地不动。落账前以 dataTransfer 载荷为准再验一遍，
+  // ref 只管悬停高亮与放行判断。
+  function crumbDropProps(targetPath) {
+    const key = targetPath.join('/');
+    const wouldMove = () => {
+      const item = libDragItemRef.current;
+      if (item?.type !== 'action') return false;
+      const action = actionStore.find((a) => a.id === item.id);
+      if (!action) return false;
+      const ap = action.path || ['mainflow'];
+      return !(ap.length === targetPath.length && ap.every((s, i) => s === targetPath[i]));
+    };
+    return {
+      onDragOver: (e) => {
+        if (libDragItemRef.current?.type !== 'action') return;
+        if (!wouldMove()) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        setCrumbDropHover((prev) => (prev === key ? prev : key));
+      },
+      onDragLeave: () => {
+        setCrumbDropHover((prev) => (prev === key ? null : prev));
+      },
+      onDrop: (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setCrumbDropHover(null);
+        libDragItemRef.current = null;
+        let data;
+        try {
+          data = JSON.parse(e.dataTransfer.getData('application/femo-item'));
+        } catch {
+          return;
+        }
+        if (data?.type !== 'action' || !data.id) return;
+        const action = actionStore.find((a) => a.id === data.id);
+        if (action) moveActionToCanvas(action, targetPath);
+      },
+    };
   }
 
   function handleCanvasDragOver(e) {
@@ -4031,6 +4407,28 @@ const selNode = sel?.type === 'node' ? nm.get(sel.id) : null;
     setModal({ type: 'editNode', action: selAction, nodeId: selNode.id });
   };
 
+  // 【刀2】视图登记制当前条目（activeViewId='job:<N>' → 登记表行）；观演
+  // 覆盖层在桌面 CENTER 与手机树各挂一份，编辑现场原封不动地垫在下面。
+  const activeWatchView = activeViewId !== 'edit'
+    ? watchViews[Number(String(activeViewId).slice(4))]
+    : null;
+  // 【下拉版（2026-10-05 用户拍板提前落刀6 菜单）】视图清单：正在编辑 + 各场
+  // 观演（新场次在前）；切到「编辑」=退出观演（该场不再自动抢屏，新场例外）。
+  const switcherViews = [
+    { id: 'edit', label: '正在编辑（未跑的稿）', status: null },
+    ...Object.keys(watchViews).map(Number).sort((a, b) => b - a)
+      .map((jid) => ({ id: `job:${jid}`, label: `Job ${jid}${watchViews[jid].meta?.scriptName ? ` · ${watchViews[jid].meta.scriptName}` : ''}`, status: watchViews[jid].mirror?.status || 'idle' })),
+  ];
+  function handleSwitchView(id) {
+    if (id === 'edit') {
+      watchExitedRef.current = watchJobRef.current;
+      setActiveViewId('edit');
+      return;
+    }
+    watchExitedRef.current = null;
+    setActiveViewId(id);
+  }
+
   if (isMobile) {
     // 窄视口（手机/平板竖屏）：提供移动端布局。
     // 插件模式同样支持——手机通过 tailscale 访问 dsh 时自动呈现手机版。
@@ -4252,6 +4650,7 @@ nodes={nodes}
           }}
           onNavigatePath={(path) => { saveCurrentFlow(); setLocationPath(path); }}
           onEnterModuleNode={(nodeId) => { const mod = nm.get(nodeId)?.modDef; if (mod) editModule(mod); }}
+          onMoveLibAction={moveActionToCanvas}
           onDragStart={handleLibDragStart}
           onSelectLib={handleSelectLib}
           onNewModule={(name) => {
@@ -4375,6 +4774,39 @@ nodes={nodes}
           onClose={() => setDirBrowseOpen(false)}
         />
         <FemoSaveReminder reminder={saveReminder} onChoice={resolveSaveReminder} />
+        {/* 【刀2·下拉版】观演视图（手机端）：portal 到 body 顶层（z 3000）——
+            dsh 聊天窗等 embedding 的层叠怪癖一概逃掉（用户实测旧 absolute/fixed
+            被宿主皮顶穿）；编辑现场零触碰，退出即原样回来。 */}
+        {activeWatchView && createPortal(
+          <WatchView
+            jobId={activeWatchView.jobId}
+            meta={activeWatchView.meta}
+            graph={activeWatchView.graph}
+            mirror={activeWatchView.mirror}
+            transport={engineTransport}
+            fixed
+            onExit={() => { watchExitedRef.current = activeWatchView.jobId; setActiveViewId('edit'); }}
+            views={switcherViews}
+            currentId={activeViewId}
+            onSwitch={handleSwitchView}
+            theme={theme}
+          />,
+          document.body,
+        )}
+        {/* 【刀2·下拉版】编辑态的观演入口（手机端）：浮游芯片（portal 顶层），
+            点开下拉选场——标题栏是宿主/布局的，不往里塞东西。 */}
+        {!activeWatchView && switcherViews.length > 1 && createPortal(
+          <div
+            data-femo-theme={theme}
+            style={{ position: 'fixed', left: 10, bottom: 14, zIndex: 3000 }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 999, background: 'var(--femo-panel-bg, #fff)', border: '1px solid var(--femo-border-strong, #ccc)', boxShadow: '0 4px 14px rgba(0,0,0,0.18)' }}>
+              <span style={{ width: 8, height: 8, borderRadius: 99, flexShrink: 0, background: 'var(--femo-warning, #d99a2b)' }} />
+              <ViewSwitcher views={switcherViews} currentId="edit" onSelect={handleSwitchView} fontSize={11.5} />
+            </div>
+          </div>,
+          document.body,
+        )}
       </ErrorBoundary>
     );
   }
@@ -4686,9 +5118,49 @@ nodes={nodes}
             display: 'flex',
             flexDirection: 'column',
             minWidth: 0,
+            position: 'relative',   // 【刀2】观演覆盖层的定位锚
           }}
         >
-          {/* Toolbar */}
+          {/* 【刀2→下拉版】视图切换条（编辑态）：有观演条目且不在观演时，顶端
+              常驻一条切换器——点开下拉选「正在编辑 / 各场戏」（2026-10-05 用户
+              拍板：显示互斥、选择性的显示；自动进入只在新场开演时）。 */}
+          {activeViewId === 'edit' && switcherViews.length > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 14px', flexShrink: 0, borderBottom: '1px solid var(--femo-border)', background: 'var(--femo-warning-soft, rgba(217,154,43,0.12))' }}>
+              <span style={{ width: 8, height: 8, borderRadius: 99, flexShrink: 0, background: 'var(--femo-warning, #d99a2b)' }} />
+              <span style={{ fontSize: 11.5, color: 'var(--femo-text-2)' }}>
+                {editMatchesJob ? '引擎有场次可看' : `引擎在跑 Job ${watchJobId}（与当前编辑稿不是同一版）`}——
+              </span>
+              <ViewSwitcher views={switcherViews} currentId="edit" onSelect={handleSwitchView} fontSize={11.5} />
+            </div>
+          )}
+          {/* 【观演切换条·观演态同款（2026-10-08 用户拍板「header 别变」）】观演
+              时这条也常驻：左侧黄点换绿点、文案换成观演知情（看的是哪场、与
+              编辑稿是否同版），右侧同一个 ViewSwitcher 下拉——与编辑态唯一
+              差异是文案，位置/形状/皮肤完全一致。 */}
+          {activeViewId !== 'edit' && switcherViews.length > 1 && (() => {
+            const watchedN = Number(String(activeViewId).slice(4));
+            const watchedEntry = watchViews[watchedN];
+            const wStatus = watchedEntry?.mirror?.status || 'idle';
+            return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 14px', flexShrink: 0, borderBottom: '1px solid var(--femo-border)', background: 'var(--femo-warning-soft, rgba(217,154,43,0.12))' }}>
+              <span style={{ width: 8, height: 8, borderRadius: 99, flexShrink: 0, background: STATUS_COLOR[wStatus] || STATUS_COLOR.idle }} title={`观演状态：${STATUS_TEXT[wStatus] || wStatus}`} />
+              <span style={{ fontSize: 11.5, color: 'var(--femo-text-2)' }}>
+                正在观看 Job {watchedN}{watchedEntry?.meta?.scriptName ? ` · ${watchedEntry.meta.scriptName}` : ''}
+                （状态：{STATUS_TEXT[wStatus] || wStatus}
+                {editMatchesJob ? ' · 与当前编辑稿同一版' : ' · 与当前编辑稿不是同一版'}）——
+              </span>
+              <ViewSwitcher views={switcherViews} currentId={activeViewId} onSelect={handleSwitchView} fontSize={11.5} />
+            </div>
+            );
+          })()}
+          {/* 【刀2→原位版（2026-10-08 用户拍板「header 别变，只改画布内容」）】
+              观演覆盖层退役——旧法 absolute 盖住整个 CENTER（连工具栏一起盖
+              且自带一套观演 header），观演时 header 全乱、透明底让编辑画布
+              透出来叠成两场。新法：观演内容只住画布那格（见下方 Canvas 容器
+              处的三元渲染），编辑画布同拍收起——结构性杜绝两场叠画；工具栏
+              恒在原位（运行/停止/打开/保存照常），观演时停止/继续的作用对象
+              即当前观看的场。 */}
+          {/* Toolbar（恒在——观演不隐藏，2026-10-08 拍板） */}
           <div
             style={{
               height: 50,
@@ -4706,6 +5178,7 @@ nodes={nodes}
               位置
             </span>
             <button
+              {...crumbDropProps(['mainflow'])}
               onClick={() => {
                 if (
                   locationPath.length !== 1 ||
@@ -4726,16 +5199,28 @@ nodes={nodes}
                 fontWeight: 700,
                 fontFamily: 'var(--femo-font-sans)',
                 border: `var(--femo-border-w-strong) solid ${
-                  mode === 'mainflow' ? 'var(--femo-primary)' : 'var(--femo-border-strong)'
+                  crumbDropHover === 'mainflow' || mode === 'mainflow'
+                    ? 'var(--femo-primary)'
+                    : 'var(--femo-border-strong)'
                 }`,
-                background: mode === 'mainflow' ? 'var(--femo-primary-soft-2)' : 'var(--femo-surface)',
-                color: mode === 'mainflow' ? 'var(--femo-primary)' : 'var(--femo-text-3)',
+                background:
+                  crumbDropHover === 'mainflow' || mode === 'mainflow'
+                    ? 'var(--femo-primary-soft-2)'
+                    : 'var(--femo-surface)',
+                color:
+                  crumbDropHover === 'mainflow' || mode === 'mainflow'
+                    ? 'var(--femo-primary)'
+                    : 'var(--femo-text-3)',
                 opacity: mode === 'mainflow' ? 0.7 : 1,
               }}
             >
               主流程
             </button>
-            {locationPath.map((seg, idx) => (
+            {locationPath.map((seg, idx) => {
+              const segPath = locationPath.slice(0, idx + 1);
+              const segKey = segPath.join('/');
+              const crumbHot = crumbDropHover === segKey;
+              return (
               <React.Fragment key={idx}>
                 {idx > 0 && (
                   <span
@@ -4746,6 +5231,7 @@ nodes={nodes}
                 )}
                 {idx === 0 ? null : (
                   <button
+                    {...crumbDropProps(segPath)}
                     onClick={() => {
                       saveCurrentFlow();
                       const newPath = locationPath.slice(0, idx + 1);
@@ -4757,16 +5243,25 @@ nodes={nodes}
                       cursor: 'pointer',
                       fontSize: 12,
                       fontWeight: 700,
-                      border: `var(--femo-border-w-strong) solid var(--femo-border-strong)`,
-                      background: 'var(--femo-surface)',
-                      color: 'var(--femo-text-3)',
+                      border: `var(--femo-border-w-strong) solid ${
+                        crumbHot
+                          ? 'var(--femo-primary)'
+                          : 'var(--femo-border-strong)'
+                      }`,
+                      background: crumbHot
+                        ? 'var(--femo-primary-soft-2)'
+                        : 'var(--femo-surface)',
+                      color: crumbHot
+                        ? 'var(--femo-primary)'
+                        : 'var(--femo-text-3)',
                     }}
                   >
                     {seg}
                   </button>
                 )}
               </React.Fragment>
-            ))}
+              );
+            })}
             {mode === 'module' && (
               <button
                 onClick={() => {
@@ -4941,7 +5436,24 @@ nodes={nodes}
                 工具栏只保留运行控制与文件读写。 */}
           </div>
 
-          {/* Canvas */}
+          {/* Canvas（观演原位版：观演时编辑画布收起、观演画布顶上——同一格
+              互斥渲染，绝不叠画。观演头不再单独占一条：场号/状态/通路知情
+              由上方观演切换条交代，观演画布整体就是编辑画布的同格替身） */}
+          {activeWatchView ? (
+            <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: 'var(--femo-bg)' }}>
+              <WatchView
+                jobId={activeWatchView.jobId}
+                meta={activeWatchView.meta}
+                graph={activeWatchView.graph}
+                mirror={activeWatchView.mirror}
+                transport={engineTransport}
+                embedded
+                onExit={() => { watchExitedRef.current = activeWatchView.jobId; setActiveViewId('edit'); }}
+                onToggleDebug={() => setDebugOpen(true)}
+                theme={theme}
+              />
+            </div>
+          ) : (
           <div
             ref={cvRef}
             style={{
@@ -5354,6 +5866,7 @@ if (enrichedNode.type === 'par_out') {
               </div>
             </div>
           </div>
+          )}
         </div>
 
         {/* ── RIGHT PANEL ── */}

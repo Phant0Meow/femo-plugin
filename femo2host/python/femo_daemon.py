@@ -118,12 +118,18 @@ class _EngineEventChannel:
         流式状态」重放会让旧轮 delta 再长一遍字（Job784 实锤）；
       · checkpoint 原位替换只留最新（变量世界快照不回放堆积）；
       · 重放帧信封顶层 replay:true——追平帧只恢复状态绝不触发浮层；
-      · 15s 心跳注释行，防代理/浏览器判死空闲连接。
+      · 15s 心跳=真实 SSE 数据帧 {'type':'ping'}（2026-10-08 翻案：旧注释行
+        `: heartbeat` 浏览器 EventSource 的 JS 完全不可见——投影页手机断线
+        同案的画布版根治；画布按「多久没收到任何帧」判管道死活。不带 id: 行，
+        不动浏览器 Last-Event-ID；消费端全链核实过：unwrapEngineFrame 对
+        非 event 帧回 null、宿主直连客户端只认 type==='event'，零惊扰）。
     帧载荷=stdio 事件信封原样（{'type':'event','event':…,'data':…}），壳
     （增量C）按行转播给适配器即成 stdio 事件，适配器全程冻结。
     归属闸（裁决⑤）：订阅带 ?host=<宿主id> 只收本场 host_refs 含该宿主的
-    事件（job 归属解析带 1s 缓存，档案读不放大盘）；不带货=全收（增量C 起
-    壳必须带货，注册表定稿后收紧为必带）。"""
+    事件（job 归属解析带 1s 缓存，档案读不放大盘）；不带货=全收；带
+    ?observer=<观察者id>（2026-10-05 刀0「画布直连」立项：femogen 等超然
+    观看面自报的合法观察者格）同=全收——将来注册表定稿把 host 收紧为必带
+    时，观察者格照旧合法全收，不随收紧瞎掉。"""
 
     RING_CAP = 400
     EPHEMERAL = frozenset({'femo_stream', 'ai_token', 'step'})
@@ -202,15 +208,20 @@ def _read_addr(data_dir):
         return None
 
 
+_NO_PROXY_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
 def _probe(addr, timeout=1.5, data_dir=None):
     """探活：GET /health 短超时（死端口通常立刻拒绝，超时算死）。
     data_dir 给出时做身份比对：账与 /health 都报了 data 且不一致=别人家的
-    hub（多数据根并存：测试沙盒与生产各认各的），不算活。"""
+    hub（多数据根并存：测试沙盒与生产各认各的），不算活。
+    回环探测直连不走系统代理：回环永远不需要代理，代理挂掉/重启不该把
+    孪生裁决弄瞎（瞎了就会把活 hub 误判成死账、抢写账本抢班夺权）。"""
     try:
         base = 'http://127.0.0.1:%d' % int(addr.get('port') or 0)
         if not addr.get('port'):
             return False
-        with urllib.request.urlopen(base + '/health', timeout=timeout) as resp:
+        with _NO_PROXY_OPENER.open(base + '/health', timeout=timeout) as resp:
             body = json.load(resp)
         if not body.get('ok'):
             return False
@@ -942,6 +953,9 @@ def _assemble_engine(args, hub, port, mailbox, mail_courier, projection_hub,
                          'runners': sorted(stage.runners.keys()),
                          'workers': sorted(stage.workers.keys()),
                          'sse_clients': len(channel._clients),
+                         # SSE 心跳已翻案为 JS 可见的 ping 数据帧（2026-10-08）——
+                         # 画布帧龄判据的开关：老引擎无此键=只许用旁路健康判据。
+                         'sse_ping': True,
                          # 进程内直连的机械证据：attach_local 挂了真身（remote
                          # 模式此值恒 None）——自环禁令的验收断言面。
                          'hub_inproc': bool(stage.hub is not None
@@ -955,6 +969,12 @@ def _assemble_engine(args, hub, port, mailbox, mail_courier, projection_hub,
         u = urllib.parse.urlparse(hreq.path)
         q = urllib.parse.parse_qs(u.query)
         host = (q.get('host') or [''])[0] or None
+        # 观察者格（刀0，2026-10-05）：画布等超然观看面自报 observer 身份，
+        # 语义=合法的全场观看（与不带 host 参数同待遇）。落成 host=None 挂进
+        # 通道——归属闸只对带 host 的订阅生效，观察者天然全收。
+        observer = (q.get('observer') or [''])[0]
+        if observer:
+            host = None
         lie = hreq.headers.get('Last-Event-ID') or (q.get('since') or [''])[0]
         try:
             since = int(lie)
@@ -976,7 +996,9 @@ def _assemble_engine(args, hub, port, mailbox, mail_courier, projection_hub,
                 try:
                     seq, env = client_q.get(timeout=_EngineEventChannel.HEARTBEAT_SEC)
                 except queue.Empty:
-                    hreq.wfile.write(b': heartbeat\n\n')
+                    # 心跳=真实数据帧（JS 可见，画布帧龄判据靠它）：不带 id 行、
+                    # 不入重放环、unwrapEngineFrame/宿主直连客户端都会安静跳过。
+                    hreq.wfile.write(b'data: {"type":"ping"}\n\n')
                 else:
                     hreq.wfile.write(channel.frame(seq, env, replay=False))
                 hreq.wfile.flush()

@@ -1,8 +1,11 @@
-@font-face {
-  font-family: 'MyCustomFont';
-  src: url('/character_need.ttf') format('truetype');
-  font-display: swap;
-}
+/* font.css — femoGen 独立模式（vite 入口）的 body 字体接线。
+   生僻字补字字体（character_need）的 @font-face 定义已收敛到 themes.js 的
+   FONT_FACE_CSS（数据内嵌、单一事实源），经 common.jsx 的 FontStyle 注入链
+   进所有形态——本文件不再另持一份 @font-face（两条路径必漂移，2026-10-08 收敛）。
+   每条主题字体链（themes.js 的 --femo-font-*）都把 'MyCustomFont' 放在首位：
+   CSS 逐字回退只在元素声明的字体清单内进行，只声明不进链=永远用不上
+   （2026-10-08 前的旧病）。放链首安全：该字体只映射 5 个生僻码位，命不中的字
+   自然滑落给后面的 DM Sans/MiSans/系统字体，不截胡。 */
 
 /* 全局应用，让浏览器自动回退 */
 body {

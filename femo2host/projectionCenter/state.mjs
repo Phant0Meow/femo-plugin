@@ -51,6 +51,14 @@ export const S = {
   // ── 时间线数据（main 的 WS 分派器写，render 读）─────────────────────
   // 当前视角的时间轨语义行：快照整发（换值），增量帧追加/原位替换。
   rows: [],
+  // 窗口化省略段（2026-10-08 快照窗口化配套）：快照只送头尾各 ~1MB 时，中间
+  // 省掉的部分记在这里，render 在分界处画省略号+双向展开按钮，展开的
+  // rows-range 增量按这份账往 S.rows 里插。形状 {job, sess, headEnd,
+  // tailStart, headEnd0, tailStart0, rows, bytes, token, _busy}：
+  //   headEnd/tailStart=已展开到的边界行号（随展开推进）；*0=快照初值（身份
+  //   对账用）；token=快照序号（rows-range 应答对账，防换场后的迟到处帧错插）；
+  //   _busy=一次一发，应答回来才放下一发。null=没有省略段（全量快照）。
+  elide: null,
   // 打字机中的直播块：key → {actor, blockKind, text, host}。live/live-done
   // 逐块增删，live-clear 换场全清，快照捎带的正在打块也落这里。
   liveBlocks: new Map(),
@@ -84,10 +92,14 @@ export const S = {
   // prompt,host,out_vars,views,seg}；序=human_wait 到达序，底部停靠照此排。
   waitingSeats: [],
   // 每席就地输入草稿：{wait_key → {wk, expanded, text, varsOpen, vars, err,
-  // busy, _focus}}。composer 唯一写口（applyWaiting 按清单增删保留——席位
-  // 消失=草稿作废；同席重推不重置 busy，交卷锁只在新建/回执失败时归零）；
-  // render 读（doingHtml 画停靠席、重绘时按 _focus 接回焦点、草稿回填）。
-  // busy（原全局 composerBusy 下放每席）：已寄出未收账禁双投。
+  // busy, _focus, _tries, _ackAt}}。composer 唯一写口（applyWaiting 按清单增
+  // 删保留——席位消失=草稿作废；同席重推不重置 busy，交卷锁只在新建/回执失败
+  // 时归零）；render 读（doingHtml 画停靠席、重绘时按 _focus 接回焦点、草稿
+  // 回填）。busy（原全局 composerBusy 下放每席）：已寄出未收账禁双投。
+  // _tries/_ackAt：寄出帧重发巡检的私人账（2026-10-08，见 composer sendWatch
+  // ——回执 2s 逾期重发至多 5 次，重连自动补发；安全网=hub 幂等闸）。
+  // 另有 sessionStorage 镜像 {wait_key→{text,vars}}（util 三件纯函数，composer
+  // 接线）：抗刷新，busy 不进镜像——刷新即解锁可重发。
   // 状态全在内存：全量重绘不丢草稿不丢焦点。
   ihumanDrafts: {},
 };

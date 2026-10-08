@@ -1,0 +1,13 @@
+{
+  "name": "femo-web-adapter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "FEMO 的网页版宿主适配器（DeepSeek/智谱清言/豆包…，站点包注册制）：本地服务（引擎桥+角色席路由）+ Chrome 扩展（网页会话座席）。",
+  "scripts": {
+    "test": "node --test tests/",
+    "smoke:bridge": "node tests/smoke-bridge.mjs",
+    "smoke:service": "node tests/smoke-service.mjs",
+    "start": "node server/service.mjs"
+  }
+}

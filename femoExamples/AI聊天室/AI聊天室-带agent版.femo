@@ -1,0 +1,130 @@
+# 群聊室 v1.4：开演人类点名上场名单，轮替发言（不与上一位重复、沉默 n+2 轮保底），AI 可自主下线、人类可拉回踢走
+
+meta:
+  name = AI群聊
+  version = 1.4
+  session = new
+  preamble = "# 群聊室 v1.4：开演人类点名上场名单，轮替发言（不与上一位重复、沉默 n+2 轮保底），AI 可自主下线、人类可拉回踢走"
+
+actors:
+  ai @DeepSeek = soul:ai1
+  ai @GLM = soul:ai2
+  ai @豆包 = soul:ai3
+  ai @Kimi = soul:ai4
+  ai @GPT = soul:ai5
+  ai @千问 = soul:ai6
+  ai @Zcode = soul:ai7
+  human @人类 = soul:human
+
+code:
+  WAIT = file:"D:\myFiles\dsh\femo-plugin\femoExamples\AI聊天室\random_wait_time.py"
+
+vars:
+  $在线 = [@DeepSeek, @GLM, @豆包]
+  @speaker = ""
+  @人类 = ""
+  沉默轮数 = {@DeepSeek: 0, @GLM: 0, @豆包: 0}
+  @ai7 = ""
+  $note = false
+  $AgentRuning = false
+  @Agent = @Zcode
+
+action 人类发言 @human(@人类):
+  prompt: |
+    请在群聊中自由发言……
+    管理指令（可选）：
+    - 想让Agent做笔记：SET VARIABLE: <<note = true>>
+    - 把某个AI拉回群聊：SET VARIABLE: <<在线 = add(@DeepSeek)>>（其他AI同理）
+    - 把某个AI踢下线：SET VARIABLE: <<在线 = remove(@DeepSeek)>>（其他AI同理）
+  scope: all
+  out:
+    在线, note
+
+action 设置群聊成员 @human(@人类):
+  prompt: |
+    聊天室点名：想让哪些AI加入聊天室？请设定参与人员（独占一行），比如：
+    SET VARIABLE: <<在线 = [@DeepSeek, @GLM, @豆包]>>
+    也可以任意增减，比如只来两位：
+    SET VARIABLE: <<在线 = [@DeepSeek, @千问]>>
+    可选AI：{allAI}。其中Zcode是Agent。
+    聊天中途想添加成员或踢掉某人，在群聊里发同样格式的赋值即可，比如：
+    SET VARIABLE: <<在线 = add(@GPT)>>
+    SET VARIABLE: <<在线 = remove(@豆包)>>
+  scope: all
+  out:
+    在线
+
+action 随机等一会儿并选AI发言 @func(WAIT.pick_next_speaker):
+  in:
+    ais = 在线
+    last_speaker = @speaker
+    silence = 沉默轮数
+  out:
+    @speaker, 沉默轮数
+
+action AI发言 @ai(@speaker):
+  prompt: |
+    你是{@speaker}，在群聊里自由发言，想聊什么聊什么。当前在线名单：{在线}。
+    如果你想下线（不再被点名发言），请单独一行输出赋值信号：
+    SET VARIABLE: <<在线 = remove({@speaker})>>
+    下线后想回来，得等人类用 add 把你拉回来，想清楚再退。
+    如果没想下线，就别输出任何赋值。
+  scope: all
+  out:
+    在线
+
+action Agent记录 @ai(@Agent):
+  prompt: |
+    请你阅读当前聊天记录，判断有哪些是需要记录的。
+    只记最终的结论，讨论过程几经变动没决定的都不用记。
+    只看人类用户的拍板，以人类用户的拍板和意图为准。
+    其他AI的发言可能太发散太幻觉，仅供参考。
+    记录人类用户希望你记录的东西。
+  scope: all
+
+action Agent开始 @assign:
+  out:
+    note = false, AgentRuning = true
+
+action Agent结束 @assign:
+  out:
+    AgentRuning = false
+
+mainflow:
+  [人类发言]: 人类发言
+  [hub]: 
+  [人类环]: 
+  [设置群聊成员]: 设置群聊成员
+  [随机等一会儿并选AI发言]: 随机等一会儿并选AI发言
+  [AI发言]: AI发言
+  [Agent记录]: Agent记录
+  [Agent开始]: Agent开始
+  [Agent结束]: Agent结束
+
+  [START] -> [设置群聊成员]
+  [设置群聊成员] -> [hub]
+  [hub] -> fork:
+    -> [人类环]
+    -> [随机等一会儿并选AI发言]
+  [人类环] -> [人类发言]
+  [人类发言] -> fork:
+    -> [人类环]
+    -> if (note == true) -> [Agent开始]
+  [Agent开始] -> [Agent记录]
+  [Agent记录] -> [Agent结束]
+  [Agent结束] -> [随机等一会儿并选AI发言]
+  [随机等一会儿并选AI发言] -> if (AgentRuning == false) -> [AI发言]
+  [AI发言] -> fork:
+    -> if (AgentRuning == false) -> [随机等一会儿并选AI发言]
+
+#sketch:
+#  [END] = 600, 200
+#  [人类发言] = 141, 78
+#  [hub] = -156, 88
+#  [人类环] = 0, 88
+#  [设置群聊成员] = -161, -10
+#  [随机等一会儿并选AI发言] = -161, 196
+#  [AI发言] = -161, 312
+#  [Agent记录] = 141, 312
+#  [Agent开始] = 141, 196
+#  [Agent结束] = -5, 312

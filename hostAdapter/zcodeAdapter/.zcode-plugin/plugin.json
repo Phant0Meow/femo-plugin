@@ -1,0 +1,23 @@
+{
+  "name": "femo-plugin",
+  "version": "0.1.1",
+  "description": "FEMO multi-agent orchestration engine (ZCode adapter) - script-driven multi-agent workflows; the main model directs, each actor speaks from its own ZCode window, humans play along via the projection hub.",
+  "description_i18n": {
+    "en": "FEMO multi-agent orchestration engine (ZCode adapter): mount .femo scripts and run multi-agent workflows — the main model directs, each actor is its own ZCode window possessing a soul (no subagents), humans join via the projection hub.",
+    "zh-CN": "FEMO 多智能体编排引擎（ZCode 适配）：挂载 .femo 脚本运行多智能体流程——主模型当导演，每个角色由一个独立 ZCode 窗口附身出演（无子代理），人类经投影中心参与。"
+  },
+  "mcpServers": {
+    "gateway": {
+      "command": "node",
+      "args": ["${ZCODE_PLUGIN_ROOT}/mcp/femo-server.mjs"],
+      "env": {
+        "FEMO_PYTHON": "python"
+      },
+      "timeoutMs": 600000,
+      "enabled": true
+    }
+  },
+  "hooks": "hooks/hooks.json",
+  "skills": "skills",
+  "commands": "commands"
+}

@@ -182,6 +182,38 @@ h1 .amp { color: var(--gold); }
   color: var(--ink-3);
 }
 
+/* ── 省略号块（2026-10-08 快照窗口化；二稿竖排——用户拍板：两枚按钮放一行太
+   迷惑，中间隐藏了很多就该在布局上强调）：向下展开钮 / 竖向点列 / 剩余量文案 /
+   竖向点列 / 向上展开钮，自上而下各占一行，整块居中。点列=radial 圆点竖线，
+   就是用户手绘的那串竖着省略号。 */
+.eliderow {
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  margin: 4px 0 4px 36px;   /* 让出左轨（22px 立柱+14px 列距），与 .cell 对齐 */
+  padding: 10px 0;
+}
+.elide-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 14px; border: 1px solid var(--line-strong); border-radius: 999px;
+  background: var(--surface-raised); color: var(--ink-3);
+  font-family: var(--mono); font-size: 11px; letter-spacing: .06em;
+  cursor: pointer; white-space: nowrap;
+}
+.elide-btn:hover { color: var(--ink); border-color: var(--ink-3); }
+.elide-btn svg { flex: none; }
+.elide-btn[disabled] { opacity: .5; cursor: default; }
+.elide-dots {
+  width: 5px; height: 52px;
+  background-image: radial-gradient(circle, var(--ink-3) 1.7px, transparent 2.2px);
+  background-size: 5px 13px;
+  background-repeat: repeat-y;
+  background-position: center top;
+  opacity: .6;
+}
+.elide-gap {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em;
+  color: var(--ink-3); white-space: nowrap;
+}
+
 /* ── 卡片族：发丝边玻璃面板 ─────────────────────────────────────── */
 .section {
   position: relative; padding: 13px 17px;
@@ -743,6 +775,21 @@ h1 .amp { color: var(--gold); }
   position: absolute; bottom: -5px; right: -5px;
   font-size: 9px; line-height: 12px; padding: 0 4px;
 }
+/* ── 悬停名牌（2026-10-05 用户拍板）：纯图标钮没有字，悬停浮出按钮名称。
+   data-tip 存名、::after 画牌；出现在按钮**下方**——顶栏贴页顶（留白退役
+   拍板），往上是视口外必被裁；0.35s 延迟防鼠标扫过一排钮时闪成跑马灯，
+   移开即隐不拖沓。原生 title 同步摘掉（双重出泡）。 ── */
+.topbtn[data-tip] { position: relative; }
+.topbtn[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute; top: calc(100% + 7px); left: 50%; transform: translateX(-50%);
+  padding: 4px 10px; border-radius: 8px; white-space: nowrap;
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; color: var(--ink);
+  background: var(--dbg-bg); border: 1px solid var(--line-strong); box-shadow: var(--raise-lg);
+  opacity: 0; pointer-events: none; z-index: 45;
+  transition: opacity .15s ease;
+}
+.topbtn[data-tip]:hover::after { opacity: 1; transition-delay: .35s; }
 .dbg-wrap { position: static; display: flex; flex-direction: column; align-items: flex-end; }
 .dbg-panel {
   display: none; position: absolute; top: calc(100% + 6px); right: 0;
@@ -801,8 +848,12 @@ h1 .amp { color: var(--gold); }
 .jump-top { top: 18px; }
 .jump-btm:hover, .jump-top:hover { color: var(--gold); border-color: var(--gold-dim); }
 .jump-btm[hidden], .jump-top[hidden] { display: none; }
-/* 底部刷新条（2026-09-29 用户拍板）：页面最下面一枚刷新钮，与顶栏刷新的区别
-   只在刷新后保持贴底跟随（sessionStorage 带旗过 reload，render 起步读旗置
-   followBottom，见 render.mjs）。按钮直接复用顶栏 .topbtn 的 token 皮肤，
-   三主题自动适配，这里只管站位居中。 */
-.tailbar { display: flex; justify-content: center; padding: 14px 0 30px; }
+/* ── 页尾镜像行（2026-10-05 用户拍板「这排按钮最下面也显示一遍，复用不重写」）：
+   顶栏控制排的 JS 克隆（main.mjs mirrorRow）住进 #tailbar——居中成排，间距对齐
+   顶栏（gap:10px）。position:relative 给页尾 print 面板当锚：面板朝上开
+   （页底再往下是视口外，往下开必被裁），与顶栏面板朝下正好镜像。 */
+.tailbar {
+  display: flex; justify-content: center; align-items: center; gap: 10px;
+  padding: 14px 0 30px; position: relative;
+}
+.tailbar .dbg-panel { top: auto; bottom: calc(100% + 6px); }

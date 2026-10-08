@@ -57,7 +57,8 @@ export interface FemoToolDeps {
    *  人类发言，不调任何模型），返回完整调试流水 + 终报。不占 Job、不写生产
    *  台账（独立 DB 沙盒），可与正式运行并行。编译失败抛 Error（原话上浮）。 */
   debugRun(sessionId: string, opts: { runs?: number; seed?: number; module?: string; signal?: AbortSignal }): Promise<DebugRunCollect>
-  /** 是否为 femo 主会话（无 parentSession）——工具调用者校验。 */
+  /** 是否为 femo 会话的主模型（无 parentSession）——工具调用者校验。
+   *  【2026-10-07 去预设】判据=身份轴 femoIdentity（有戏有账即算），不再看预设。 */
   isFemoMainSession(agent: Agent): boolean
   /** 引擎根（femo_possess 写 hub 绑定账用）。 */
   femoRoot: string
@@ -159,7 +160,7 @@ export function registerFemoTools(
       execute: async (args, exec) => {
         const sid = callerSessionId(deps, exec.agent)
         if (sid === null) {
-          return { ok: false, error: '该工具仅 Femo 主会话可用（角色/子代理不可调用）' }
+          return { ok: false, error: '该工具仅会话主模型可用（角色/子代理不可调用）；本会话尚未与 FEMO 结缘时，先挂一个脚本或开一场戏' }
         }
         try {
           return await run((args ?? {}) as Record<string, unknown>, exec.agent!, { signal: exec.signal })

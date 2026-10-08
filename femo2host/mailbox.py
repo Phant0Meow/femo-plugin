@@ -344,7 +344,10 @@ def drain_outgoing(host, only_job_ids=None, all_hosts=False):
     【all_hosts（2026-09-26 第2步增量B，daemon 信柜管家专用）】常驻引擎一座
     进程养全场（bound=全数据根的场次），本场次的回信无论寄到哪个宿主格都归
     它喂——不再按 target_host 过滤。认领纪律仍由 only_job_ids 站岗；裸
-    all_hosts（无 only_job_ids）=全城乱捞，响亮拒绝。"""
+    all_hosts（无 only_job_ids）=全城乱捞，响亮拒绝。
+    【退回重投（2026-10-07，j2717 文件锁吞信事故）】投递遇瞬时错误被 requeue
+    退回的信带 retry_not_before（退避到点时刻），未到点不出站——邮差的「过会
+    再来一趟」，避免对同一把没松的锁热循环。"""
     if all_hosts and only_job_ids is None:
         raise ValueError('drain_outgoing: all_hosts 必须与 only_job_ids 同用'
                          '（认领纪律是唯一防乱捞的闸）')
@@ -353,7 +356,8 @@ def drain_outgoing(host, only_job_ids=None, all_hosts=False):
         box = _load()
         for x in box['letters']:
             if x['status'] == 'pending' and x['action'] == 'send' \
-                    and (all_hosts or x['target_host'] == host):
+                    and (all_hosts or x['target_host'] == host) \
+                    and float(x.get('retry_not_before') or 0) <= time.time():
                 if only_job_ids is not None and x.get('job_id') not in only_job_ids:
                     continue
                 x.update(status='delivered', sent_at=time.strftime('%Y-%m-%d %H:%M:%S'), sent_via='station')
@@ -361,6 +365,20 @@ def drain_outgoing(host, only_job_ids=None, all_hosts=False):
         if out:
             _save(box)
     return out
+
+
+def pending_out_by_ref(ref):
+    """出站口「同凭据在柜未捞」查询（2026-10-08 寄出帧重发的幂等闸配套）：
+    回执丢失/迟到的寄件方重发同一 wait_key 时，若第一封还在柜里 pending 没
+    被任何桥捞出站，就不该叠第二封——返回在柜信 id，没有则 None。只查不改，
+    锁内快照；信被捞出站（delivered）后即视作「已出门」，再查为 None。"""
+    with _locked():
+        box = _load()
+        for x in box['letters']:
+            if x['status'] == 'pending' and x['action'] == 'send' \
+                    and x.get('ref') == ref:
+                return x['id']
+    return None
 
 
 def mark_delivered(letter_id, via):
@@ -382,6 +400,29 @@ def mark_consumed(letter_id):
         for x in box['letters']:
             if x['id'] == letter_id:
                 x['status'] = 'consumed'
+                _save(box)
+                return True
+    return False
+
+
+def requeue(letter_id, reason='', delay_sec=0):
+    """出站投递遇**瞬时**错误把信退回在柜重投（2026-10-07，j2717 文件锁吞信
+    事故）：Permission denied 这类下一秒就自愈的错误，旧法一步记死信，用户的
+    话当场蒸发。requeue 把状态回 pending、清送达戳、记重试次数（handin_retries）
+    与退避到点时刻（retry_not_before，drain_outgoing 未到点不出站）——「邮差
+    扑空是修邮差的事情」：重投次数与到顶改判死信归调用方（出站轮询）裁决，
+    驿站只管退回与放行。"""
+    with _locked():
+        box = _load()
+        for x in box['letters']:
+            if x['id'] == letter_id:
+                x['status'] = 'pending'
+                x.pop('sent_at', None)
+                x.pop('sent_via', None)
+                x['handin_retries'] = int(x.get('handin_retries') or 0) + 1
+                if reason:
+                    x['last_handin_error'] = str(reason)[:200]
+                x['retry_not_before'] = time.time() + max(0.0, float(delay_sec or 0))
                 _save(box)
                 return True
     return False

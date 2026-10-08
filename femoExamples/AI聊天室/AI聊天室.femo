@@ -1,10 +1,10 @@
-﻿# 群聊室：单循环轮替发言（不与上一位重复），沉默 n+2 轮保底必发言，无限循环
+# 群聊室 v1.4：开演人类点名上场名单，轮替发言（不与上一位重复、沉默 n+2 轮保底），AI 可自主下线、人类可拉回踢走
 
 meta:
   name = AI群聊
-  version = 1.0
+  version = 1.4
   session = new
-  preamble = "﻿# 群聊室：单循环轮替发言（不与上一位重复），沉默 n+2 轮保底必发言，无限循环"
+  preamble = "# 群聊室 v1.4：开演人类点名上场名单，轮替发言（不与上一位重复、沉默 n+2 轮保底），AI 可自主下线、人类可拉回踢走"
 
 actors:
   ai @DeepSeek = soul:ai1
@@ -13,25 +13,49 @@ actors:
   ai @Kimi = soul:ai4
   ai @GPT = soul:ai5
   ai @千问 = soul:ai6
+  ai @Zcode = soul:ai7
   human @人类 = soul:human
 
 code:
   WAIT = file:"D:\myFiles\dsh\femo-plugin\femoExamples\AI聊天室\random_wait_time.py"
 
+vars:
+  $shutdown = false
+  $在线 = [@DeepSeek, @GLM, @豆包]
+  @speaker = ""
+  @人类 = ""
+
 action 人类发言 @human(@人类):
   prompt: |
-    "请在群聊中自由发言……"
+    "请在群聊中自由发言……
+    管理指令（可选）：
+    - 想结束群聊：SET VARIABLE: <<shutdown = true>>
+    - 把某个AI拉回群聊：SET VARIABLE: <<在线 = add(@DeepSeek)>>（@GLM/@豆包同理）
+    - 把某个AI踢下线：SET VARIABLE: <<在线 = remove(@DeepSeek)>>（@GLM/@豆包同理）"
   scope: all
+  out:
+    shutdown, 在线
+
+action 设置上场名单 @human(@人类):
+  prompt: |
+    "开演点名：这一场让谁上场？照抄下面这行、改改名字再寄出（必须独占一行，逗号用英文逗号）：
+    SET VARIABLE: <<在线 = [@DeepSeek, @GLM, @豆包]>>
+    也可以任意增减，比如只来两位：
+    SET VARIABLE: <<在线 = [@DeepSeek, @千问]>>
+    可选演员：{allAI}。
+    演出中途想换人，在群聊里发同样格式的赋值即可：<<在线 = add(@GPT)>> 或 <<在线 = remove(@豆包)>>"
+  scope: all
+  out:
+    在线
 
 module 群聊:
   vars:
     @speaker = ""
-    ai_members = [@DeepSeek, @GLM, @豆包]
     沉默轮数 = {@DeepSeek: 0, @GLM: 0, @豆包: 0}
 
   action 随机等一会儿并选AI发言 @func(WAIT.pick_next_speaker):
     in:
-      ais = ai_members
+      ais = 在线
       last_speaker = @speaker
       silence = 沉默轮数
     out:
@@ -39,36 +63,49 @@ module 群聊:
 
   action AI发言 @ai(@speaker):
     prompt: |
-      "你是{@speaker}，在群聊里自由发言，想聊什么聊什么。"
+      你是{@speaker}，在群聊里自由发言，想聊什么聊什么。当前在线名单：{在线}。
+      如果你想下线（不再被点名发言），请单独一行输出赋值信号：
+      SET VARIABLE: <<在线 = remove({@speaker})>>
+      下线后想回来，得等人类用 add 把你拉回来，想清楚再退。
+      如果没想下线，就别输出任何赋值。
     scope: all
+    out:
+      在线
 
   flow:
-    [IN] -> [随机等一会儿并选AI发言]: 随机等一会儿并选AI发言 -> [AI发言]: AI发言 -> [IN]
+    [随机等一会儿并选AI发言]: 随机等一会儿并选AI发言
+    [AI发言]: AI发言
+
+    [IN] -> [随机等一会儿并选AI发言]
+    [随机等一会儿并选AI发言] -> [AI发言]
+    [AI发言] -> [随机等一会儿并选AI发言]
 
 #  sketch:
-#    [随机等一会儿并选AI发言] = 309, -55
-#    [AI发言] = 309, 42
+#    [OUT] = 600, 200
+#    [随机等一会儿并选AI发言] = 155, -10
+#    [AI发言] = 353, -10
 
 mainflow:
   [群聊]: &群聊
   [人类发言]: 人类发言
   [hub]: 
-  [群聊环]: 
   [人类环]: 
+  [设置上场名单]: 设置上场名单
 
-  [START] -> [hub]
+  [START] -> [设置上场名单]
+  [设置上场名单] -> [hub]
   [hub] -> fork:
-    -> [群聊环]
     -> [人类环]
-  [群聊环] -> [群聊]
-  [群聊] -> [群聊环]
-  [人类环] -> [人类发言]
+    -> [群聊]
+  [人类环] -> fork:
+    -> if (shutdown == false) -> [人类发言]
+    -> if (shutdown == true) -> [END]
   [人类发言] -> [人类环]
 
 #sketch:
-#  [END] = 600, 200
-#  [群聊] = 147, 175
-#  [人类发言] = 468, -10
-#  [hub] = 157, 0
-#  [群聊环] = 157, 91
-#  [人类环] = 313, 0
+#  [END] = 156, 294
+#  [群聊] = -10, 279
+#  [人类发言] = 344, 176
+#  [hub] = 0, 186
+#  [人类环] = 156, 186
+#  [设置上场名单] = -5, 88

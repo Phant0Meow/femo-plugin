@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import React from 'react';
-import { THEME_CSS } from './themes';
+import { THEME_CSS, FONT_FACE_CSS } from './themes';
 // 拖拽吸附对齐（纯计算，与 React/DOM 无关）：桌面端 onMM 与手机端 nodeDrag 共用
 import { SNAP_PX, computeSnap, snapAndLink } from './snap';
 
@@ -59,6 +59,11 @@ class ErrorBoundary extends React.Component {
 // 画布动画（呼吸灯/流光）与编辑器内 class 始终保留。
 const FontStyle = ({ scoped = false }) => (
   <style>{`
+    /* 生僻字补字字体（character_need，数据内嵌）：字体链单源——每条 --femo-font-*
+       链首都是 'MyCustomFont'（themes.js），只映射 5 个生僻码位、逐字回退不截胡。
+       2026-10-08 裁决：@font-face 必须住 FontStyle 注入链，dsh 插件模式没有 css
+       管道（构建走 esbuild 门面直入，styles/font.css 那条 vite 路径到不了 dsh 包）。 */
+    ${FONT_FACE_CSS}
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
     /* MiSans（小米，免费商用）：中文主字体，unicode-range 子集按需加载；字重为官方新刻度 330-700。
        round12：去掉 Heavy——用户反馈加粗中文太粗，800/900 就近落到 Bold(630)。 */

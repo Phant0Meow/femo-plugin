@@ -16,8 +16,12 @@
  *     femo-server.mjs）存在即静态托管；打包清单（scripts/sync-zcode-dist.ps1）
  *     按字面路径拷贝。改目录名 = 三处同步（vite.config 的 outDir + 上述两处）。
  *  ③ 反向 HTTP 契约（femoGen 前端 → 宿主，方向与本文件相反）：/femo-plugin/*
- *     路由族 + SSE 事件流归 dshAdapter 所有（host/routes.ts），不在本文件
- *     契约内——编辑器前端按 route 名直调，那是宿主暴露给前端的 API。
+ *     路由族归 dshAdapter 所有（host/routes），不在本文件契约内——编辑器前端
+ *     按 route 名直调，那是宿主暴露给前端的 API。【2026-10-05 画布直连改口径】
+ *     引擎状态面（事件流/校准/观演/停止/继续/人类输入）已改画布直连常驻引擎
+ *     （观察者身份），宿主路由族只剩宿主脸：运行/守卫/record/文件面/干跑，
+ *     外加两个薄插座 GET /femo-plugin/engine-base（喂引擎地址）与
+ *     /femo-plugin/engine-relay/*（透明转发后备）——接新宿主照抄这两件。
  *
  * ── 两种运行形态 ────────────────────────────────────────────────────────
  *  - standalone（vite，src/main.jsx）：自带旧世界 fetch 直连，不传 plugin 旗标；

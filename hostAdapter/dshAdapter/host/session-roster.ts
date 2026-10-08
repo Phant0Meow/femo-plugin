@@ -1,21 +1,22 @@
 /**
  * session-roster.ts — FEMO 会话名册（宿主方言 → 投影中心 hub）。
  *
- * 「哪些会话算 FEMO 会话」是宿主的事。dsh 的判据（两路并集）：
- *  ① agentPreset 命中 'femo-plugin'（persona.presetOf：header 冷事实 +
- *    agent-preset/selected 活覆盖）；
- *  ② 宿主 host-history 有账（drafts/<sid>.json 存在）——/femo 命令路径的会话
- *    不走模式菜单，preset 判不到（实锤：真主会话 session-89aba104 是这类）。
+ * 「哪些会话算 FEMO 会话」是宿主的事。dsh 的判据（2026-10-07 换轴，唯一尺子在
+ *  femoIdentity.isFemoSession）：**有戏有账**——宿主 host-history 有账
+ *  （user_data/host-history/drafts/<sid>.json 存在 = 挂过脚本/跑过 Job）即算；
+ *  旧会话 header 里的预设标记 'femo-plugin' 只当 legacy 兜底。此前的主判据
+ *  「agentPreset 命中」随「去预设」退役——那正是历史坑：/femo 路径的会话不走
+ *  模式菜单、preset 判不到（实锤：真主会话 session-89aba104 是这类），换轴后
+ *  这类会话天然入册。
  * hub 只记账出清单（roster.json + GET /sessions + WS ctrl 'sessions'），
  * 网页主会话面板按宿主分组画下拉；zcode 以后实现自己的 announcer（它自己定义
  * 什么算 FEMO 会话），hub/页面零改动。
  *
  * 三条上报路径（全部 best-effort，hub 不在线绝不挡会话）：
  *  ① 冷扫描（插件启动）：ctx.sessionQuery.listSessions() 枚举全部持久化会话，
- *    **只取主会话**（无 parentSession、非 subagent），agentPreset 命中 FEMO
- *    预设者入册——老会话不打开也进下拉。零 I/O 冷读与 dsh 自己的冷清单同款
- *    （sessionProjectionCache.cachedSnapshot；seeded 走 cachedPredecessorTitle，
- *    preset 回退 header）。**不 bind**：换绑只归「说话即绑」与面板。
+ *    **只取主会话**（无 parentSession、非 subagent），有戏有账者入册——老会话
+ *    不打开也进下拉。零 I/O 冷读与 dsh 自己的冷清单同款
+ *    （sessionProjectionCache.cachedSnapshot；seeded 走 cachedPredecessorTitle）。**不 bind**：换绑只归「说话即绑」与面板。
  *    名字在宿主侧解析成成品再上报（2026-09-21 拍板「hub 不劳心」）：dsh 列表页
  *    同款 displayTitleOf 回退（title → cwd 工作区名 → 空）；没被用户碰过的空壳
  *    （无 title 事件也无 job 账）随单 delist（hub 只标 active=False 不删档，
@@ -24,22 +25,18 @@
  *    的 user/message 真用户）→ upsert+bind 一并公告 = HTML 投影中心的 dsh
  *    主会话当场切过去（名单里没有就先加入再上台）。steer 派工料包（插件
  *    来源：旧版 kind='plugin'、0.1.7 起 kind='plugin:femo-plugin'）不算用户说话。
- *  ③ 选预设入册：agent-preset/selected → femo-plugin → upsert（不 bind）。
- *    切走不管（用户拍板：dsh 那边没法切走预设；「切预设→delist」仍留给 zcode，
- *    dsh 的 delist 只做冷扫描的空壳清扫）。
+ *  （原「③ 选预设入册」已随去预设整条退役，2026-10-07。）
  *
  * 上报形态：**只有增量、没有快照覆盖**（POST /sessions/announce
  * {source, upsert, bind, delist}，hub 幂等）——本进程重启后内存空了也绝不冲掉
  * hub 已有名单。失败重试 5s×12 次，之后放弃（说话/切预设的自然重报兜底）。
  */
 
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionId, SessionEvent } from '@deepseek-ai/dsh-session'
-import { FEMO_PRESET, presetOf, type PresetBearingIdentity } from './persona'
+import { isFemoSession } from './femoIdentity'
 import { readSessionEvents } from './compat/session-events'
-import { draftsDirOf, readSessionCurrentJob, readSessionJobIds } from './state-files'
+import { readSessionCurrentJob, readSessionJobIds } from './state-files'
 import { hostAddr } from './hub/hub-feed' // 宿主标签（announce 的 source 与喂/读侧同一词）
 import { hubBaseUrl } from '../../../femo2host/host/hub-client.mjs' // hub 地址唯一解析（2026-09-24 A2）
 
@@ -274,20 +271,16 @@ async function observeTitle(query: unknown, sessionId: string, keys?: Map<string
   }
 }
 
-/** dsh 方言的「FEMO 会话」判据（两路任一命中）：
- *  ① agentPreset 命中 'femo-plugin'（模式菜单选了 FEMO 模式的会话）；
- *  ② 宿主 host-history 有账（user_data/host-history/drafts/<sid>.json 存在
- *     =建过FEMO脚本/跑过 Job——/femo 命令路径的会话不走模式菜单，preset 判不到，
- *     实锤：真主会话 session-89aba104 就是这类）。
+/** dsh 方言的「FEMO 会话」判据：**唯一尺子在 femoIdentity.isFemoSession**
+ *  （2026-10-07 换轴：权威=host-history 有账即「有戏有账」，旧预设标记只当
+ *  legacy 命中）。这里只做再导出，供戏外旁挂等同尺消费——全插件只有一份判据，
+ *  杜绝另写一套漂移（原两路并集的第二路「preset 命中」已降级为兼容读法）。
  *  导出=全插件唯一尺子（2026-09-23 用户拍板「非 FEMO 会话不发」：god-mirror
- *  喂侧同尺拦闸，杜绝另写一套判据漂移）。 */
-export function isFemoSession(sid: string, identity?: PresetBearingIdentity): boolean {
-  if (identity !== undefined && presetOf(identity) === FEMO_PRESET) return true
-  if (sid === '' || femoRootDir === '') return false
-  return existsSync(join(draftsDirOf(femoRootDir), `${sid}.json`))
-}
+ *  喂侧同尺拦闸）。 */
+export { isFemoSession }
 
-/** 引擎根（registerSessionRoster 注入；冷扫描与说话即绑的 host-history 判定共用）。 */
+/** 引擎根（registerSessionRoster 注入；host-history 账本判定用的那根已在
+ *  femoIdentity 里配置，这里保留一份供本文件读最新场次用）。 */
 let femoRootDir = ''
 
 /** 读会话最新场次：host-history 账（drafts/<sid>.json）的 currentJobId 优先，
@@ -333,8 +326,10 @@ async function coldScanRoster(ctx: Context, femoRoot: string, attempt: number): 
       if (!header || header.id === undefined) continue
       if (header.origin === 'subagent' || header.parentSession !== undefined) continue
       const sid = String(header.id)
-      // preset 判定 + host-history 有账并集（投影缓存本部署没挂，cachedSnapshot 恒缺）
-      if (!isFemoSession(sid, { id: header.id as never, header: { agentPreset: typeof header.agentPreset === 'string' ? header.agentPreset : undefined } })) continue
+      // 身份判据（2026-10-07 换轴）：**有戏有账**即入册——user_data/host-history/
+      // drafts/<sid>.json 存在（挂过脚本或跑过 Job）。旧预设标记在 femoIdentity
+      // 里当 legacy 兜底，此处不必单独问 header。
+      if (!isFemoSession(sid)) continue
       entries.push({ sid, name: '' })
       keys.set(sid, typeof header.createdAt === 'number' ? header.createdAt : 0)
       if (typeof header.cwd === 'string' && header.cwd !== '') cwds.set(sid, header.cwd)
@@ -378,22 +373,14 @@ function promoteInOrder(sid: string): string[] {
 }
 
 /** 注册名册钩子（index.ts 总装调用一次；必须在 registerPersonaHooks 之后——
- *  说话即绑的 presetOf 判定依赖 persona 先建好的 override 表）。
- *  femoRoot=引擎根（host-history 账本判定用）。 */
+ *  身份轴（femoIdentity）的根目录在那一步注入）。
+ *  femoRoot=引擎根（host-history 账本判定与读最新场次共用）。 */
 export function registerSessionRoster(ctx: Context, femoRoot: string): void {
   femoRootDir = String(femoRoot || '').replace(/[\\/]+$/, '')
-  // ③ 选预设入册（不 bind；切走不管——用户拍板 dsh 没法切走预设）
-  ;(ctx.on as (event: string, listener: (sessionId: SessionId, agentPreset: string) => void) => () => void)(
-    'agent-preset/selected',
-    (sessionId, agentPreset) => {
-      if (agentPreset !== FEMO_PRESET) return
-      const sid = String(sessionId)
-      const session = ctx.agents.get(sessionId)?.session
-      const name = session ? displayNameOf(titleOfSession(session), cwdOfSession(session)) : ''
-      announceSessions([{ sid, name }], undefined, promoteInOrder(sid))
-      console.log(`[femo-plugin] session roster: ${sid} entered (preset ${agentPreset})`)
-    },
-  )
+  // 【2026-10-07 去预设】旧的「③ 选预设入册」整条退役：本插件不再有预设，
+  // 也没有「选 FEMO 模式」这个动作；会话入册只剩两条路——冷扫描（有戏有账）
+  // 与说话即绑。存量会话若还带着旧预设标记，冷扫描那路照样认得（femoIdentity
+  // 的 legacy 命中），无需这里再补一条。
   // ② 说话即绑：用户在 FEMO 主会话发言 → upsert + bind（投影窗自身与子代理
       // 会话带 parentSession，天然排除；steer 派工（插件来源：旧 kind='plugin'、
       // 0.1.7 起 kind='plugin:femo-plugin'）都不算说话——只认缺 source 与 'user'。
@@ -404,7 +391,7 @@ export function registerSessionRoster(ctx: Context, femoRoot: string): void {
       const data = event.data as { source?: { kind?: unknown } }
       const srcKind = data.source?.kind
       if (srcKind !== undefined && srcKind !== 'user') return
-      if (!isFemoSession(String(session.id), session as unknown as PresetBearingIdentity)) return
+      if (!isFemoSession(String(session.id))) return
       const sid = String(session.id)
       void (async (): Promise<void> => {
         const job = await readLatestJob(femoRootDir, sid)

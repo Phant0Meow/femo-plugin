@@ -151,19 +151,41 @@ export function render() {
   // 插件行进 pendingPlugins；遇到段容器（kind=section 且非插件/用户之外的特殊
   // 行）就把**当前攒着的**料包挂到该段 _plugs 上并清空队列——后续料包归后续段。
   // 结尾没等到段的，render 末尾兜底独立折叠块，不丢内容。
-  for (const r of S.rows) {
+  // 窗口化省略段（2026-10-08）：快照只送了头尾各 ~1MB 时，行按边界切成两段
+  // 分别过分拣循环，主轨正中插省略号块。两段各自的工具配对/插件攒队/停靠判定
+  // 照旧（跨分界不存在真实相邻行——中间隔着省掉的整段）；分界对不上行号时
+  // 不画（换场竞态：下一拍快照自然重同步）。
+  let headArr = S.rows, tailArr = null;
+  if (S.elide) {
+    const i = S.rows.findIndex(r => r.n === S.elide.headEnd);
+    const k = S.rows.findIndex(r => r.n === S.elide.tailStart);
+    if (i >= 0 && k > i) {
+      headArr = S.rows.slice(0, i + 1);
+      tailArr = S.rows.slice(k);
+    } else {
+      S.elide = null;
+    }
+  }
+  const classify = (r) => {
     const prev = disp[disp.length - 1];
     if ((r.kind || '') === 'tool_result' && prev && (prev.kind || '') === 'tool' && !prev._res) {
       disp[disp.length - 1] = Object.assign({}, prev, { _res: r });
-      continue;
+      return;
     }
-    if ((r.zone || '') === 'outside' && (r.kind || '') === 'whisper' && r.actor === '插件') { pendingPlugins.push(r); continue; }
+    if ((r.zone || '') === 'outside' && (r.kind || '') === 'whisper' && r.actor === '插件') { pendingPlugins.push(r); return; }
     if ((r.kind || '') === 'section' && pendingPlugins.length) {
       r._plugs = pendingPlugins.splice(0);
     }
     if (docked(r)) docks.push(r); else disp.push(r);
+  };
+  for (const r of headArr) classify(r);
+  const dispSplit = tailArr ? disp.length : -1;   // 省略号块在主轨 disp 里的落点
+  if (tailArr) for (const r of tailArr) classify(r);
+  for (let di = 0; di < disp.length; di++) {
+    if (di === dispSplit) mainParts.push(elideHtml());
+    mainParts.push(rowHtml(disp[di]));
   }
-  for (const r of disp) mainParts.push(rowHtml(r));
+  if (tailArr && dispSplit === disp.length) mainParts.push(elideHtml());   // 尾段全被停靠时块也不许丢
   // 位置在最后、没等到段的插件行（后面全是直播块/账本结尾）：兜底独立折叠块
   for (const p of pendingPlugins.splice(0)) mainParts.push(rowHtml(p));
   // 打字机中的块
@@ -261,8 +283,11 @@ function paraText(t) {
 // ── 正式发言 Markdown 渲染（2026-09-21 拍板）：say 槽与独立 say 气泡走 mdHtml；
 // 思考链/耳语/场注等仍纯文本。手写小渲染器不引外部库（拆分后依旧），只收常用
 // 件：围栏代码块（带语言签）/行内码/标题/列表（两级）/引用/管道表格/分隔线/
-// 加粗斜体删除线/链接（仅 http(s)/mailto）。安全姿势：一切先 esc，转换只产
-// 出自家标签，绝不回插外源 HTML；行内码内容抽 token 隔离，不吃其他转换。──
+// 加粗斜体删除线/链接（仅 http(s)/mailto）；清单条目下缩进的续行归入条目、
+// 条目间空行不拆表（loose list）、<ol> 带首条真实序号——模型清单惯例是
+// 「1. 标题 + 缩进说明行」条目间还空行，收不对就整张单子全显示成 1.（4556 实案）。
+// 安全姿势：一切先 esc，转换只产出自家标签，绝不回插外源 HTML；
+// 行内码内容抽 token 隔离，不吃其他转换。──
 function mdInline(raw) {
   let s = esc(String(raw ?? ''));
   const codes = [];
@@ -277,7 +302,7 @@ function mdInline(raw) {
 function mdList(items) {
   const tops = [];
   for (const it of items) {
-    if (it.lvl === 0 || !tops.length) tops.push({ ord: it.ord, txt: it.txt, kids: [] });
+    if (it.lvl === 0 || !tops.length) tops.push({ ord: it.ord, num: it.num, txt: it.txt, kids: [] });
     else tops[tops.length - 1].kids.push(it);
   }
   // 相邻同 ord 的 top 归一张表；ord 变了另起（ul/ol 混排不串种，1. 不并进 - ）
@@ -287,8 +312,13 @@ function mdList(items) {
     if (!g || g.ord !== tp.ord) groups.push({ ord: tp.ord, arr: [tp] });
     else g.arr.push(tp);
   }
-  const rl = (arr, ord) => '<' + (ord ? 'ol' : 'ul') + '>' + arr.map(x =>
-    '<li>' + mdInline(x.txt) + ((x.kids && x.kids.length) ? rl(x.kids, x.kids[0].ord) : '') + '</li>').join('') + '</' + (ord ? 'ol' : 'ul') + '>';
+  // <ol> 带首条真实序号：被段落打断的续排清单（前文到 13、「然后就是：」再排 14.）
+  // 得从 14 显示——没有 start 浏览器一律从 1 起数（4556 实案：全墙清单都显示成 1.）
+  const rl = (arr, ord) => {
+    const open = ord ? ('ol' + (arr[0].num && arr[0].num !== 1 ? ' start="' + arr[0].num + '"' : '')) : 'ul';
+    return '<' + open + '>' + arr.map(x =>
+      '<li>' + mdInline(x.txt).replace(/\n/g, '<br>') + ((x.kids && x.kids.length) ? rl(x.kids, x.kids[0].ord) : '') + '</li>').join('') + '</' + (ord ? 'ol' : 'ul') + '>';
+  };
   return groups.map(g => rl(g.arr, g.ord)).join('');
 }
 function mdText(t) {
@@ -327,11 +357,27 @@ function mdText(t) {
     }
     if (/^\s*([-*+]|\d+[.)])\s+/.test(ln)) {
       const items = [];
+      const isItem = s => /^\s*([-*+]|\d+[.)])\s+/.test(s);
       while (i < lines.length) {
         const mm = lines[i].match(/^(\s*)([-*+]|\d+[.)])\s+(.*)$/);
-        if (!mm) break;
-        items.push({ lvl: mm[1].length >= 2 ? 1 : 0, ord: /\d/.test(mm[2]), txt: mm[3] });
-        i++;
+        if (mm) {
+          const nm = mm[2].match(/\d+/);
+          items.push({ lvl: mm[1].length >= 2 ? 1 : 0, ord: /\d/.test(mm[2]), num: nm ? +nm[0] : 0, txt: mm[3] });
+          i++;
+          // 缩进续行归当前条目（「1. 标题」底下一行缩进说明，模型清单惯例）；
+          // 这刀不收，条目说明行会把收集循环打断，每条各成一张单项表
+          while (i < lines.length && /^\s+\S/.test(lines[i]) && !isItem(lines[i])) {
+            items[items.length - 1].txt += '\n' + lines[i].trim();
+            i++;
+          }
+        } else if (items.length && lines[i].trim() === '') {
+          // 空行窥看：下一非空行仍是条目就接着收（清单内空行不拆表，loose list）；
+          // 否则断表，空行留给主循环消化——清单到此为止，后续照旧按段落走
+          let j = i;
+          while (j < lines.length && lines[j].trim() === '') j++;
+          if (j < lines.length && isItem(lines[j])) { i = j; continue; }
+          break;
+        } else break;
       }
       out.push(mdList(items));
       continue;
@@ -354,6 +400,32 @@ function bannerMeta(kind) {
   if (kind === 'prompt') return { mod: 'prompt', icon: 'pen', label: '输入提示' };
   if (kind === 'notice') return { mod: '', icon: 'horn', label: '公告' };
   return { mod: 'showprompt', icon: 'horn', label: '公告' };
+}
+// 省略号块（2026-10-08 快照窗口化）：头尾之间的「中间还有多少」+ 双向展开钮。
+// 按用户拍板的形态：头段最底下是向下展开钮、尾段顶上是向上展开钮，中间省略号；
+// 各按一下多加载一块（连接预算，缺省 1MB），中间没货了 hub 回 met、块整体退休。
+// 点击在 main 的委托里（requestRange），这里只画。
+// 二稿竖排（2026-10-08 用户拍板「两枚按钮放一行太迷惑，中间隐藏了很多就该在
+// 布局上强调出来」）：向下展开钮一行、竖向点列、剩余量文案、再一段点列、
+// 向上展开钮一行。点列就是「中间真的很多」的布局强调，文案不再画首尾……；
+// 展开过不再报字节数（页面侧无法精确记账），只报条数。点击在 main 委托里，这里只画。
+function elideHtml() {
+  const e = S.elide;
+  if (!e) return '';
+  const size = e.bytes > 0
+    ? ' · 约 ' + (e.bytes >= 1024 * 1024
+        ? (e.bytes / 1024 / 1024).toFixed(1) + ' MB'
+        : Math.max(1, Math.round(e.bytes / 1024)) + ' KB')
+    : '';
+  return '<div class="eliderow">' +
+    '<button type="button" class="elide-btn" data-elide="dn" title="向下展开（加载更多）">' +
+      faIcon('chevdown', 12) + '<span>向下展开</span></button>' +
+    '<div class="elide-dots" aria-hidden="true"></div>' +
+    '<span class="elide-gap">中间还有 ' + e.rows + ' 条' + size + ' 未显示</span>' +
+    '<div class="elide-dots" aria-hidden="true"></div>' +
+    '<button type="button" class="elide-btn" data-elide="up" title="向上展开（加载更多）">' +
+      faIcon('chevup', 12) + '<span>向上展开</span></button>' +
+    '</div>';
 }
 function liveRowHtml(b) {
   const head = hostTag(b.host) + '<span class="t">' + hhmmss(Date.now()) + ' · 直播</span>';
@@ -473,7 +545,7 @@ function doingHtml(r) {
     // 拼在串里，每敲一个键整条时间轨跟着全量重画（IME 组合被打断=中文打不进；
     // 实测 web 侧栏投影中心）。
     '<textarea class="ihuman-text" data-seg="' + esc(r.seg) + '" rows="1" ' +
-    'placeholder="直接输入 · Enter 寄出 · Shift+Enter 换行"></textarea>' +
+    'enterkeyhint="enter" placeholder="直接输入 · Enter 换行 · Ctrl+Enter 寄出"></textarea>' +
     (draft.err ? '<div class="ihuman-note err">' + esc(draft.err) + '</div>' : '');
 }
 // 席位内联变量浮层的面板（DSH 投影窗 composer 同款构造；底部输入框退役后，

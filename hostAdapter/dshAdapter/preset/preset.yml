@@ -1,3 +1,0 @@
-﻿name: FEMO模式
-description: FEMO 多智能体脚本引擎。主模型可对话、写脚本、运行 FEMO脚本；FEMO 运行期间由引擎按角色组装 system prompt 驱动。
-order: 10

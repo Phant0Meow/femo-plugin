@@ -36,7 +36,8 @@ export interface ProjectionInputDeps {
   projections: ProjectionRegistry
   sessionsStore?: { get(id: SessionId): Session | undefined }
   /** 【2026-09-11】主会话不在 store 时按官方路径拉活（run-control 的
-   *  ensureSessionLive：agents.resume + 挂 FEMO_PRESET）。重启后主会话与投影窗
+   *  ensureSessionLive：agents.resume。2026-10-07 去预设后不再补挂预设/根路径段）。
+   *  重启后主会话与投影窗
    *  一起缺席，没有它 ensure 兜底只能空转（cwd 拿不到）→ 用户看到
    *  「404 窗不在 store」+ composer 报 session not found。 */
   ensureMainLive?: (mainSid: string) => Promise<Session | undefined>

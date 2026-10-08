@@ -26,6 +26,7 @@ import { readActorUsageFile } from '../actor-usage'
 import { handleCreateSession, handleRunOnSession, handleSaveScript, handleReadScript, collectLlmModels, ensureSessionLive } from '../run-control'
 import { forgetFemoFile, listFemoFiles, readLedgerFemoFile, rememberFemoFile } from '../femo-files'
 import { handleProjectionInput } from './projection-input'
+import { registerEngineGateway } from './engine-gateway'
 import { isNativeMode } from '../projection/windowing-native'
 import { handleDebugRun } from '../debug-run'
 import { registerHubProxy } from '../hub/hub-proxy'
@@ -61,6 +62,9 @@ export function registerRoutes(ctx: Context, deps: RoutesDeps): void {
     // 【2026-09-27 复接】刀⑤c-1（087cd3a）前台分家时误删了本调用——hub-view
     // 从此 404，投影窗锚行拿不到 hub 数据整窗空白（新旧版本全中，桌面 rc.2 实案）。
     registerHubProxy(resolved, runState, (spec) => webServer.register(spec))
+    // 【刀3（画布直连引擎，2026-10-05）】引擎地址发现 + 透明转发后备：画布
+    // 改直连常驻引擎后的两件薄插座（细则见 routes/engine-gateway.ts 头注）。
+    registerEngineGateway(resolved, (spec) => webServer.register(spec))
     // 【作者预留·2026-09-27 死代码审计已核】前端调用点已随侧栏按钮清零（2026-08-30），
     // 按档保留作编程式新建 Femo 会话入口（dshPatch/MEOW_MODIFICATIONS.md 明记保留）——非死代码，勿清。
     webServer.register({

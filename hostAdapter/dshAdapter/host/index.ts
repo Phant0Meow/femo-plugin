@@ -59,6 +59,7 @@ import { Config, resolveConfig, packageRoot } from './config'
 import { join } from 'node:path'
 import { FemoBridge } from './bridge'
 import { registerPersonaHooks } from './persona'
+import { installFemoSkill } from './femo-skill'
 import { registerSessionRoster } from './session-roster'
 import { createProjectionRegistry, awakenedDisposers, disposeProjectionWriters } from './projection/projection'
 import { installNativeWindowing, isNativeDshBuild } from './projection/windowing-native'
@@ -74,7 +75,6 @@ import { apiRetry } from './api-retry'
 import { activeChildRuns } from '../../../femo2host/host/subagent-core.mjs'
 import { disposeMainDeliveries, isMainActorNotice, isMainAnswerPending, mainActorSceneActor, pendingNodeName } from './main-actor'
 import { broker } from './node-retry'
-import { installFemoPreset, declareFemoPreset } from './preset-install'
 // 刀④抽出的三件：桥保姆（C1 自愈）/断电索引重建/主Agent工具执行依赖。
 import { installBridgeSupervisor } from './bridge-supervisor'
 import { rebuildJobIndexFromRecords } from './job-index'
@@ -118,13 +118,12 @@ export async function apply(ctx: Context, config: unknown): Promise<void> {
     console.log('[femo-plugin] disabled by config')
     return
   }
-  // 先于一切会话加载：把随插件打包的 FEMO preset 供给两代预设机制——
-  // 旧制镜像到 dsh home 的 .agent-presets/femo-plugin/（文件系统发现的
-  // 宿主如 meow fork 扫它），新制向 agentPresets 注册表程序化注册
-  // （0.1.7-rc.2 官方版不再读那个目录；分流是行为探测不是版本比对，
-  // 见 preset-install.ts 头注）。两件都做，菜单里才有「FEMO模式」可选。
-  console.log(`[femo-plugin] preset install: ${installFemoPreset(resolved.femoRoot)}`)
-  declareFemoPreset(ctx, resolved.femoRoot)
+  // 【2026-10-07 去预设】FEMO 教条从「FEMO模式」预设的 persona 行搬进一个
+  // **skill**：任何会话、任何预设都能用（模型自己发现并加载，或用户敲 /femo），
+  // 同时全局挂两段提示——femo:root（根路径一行）与 femo:tips（一句话说清本会话
+  // 有 femo-* 工具、要写/跑剧本就载入教条）。工具本身早就全局注册（tools.ts）。
+  // 不再向预设名册注册/镜像任何预设：本插件不再需要选模式才能用。
+  installFemoSkill(ctx, resolved.femoRoot)
   // 全局默认模型选择（用户在模型选择 UI 保存的推理等级在这里）；
   // 子 agent 不走 apiproxy 的 selection 安装，需要手动注入。
   const defaultModel = ctx.get('agentDefaultModel') as
@@ -239,8 +238,8 @@ export async function apply(ctx: Context, config: unknown): Promise<void> {
   // 身份钩子（preset override 重建 + docs section 补注入/清除）。
   registerPersonaHooks(ctx, resolved.femoRoot)
 
-  // FEMO 会话名册（2026-09-21 主会话面板）：冷扫描 + 说话即绑 + 选预设入册。
-  // 必须在 registerPersonaHooks 之后——presetOf 判定依赖 persona 先建的 override 表。
+  // FEMO 会话名册（2026-09-21 主会话面板）：冷扫描 + 说话即绑。
+  // 必须在 registerPersonaHooks 之后——身份轴（femoIdentity）的根目录在那一步注入。
   registerSessionRoster(ctx, resolved.femoRoot)
 
   // 运行期总调度：pre-step 门卫 + 输入桥 + 上帝窗实时镜像 + 引擎事件 switch

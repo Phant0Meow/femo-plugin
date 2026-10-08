@@ -448,11 +448,17 @@ def build_stage(args, femo_root, mailbox, mail_courier, projection_hub,
 
     def _hub_display(job_id, payload):
         """带括号显示名进 hub（ai_request 现场）：菜单派工瞬间即长出括号。
-        执行者名 = 引擎事件里的 actor_name（2026-09-19 由 ai_name 正名而来，旧名已删）。"""
+        执行者名 = 引擎事件里的 actor_name（2026-09-19 由 ai_name 正名而来，旧名已删）。
+        角色↔soul 映射同拍登记（2026-10-06）：actor_info.soul 是引擎解析剧本
+        actors 区的唯一出口——hub 视角菜单的宿主标签经它换算本场选角账定格
+        的宿主（「soul 实际绑在哪个 host 就显示哪个」）；解析权在引擎，桥只
+        捎带，不另起第二份剧本解析。"""
         if hub is None:
             return
         try:
-            hub.remember_display(job_id, payload.get('actor_name'))
+            info = payload.get('actor_info') or {}
+            soul = str(info.get('soul') or '').strip() or None
+            hub.remember_display(job_id, payload.get('actor_name'), soul=soul)
         except Exception as exc:
             sys.stderr.write(f"femo_bridge: hub display failed: {exc}\n")
 
@@ -809,23 +815,36 @@ def build_stage(args, femo_root, mailbox, mail_courier, projection_hub,
         编译警告原先只是 job_start/job_resume 响应字段——用户按钮启动运行/续跑时
         主模型零感知。现补成滞留件（subkind=warning），随本 Job 的终局急件一起
         放行打包送达（dsh 代取/zcode 到站取，同一条信）。warnings 元素
-        {where?, message}（femo_api 编译警告桶）；产信失败只记 stderr，不挡启动运行。"""
-        if mailbox is None or not isinstance(warnings, list):
+        {where?, message}（femo_api 编译警告桶）；产信失败只记 stderr，不挡启动运行。
+        【事件流同拍产信（2026-10-05 画布直连刀1.5）】同一批警告向事件通道多发
+        一条 compile_warnings（{job_id, warnings}，形状照 dsh 宿主原来的合成
+        广播帧）——画布改直连引擎后宿主合成够不着它，编译器警告自此单源在
+        引擎；dsh run-control 的两处合成广播随刀退役（观察期）。"""
+        clean = []
+        if isinstance(warnings, list):
+            for w in warnings:
+                if isinstance(w, dict) and str(w.get('message', '')).strip():
+                    entry = {'message': str(w.get('message', '')).strip()}
+                    if str(w.get('where', '') or ''):
+                        entry['where'] = str(w.get('where'))
+                    clean.append(entry)
+        if clean:
+            try:
+                emit({'type': 'event', 'event': 'compile_warnings',
+                      'data': {'job_id': job_id, 'warnings': clean}})
+            except Exception as exc:
+                sys.stderr.write(f"femo_bridge: compile_warnings emit failed: {exc}\n")
+        if mailbox is None or not clean:
             return
         # 身份契约（A4）：送货上门与否看门（桥自家铃/daemon 门铃注册表）
         who_move = _who_move(_job_host(job_id))
-        for w in warnings:
-            if not isinstance(w, dict):
-                continue
-            message = str(w.get('message', '')).strip()
-            if not message:
-                continue
+        for w in clean:
             where = str(w.get('where', '') or '')
             try:
                 mailbox.post(
                     job_id=job_id, soul='main', kind='notice',
-                    payload=(f"编译警告（{where}）：{message}" if where
-                             else f"编译警告：{message}"),
+                    payload=(f"编译警告（{where}）：{w['message']}" if where
+                             else f"编译警告：{w['message']}"),
                     action='receive', delivery='held', who_move=who_move,
                     who_require='system_require', target_host=_job_host(job_id),
                     node=where or None, subkind='warning')
@@ -889,6 +908,11 @@ def build_stage(args, femo_root, mailbox, mail_courier, projection_hub,
                 pass
 
         _retry_tick = 0
+        # 出站投递瞬时错误的重投上限（2026-10-07，j2717 文件锁吞信事故）：
+        # OSError 族（文件被占/Permission denied——同步盘/杀毒/索引器扫过
+        # user_data 的一瞬）按「下一秒就自愈」对待，退回信柜退避重投；
+        # 到顶才记死信。非 OSError（真 bug）维持一步死信响亮留痕。
+        _HANDIN_RETRY_MAX = 8
         while True:
             _time.sleep(0.5)
             try:
@@ -924,6 +948,9 @@ def build_stage(args, femo_root, mailbox, mail_courier, projection_hub,
                         _trace(f"poll skip kind={x.get('kind')} "
                                f"ref={x.get('ref')} id={x.get('id')}")
                         continue
+                    # ── 第一段：备料 + 喂引擎。只有这一段的错才配「退回重投」——
+                    # 此时信还没进引擎，重投是纯收益（2026-10-07 j2717 文件锁吞信
+                    # 事故的裁决正身）。
                     try:
                         body = x.get('body') if isinstance(x.get('body'), dict) else None
                         if body is None:
@@ -946,44 +973,73 @@ def build_stage(args, femo_root, mailbox, mail_courier, projection_hub,
                         _trace(f"handin→engine ref={x['ref']} soul={x.get('soul')} "
                                f"job={x.get('job_id')} body_keys={sorted(body.keys())}")
                         _handin_out = jm.deliver_human_input(int(x['job_id']), x['ref'], body)
-                        _delivered = (isinstance(_handin_out, dict)
-                                      and _handin_out.get('delivered') is True)
-                        _poll_log(f"handin ref={x['ref']} job={x.get('job_id')} "
-                                  f"delivered={_delivered} out={str(_handin_out)[:100]}")
-                        if not _delivered:
-                            # 【刀0 诚实闸 2026-09-26】喂不进：死信终态留档，不销账、
-                            # 不投影。旧代码在此无条件 mark_consumed + on_post_speech
-                            # ——「引擎压根没收到」在账面上与「收到了」无法区分
-                            # （2471 僵死 15min 的静默点），拒收台词还上墙冒充真台词
-                            # （job 2585 鬼影段实锤）。死信不回炉：引擎等待超时与
-                            # 续跑是既定裁决，被捞出的信别人也不会再来捞。
-                            _trace(f"handin FAILED ref={x['ref']} "
-                                   f"out={str(_handin_out)[:160]} ← 死信留档")
-                            mailbox.mark_dead(x['id'], reason=str(_handin_out))
-                            sys.stderr.write(f"femo_bridge: speech letter DEAD "
-                                             f"(job={x['job_id']} ref={x['ref']}) "
-                                             f"out={str(_handin_out)[:160]}\n")
-                            continue
-                        _trace(f"handin ok ref={x['ref']}")
-                        mailbox.mark_consumed(x['id'])
-                        if projector is not None:   # 幕布：引擎真吃了才投影（best-effort）
-                            try:
-                                rows = projector.on_post_speech({
-                                    'job_id': x.get('job_id'), 'wait_key': x.get('ref'),
-                                    'soul': x.get('soul') or 'main', 'node': x.get('node'),
-                                    'payload': x.get('payload'),
-                                    'body': body,
-                                })
-                                if rows:
-                                    _hub_feed(int(x['job_id']), rows)
-                            except Exception as exc:
-                                sys.stderr.write(f"femo_bridge: hub project failed: {exc}\n")
-                        sys.stderr.write(f"femo_bridge: speech consumed "
-                                         f"(job={x['job_id']} ref={x['ref']})\n")
                     except Exception as exc:
+                        # 【瞬时错误退回重投（2026-10-07，j2717 文件锁吞信事故）】
+                        # OSError 族按「下一秒就自愈」对待：退回信柜退避重投，
+                        # 重试次数随信携带（handin_retries），到顶才记死信；
+                        # 其余异常（真 bug）维持一步死信响亮留痕。delivered=False
+                        # 的诚实拒收（job_not_active 等）不进此支——刀0 裁决不变。
+                        # 【护栏只到喂引擎（2026-10-08，j2719 human_26 实案）】旧法
+                        # 一个 try 罩到收尾记账：投喂已成功、其后 mark_consumed 撞
+                        # 文件锁（mailbox.json.tmp replace WinError 5）也落进这条
+                        # except，把已送达的信退回重投、同一句台词喂了引擎两遍。
+                        # 重投判据从此只看喂引擎这一步的错。
+                        if isinstance(exc, OSError):
+                            _retries = int(x.get('handin_retries') or 0) + 1
+                            if _retries <= _HANDIN_RETRY_MAX:
+                                _delay = min(5 * _retries, 30)
+                                mailbox.requeue(x['id'], reason=str(exc), delay_sec=_delay)
+                                _poll_log(f"handin ref={x['ref']} job={x.get('job_id')} "
+                                          f"transient_error={exc!r} retry={_retries}/{_HANDIN_RETRY_MAX} in {_delay}s")
+                                sys.stderr.write(f"femo_bridge: handin transient error "
+                                                 f"(job={x['job_id']} ref={x['ref']}): {exc} "
+                                                 f"— 退回信柜，{_delay}s 后第 {_retries}/{_HANDIN_RETRY_MAX} 次重投\n")
+                                continue
                         mailbox.mark_dead(x['id'], reason=f'exception: {exc}')
                         sys.stderr.write(f"femo_bridge: speech letter dead "
                                          f"(job={x['job_id']} ref={x['ref']}): {exc}\n")
+                        continue
+                    _delivered = (isinstance(_handin_out, dict)
+                                  and _handin_out.get('delivered') is True)
+                    _poll_log(f"handin ref={x['ref']} job={x.get('job_id')} "
+                              f"delivered={_delivered} out={str(_handin_out)[:100]}")
+                    if not _delivered:
+                        # 【刀0 诚实闸 2026-09-26】喂不进：死信终态留档，不销账、
+                        # 不投影。旧代码在此无条件 mark_consumed + on_post_speech
+                        # ——「引擎压根没收到」在账面上与「收到了」无法区分
+                        # （2471 僵死 15min 的静默点），拒收台词还上墙冒充真台词
+                        # （job 2585 鬼影段实锤）。死信不回炉：引擎等待超时与
+                        # 续跑是既定裁决，被捞出的信别人也不会再来捞。
+                        _trace(f"handin FAILED ref={x['ref']} "
+                               f"out={str(_handin_out)[:160]} ← 死信留档")
+                        mailbox.mark_dead(x['id'], reason=str(_handin_out))
+                        sys.stderr.write(f"femo_bridge: speech letter DEAD "
+                                         f"(job={x['job_id']} ref={x['ref']}) "
+                                         f"out={str(_handin_out)[:160]}\n")
+                        continue
+                    _trace(f"handin ok ref={x['ref']}")
+                    # ── 第二段：收尾记账，各兜各的错，一律不退回重投——信已进
+                    # 引擎。清账失败只是死账留柜（出站口只捞 pending，绝不会因此
+                    # 再喂第二遍），响亮留痕，等信柜滚动清理收殓。
+                    try:
+                        mailbox.mark_consumed(x['id'])
+                    except Exception as exc:
+                        sys.stderr.write(f"femo_bridge: mark_consumed failed "
+                                         f"(letter {x['id']} stays delivered, no requeue): {exc}\n")
+                    if projector is not None:   # 幕布：引擎真吃了才投影（best-effort）
+                        try:
+                            rows = projector.on_post_speech({
+                                'job_id': x.get('job_id'), 'wait_key': x.get('ref'),
+                                'soul': x.get('soul') or 'main', 'node': x.get('node'),
+                                'payload': x.get('payload'),
+                                'body': body,
+                            })
+                            if rows:
+                                _hub_feed(int(x['job_id']), rows)
+                        except Exception as exc:
+                            sys.stderr.write(f"femo_bridge: hub project failed: {exc}\n")
+                    sys.stderr.write(f"femo_bridge: speech consumed "
+                                     f"(job={x['job_id']} ref={x['ref']})\n")
             except Exception as exc:
                 sys.stderr.write(f"femo_bridge: mailbox poll failed: {exc}\n")
 

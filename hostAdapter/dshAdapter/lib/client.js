@@ -1744,15 +1744,15 @@ function registerProj2Nodes(register) {
 }
 
 // client/client-ui/editor-view.tsx
-var import_react21 = require("react");
+var import_react22 = require("react");
 
 // client/client-ui/editor-page.tsx
-var import_react20 = require("react");
-var import_react_dom2 = require("react-dom");
+var import_react21 = require("react");
+var import_react_dom3 = require("react-dom");
 var import_client = require("react-dom/client");
 
 // ../../femoGen/src/FemoWorAuto.jsx
-var import_react19 = __toESM(require("react"), 1);
+var import_react20 = __toESM(require("react"), 1);
 
 // ../../femoGen/src/common.jsx
 var import_react6 = __toESM(require("react"), 1);
@@ -1764,6 +1764,11 @@ var FEMO_THEMES = [
   { id: "dsh-dark", name: "DSH \u6DF1\u8272", desc: "dsh \u672C\u4F53\u9ED1\u591C\u8BBE\u8BA1\u8BED\u8A00\uFF08\u6DF1\u8272 bluish \u5C42\u7EA7 + \u4EAE\u8272\u72B6\u6001\uFF09" },
   { id: "web", name: "\u7FE1\u7FE0", desc: "\u6DF1\u8272\u73BB\u7483 + \u7FE1\u7FE0\u7EFF\u4E3B\u7D2B\u8F85 + \u7CFB\u7EDF\u5B57\u4F53 + \u6309\u538B\u7F29\u653E\uFF08\u6E90\u81EA webAdapter \u64CD\u4F5C\u53F0\u8BBE\u8BA1\u8BED\u8A00\uFF09" }
 ];
+var FONT_FACE_CSS = `@font-face {
+  font-family: 'MyCustomFont';
+  src: url('data:font/truetype;charset=utf-8;base64,AAEAAAAOAIAAAwBgT1MvMrqEc+EAAAFoAAAAYGNtYXAAP9gfAAAB2AAAAJRjdnQgAAAAAAAAApQAAAAIZnBnbfQN3xMAAAJsAAAAEWdhc3AANwAJAAAQmAAAABBnbHlme2HGKwAAAqwAAA1GaGVhZB83mg0AAADsAAAANmhoZWEIAQNEAAABJAAAACRobXR4BF8ATAAAAcgAAAAQbG9jYQspBsUAAAKcAAAADm1heHAIHgF2AAABSAAAACBuYW1lBN0dQgAAD/QAAACCcG9zdP+VADIAABB4AAAAIHByZXBihu4KAAACgAAAABMAAQAAAAGzM2NUXWhfDzz1AAMEAAAAAADWQe6JAAAAAOXetOcADP9XA/MDGgAAAAQAAgAAAAAAAAABAAADNP80AMwEAAAMAA0D8wABAAAAAAAAAAAAAAAAAAAAAgABAAAABgF1ABUAAAAAAAEAAAAAAAIAAAgAAAAAAAAAAAMD/wGQAAUACAIAAgAAAAAAAgACAAAAAgAAMwEEAQUCAgUAAAAAAAAAAAAAAAoAAAAAAAAAAAAAAFdGRyAAQGEx//8DNP80AMwDNADMAAAAAQAAAAABuAKjAAAAIAAAAAAAAAQAACQAOwAMACQAHAAAAAIAAAAEAAAAFAADAAoAAABIAAwAAAAAADQAAAAAAAAAAwACJfwAAiX8AAAAAQACckkAAnJJAAAAAgAC1soAAtbKAAAAAwAMAAAAAABMAAAAAAAAAAUAAGExAABhMQAAAAUAAiX8AAIl/AAAAAEAAnJJAAJySQAAAAIAAtbKAALWygAAAAMAAyw8AAMsPAAAAASxAQAsAC+wAOYtLAEvsALmLQAAALBAS1JYuQH/AAAbuQAAAABZjYUAAAAAAAAAAAAAAAAAAMsBmwO7BSoGowAAAAYAJP9gA78DDAAUADwARABZAHEAiAAAARYXFhcWFxYXFhUGIyInJicmJyYnBxchNxYXFhUUBxUWFxYVFCMhBgcGBwYHBgcGByc2NzY3Njc2NzY1NhchNzUnIRUUJTMUBwYHBgcGBwYjIjU0NzY3Njc2ExYXFhUUBwYHERQXFhUUIyI1NDc2NRE0FxYXFhcWFxYVFAcGIyInJicmJyYnJicCYxwUFgsLBwQDAwIbBAMEDA4PEBudOQF2HSUQBycOCwYI/joCBAQODBQQHBcqDRwTFA0QCwwFCAEuAXUNAv6C/pAXCgYMCA8ICQcJGwUZEBIIC1U4Jg0NEhgBAiAXAgJjFhATCwwEBAUHCwYEBQMECQkLCxIDDBIUEQ4MCAgIBwgoBAUdHRcZHoQkKBcUBwcJFuIKCAQEESkkPz81LCgjICEIHSEdIiUxOjtPYa/bDPQE2Bb2WzwtIiATDQYIGQcIJiIlKi4BEAcPBgkIBAkC/O8WCBILIRAWISMaAtQ2lSIjHx4eFhYUEgoMCAYdJiMjICAlAAAEADv/YAPIAwEATQBRAFYAlQAAExczNTQnFhcWFRQHBgcVMzcWFxYVFAcVFhcWFRQjIRU2NyYnJic3FhcWFxYXFhcWFQYjIicmJyYnBgcGBwYjIicWMzI3NSMVFAcGIyI1NzM1IyEVITc1ARYzITU0JxYXFhUUBwYHFSE3FhcWFRQjIRUzNxYXFhUUIyEVITcWFxYVFCMhBgcnFjMhNSMGBycWMzM1IQYHvz3nBDolDg4TGPwgJRAIKAwKBQj+vKZ7BQQdMwwvIyQVEwoIBAUBFAgFBxgLDGm/x84HBAwkKF2JhfMNDgkNMfPzASMBAAX9RyxJARgFLR0KBwsNAQAwJB8JDf6RwywkIAgL/tABMDAkHwkN/PRGGRUsSAE92UYaEytI2f7oRxkBKSAoNRsHDwYICQQKAjsrFhQHBgoWbAkIAwQRjwkNBQUeJQ0aGhkSEQsMCgkKHQUFJRIODxIVBB1UAwaRHwkGBg1DiIgEhAHBDBA1GwgJBQcFAwcEMDQcGQUHD1gwGhcFBhFjMxsZBQYRAQMsC2MBAywLWAEDABUADP9fA/MDBAAEAAkAGgAsAEYATgBlAIgAlwClAKoAuADLAOMA9QEcASoBOwFLAVwBdAAAARUxITUFFTEhNQEWFRQHFRQXFhUUByI1NSc3JRYXFhcWFRQjIicmJyYnJic3NxYXFhUUBwYjBgcGBwYHBgcnNjc2NzY3NjcFFjMhFSEiBxcXBwYHBgcGBwYjIjU0NzY3Njc2NzY3BRYXFhUUBwYHBgcGBwYHBiM0JyYnNxYzMjc2NzY3Njc2NycDFBcWFRQjIjU0NzY1ETMDNjczBgcGBwYHJzY3NgEVMSE3NxYXFhUUBwYHFSM1NCcXFhcWFRQHBgcGBwYHJzY3NjcnJRcWFRQHBgcGBwYHBiMiNTQ3Njc2NzY3FzMGBwYHBgcGByc2NzY3Njc2BxYXFhcWFRQHBgcGBwYjNCcmJyYnNxYzMjc2NzY3NjU0JyYnJic3FxcGBwYHBgcnNjc2NzYXNjc2NzY3FhUUIyInBgcGBwcXBwYHBgcGByc2NzY3NjcXJyYnNxYXFhcWFwcmByYnJgMjBgcnFjsGNxYXFhUUKwQBr/7XAUH+mwFTMh4BASIQCCT+zSkXFAoHFwYFBAYNDhAbDeUvJAcMFRIKCwwNDQ4LFRISDQ8NDAgDAv7TI0ABJ/7ZRQ4pPhALCwsSBQMEIBgDBAkRDQgJCAIBXCMTCCcFCgoLCg0OEA4IBwgxByoZCAYGBAUGBwQFAw2DAgEhGgQEMGsaCjkMJCY8MT0NOywwAwr+hQKTPCcNDRQYMAfiIxwDExAPDBASEREOCQkEA/6nDQIEBAgGCgcJCAYZCxkKDAYHAag2DykjHSMnLCQLJiAiGyUWFSo2Hx4PDw4JEhAfGhoGBAsVKgVVGQ0LCggJBQUKDBgaMBc1GRgcKCgwMg0rKSYeJEokGxgXGhY+EwwIGCklQAwZHRI1NzVGMgxDNDMxJCFFGBclDyQkOCgoPwQrCzAhItMCIRYSJh8UKiwVGWMsIB8IDsQbJC0BqBgYqBgYAXQlDwkQixcHBwkVBgvaGCSIGBkUFA0OJAUDECUXFxsSCA4TBwUJBQcSEhIPEgwMDw4VFRgbHB0ND60HGAZkJhhDJicrEQUTCwQEBRUlMyktKR6qFhMJBQwPQCsvFRQICwYGDggLGRgPAwIGCBISJCI4GP7CFwgRDCISFSEiGgJg/kwwMC1DRD00JxMwNTgCNRkZdwgPBgkKBAkCRTM2G1YaHAQDBwUDAwsNDQoNDw4ODBg2AxcVHh0bExEJCwMEEgkLHhUTGRgnzhoqIA8ZERUHEQ4RERYWGRZEPjs4Pjw9OicmGRQMDBsGCQUOChUZBwcODx8gH0E3NTU8PwtXJCYUIxQbDxIQGBgdJhwXFxgbJCUpDQsFHCEiHhMrKRsrKBsdDxUYHR4qHy4lJyxJCzouRCEjHRMEIR8mJgGIAgQoCjQbGgUGDAAABwAk/1cD3AMaACkALwA1ADkAPQCIAPwAABMUFwYHBiMmNzY3NSYnJjcyFzMyNzc2FxYXFgcGBwYVFRYXFAcGJyY3NyYVMzUjFRczNjc1IycjFTsCNSMDNicmNzYXFhcWBwYjIgcGBzM2Nzc2FxYHBhUGBwYHBjUmJyYnJjc2FxY3Njc2NyMGBwYHBgcGJyY3Njc2NyMGBwYnJicmNzYXFjMlFRQXFgcHBjc2NzUHERYXFjMzMjc2NzYXFhUGFxYXFgcGIyMiJyY1ESMGBwYnJicmNzY3NzU0JyYXFhcWBwYHBhUVNzUmJyYXFhcWBwYHBhUVNzY3NzY3FhcWFQYHIgcGFwYHBgcGJyYnJjc2FxY3Njc2N7UBASUIBAYBBAMBBgIDASfvDAcZBQkfFgcJEQkIAQcKLQQEAQL5aWiYYQIBZDBoaDBkZEMJAQEEBActJAcBARIOBwYJWQsEFwYJRAwfEAYOUggEDQ8yDwECDGwPFgYFBHwJHh8yMFESCQQObzsWFFUqHwkBBQ8IBAQHJi4CTwECBCoNAQYBSAENDRiiHRAZEwIKCgUKBwoGBzpakzUVGAYlDAUDEBUKDxsuFgQBCjUTDRAPBAdIAQQCDDYSDhAQBAdyCgMPAQQKQgYCDQUBGgECHBQuBwEENwoBAwtECRQHCgEBgxANDxkEARNkapwgLgoBHwcaBwYXEwgBAwkJCqREYw0GGgECECZWN4ULeis0JqyNjf4fPzYHAwIBDA8DBgYJBUgBBCAKCjsGCw/LK0MiBAYWDA0KAgoKAwsSE3VhNFA9SjY5KwsKDApUeCpmAQYDCRINBwQDBAm8mjo8VwMbChWFW4Uq/oEcDQ4QFHsOAQENUxYTBAUHQhgZKwFyEBIGBhUGBwUEFQqgTjAQAxIHCAkJCRI9iymyUDARBBEKBwkIChM9nDkFByQFAQEnBQQGBAMJRfcrHxMCBxcbBggHAgMJEDBOtAAGABz/ZAPUAwkAFQBEAIsAogDuAQUAABMzFRQHBgcGBwYHBiMiNTQ3Njc2NzYTFhcWFRQHBgcVFhcWFxYXFhUUBwYjIicmJyYnJicmJxEUFxYVFCMiNTQ3NjURNCUWFxYXFhcWFRQHBgczNxYXFhUUIyERFAcGBwYHBgcGByc2NzY3Njc2NzY3BgcGBxQjIic2NzY3Njc1NCcXMyYnJicmJyYnBRYXFhcWFxYVFAcGIyInJicmJyYnJiclFhcWFRQHBiMGBzM3FhcWFRQjIwYHBgczNxYXFhUUIyMGBwYHBgcGBwYHJzY3Njc2NzY3IwYHJxYzMzY3NjUjBgcGByc2NzY3Njc2ExYXFhcWFxYXFhUUIyInJicmJyYnJidfDQUDCAUICAgGBhcKFgsLBgVHOCYNDRIZGBIZDhAGBgYICwcFBgUGDAwPBwkCAiAXAgIB2xcREwwMBQQGBASDLCQfCQ3+MQsFERAXFiEdNA0kGhkSFA4QBgkCEQ8bJQgFNh0hHhsVFwQ5xgUDBAkJDAoS/tAWExQMDgQFBQgMBgQEAwULCQsLFAEoLSEGEBMJCgy+LCEcCA2TAQcDBVwsJB8JDc4EBRAaHR8oNC9AC1osKSIhEwsHP0cZFSxJRQICB2UNDxMYERQNCgsKBwanNSgqFxgKCgMEEAcHCBAVGhkfHiUCKTcmIyIYEw0OBAUQCw4lGhggHgETBw8GCQgECQKWERMTEhIODQ0RCwwGAxQYGBYVCgr9qBYIEgshERUhIxoC0DYXDxAODQ4JCgkUCwcCMBoXBgYP/tdGPTc5LiciIRwdCRgeGR4hLDE0OkAUEx0hKEMLExEUDxQG4YcjAw8VEhIREBTBEhUREhANDQwPCQwFBBIWFhUTExcPDxEGBggDBCkkLBYXBQURSDkfGDAYGQQGERMPOy4xJSggHxgVJycjMDE5HSMBAywMDQ05ZSgfIyUHKyUhKCgkIP5kIiQnHhwTDw8OChQGBRspIiQjIR4AAAAAAAYATgADAAEECQABAA4AAAADAAEECQACAA4ADgADAAEECQADAA4AAAADAAEECQAEAA4AAAADAAEECQAFABgAHAADAAEECQAGAA4AAABGAFMAdQBuAGcALQAyAFIAZQBnAHUAbABhAHIAVgBlAHIAcwBpAG8AbgAgADEALgA3ADAAAAADAAAAAAAA/5IAMgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAIAAIAMAAB//8AAw==') format('truetype');
+  font-display: swap;
+}`;
 var THEME_CSS = `
 /* \u2550\u2550 \u6D45\u8272\u4E3B\u9898\uFF08\u9ED8\u8BA4\uFF09\uFF1A\u5168\u90E8 token \u2550\u2550 */
 :root, [data-femo-theme] {
@@ -1912,10 +1917,13 @@ var THEME_CSS = `
   --femo-border-w-accent: 3px;       /* \u5DE6\u4FA7\u5F3A\u8C03\u8FB9\uFF08\u5217\u8868\u9009\u4E2D/\u9519\u8BEF\u6761\uFF09 */
   --femo-border-w-node: 4px;         /* \u8282\u70B9\u5DE6\u4FA7\u7C97\u8272\u6761 */
 
-  /* \u2500\u2500 \u5B57\u4F53\u65CF\uFF08\u4E3B\u9898\u53EF\u6574\u4F53\u6362\u5B57\u4F53\uFF09\u2500\u2500 */
-  --femo-font-sans: 'DM Sans', 'MiSans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --femo-font-mono: 'JetBrains Mono', monospace;
-  --femo-font-body: 'DM Sans', 'MiSans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; /* \u72EC\u7ACB\u6A21\u5F0F body \u56DE\u9000\u5B57\u4F53 */
+  /* \u2500\u2500 \u5B57\u4F53\u65CF\uFF08\u4E3B\u9898\u53EF\u6574\u4F53\u6362\u5B57\u4F53\uFF09\u2500\u2500
+     \u6BCF\u6761\u5B57\u4F53\u94FE\u9996\u4F4D\u653E 'MyCustomFont'\uFF08\u751F\u50FB\u5B57\u8865\u5B57\u5B57\u4F53\uFF0C\u5B9A\u4E49\u89C1 styles/font.css\uFF09\u2014\u2014
+     CSS \u9010\u5B57\u56DE\u9000\u53EA\u8BA4\u5143\u7D20\u58F0\u660E\u6E05\u5355\uFF0C\u4E0D\u8FDB\u94FE=\u6C38\u8FDC\u7528\u4E0D\u4E0A\uFF1B\u5B83\u53EA\u6620\u5C04 5 \u4E2A\u751F\u50FB\u7801\u4F4D\uFF0C
+     \u94FE\u9996\u547D\u4E2D\u51FA\u5B57\u5F62\u3001\u547D\u4E0D\u4E2D\u6ED1\u843D\u540E\u9762\u7684\u5B57\u4F53\uFF0C\u4E0D\u622A\u80E1\uFF082026-10-08 \u88C1\u51B3\uFF0C\u89C1 AGENTS.md \xA7\u516B\uFF09\u3002 */
+  --femo-font-sans: 'MyCustomFont', 'DM Sans', 'MiSans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --femo-font-mono: 'MyCustomFont', 'JetBrains Mono', monospace;
+  --femo-font-body: 'MyCustomFont', 'DM Sans', 'MiSans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; /* \u72EC\u7ACB\u6A21\u5F0F body \u56DE\u9000\u5B57\u4F53 */
 
   /* \u2500\u2500 \u753B\u5E03\u80CC\u666F\uFF08\u4E3B\u9898\u53EF\u6362\u70B9\u9635/\u7F51\u683C/\u7EAF\u8272\uFF09\u2500\u2500 */
   --femo-canvas-dots: radial-gradient(circle, var(--femo-canvas-dot) 1.2px, transparent 1.2px);   /* \u684C\u9762\u753B\u5E03\u70B9\u9635\uFF08\u989C\u8272\u5D4C\u5957\u8054\u52A8\uFF09 */
@@ -1993,10 +2001,10 @@ var THEME_CSS = `
   --femo-border-w-accent: 2px;
   --femo-border-w-node: 3px;
 
-  /* \u2500\u2500 \u5B57\u4F53\uFF1ADM Sans\uFF08\u62C9\u4E01\uFF09+ MiSans\uFF08\u4E2D\u6587\uFF0Cround11 \u6362\u6389\u7CFB\u7EDF\u96C5\u9ED1\uFF09\u2500\u2500 */
-  --femo-font-sans: 'DM Sans', 'MiSans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  --femo-font-mono: 'SF Mono', 'JetBrains Mono', 'Fira Code', Consolas, 'Liberation Mono', Menlo, Courier, 'PingFang SC', 'Microsoft YaHei';
-  --femo-font-body: 'DM Sans', 'MiSans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  /* \u2500\u2500 \u5B57\u4F53\uFF1ADM Sans\uFF08\u62C9\u4E01\uFF09+ MiSans\uFF08\u4E2D\u6587\uFF0Cround11 \u6362\u6389\u7CFB\u7EDF\u96C5\u9ED1\uFF09+ MyCustomFont\uFF08\u751F\u50FB\u5B57\u8865\u5B57\uFF0C\u94FE\u9996\u9010\u5B57\u56DE\u9000\uFF09\u2500\u2500 */
+  --femo-font-sans: 'MyCustomFont', 'DM Sans', 'MiSans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --femo-font-mono: 'MyCustomFont', 'SF Mono', 'JetBrains Mono', 'Fira Code', Consolas, 'Liberation Mono', Menlo, Courier, 'PingFang SC', 'Microsoft YaHei';
+  --femo-font-body: 'MyCustomFont', 'DM Sans', 'MiSans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
 
   /* \u2500\u2500 \u6EDA\u52A8\u6761 8px\uFF08dsh \u89C4\u8303\uFF09\u2500\u2500 */
   --femo-scrollbar-w: 8px;
@@ -2352,10 +2360,10 @@ var THEME_CSS = `
   --femo-radius-top: 14px 14px 0 0;
   --femo-radius-bubble: 10px 10px 10px 3px;
 
-  /* \u2500\u2500 \u5B57\u4F53\uFF1Aweb \u7CFB\u7EDF\u6808\uFF08\u63A7\u5236\u53F0\u4E0D\u505A\u54C1\u724C\u5B57\u4F53\uFF0Csystem-ui \u76F4\u51FA\uFF09\u2500\u2500 */
-  --femo-font-sans: system-ui, 'Segoe UI', 'MiSans', 'Microsoft YaHei', sans-serif;
-  --femo-font-mono: ui-monospace, Consolas, 'JetBrains Mono', monospace;
-  --femo-font-body: system-ui, 'Segoe UI', 'MiSans', 'Microsoft YaHei', sans-serif;
+  /* \u2500\u2500 \u5B57\u4F53\uFF1Aweb \u7CFB\u7EDF\u6808\uFF08\u63A7\u5236\u53F0\u4E0D\u505A\u54C1\u724C\u5B57\u4F53\uFF0Csystem-ui \u76F4\u51FA\uFF09+ MyCustomFont\uFF08\u751F\u50FB\u5B57\u8865\u5B57\uFF0C\u94FE\u9996\u9010\u5B57\u56DE\u9000\uFF09\u2500\u2500 */
+  --femo-font-sans: 'MyCustomFont', system-ui, 'Segoe UI', 'MiSans', 'Microsoft YaHei', sans-serif;
+  --femo-font-mono: 'MyCustomFont', ui-monospace, Consolas, 'JetBrains Mono', monospace;
+  --femo-font-body: 'MyCustomFont', system-ui, 'Segoe UI', 'MiSans', 'Microsoft YaHei', sans-serif;
 
   /* \u2500\u2500 \u5B9E\u5FC3\u6309\u94AE\uFF1A\u5BF9\u9F50 webAdapter \u4FA7\u680F\u300C\u7075\u9B42\u5E2D\u4F4D\u300D\u8FD0\u884C\u63A7\u5236\u7684\u8BED\u8A00\u2014\u2014
      \u552F\u4E00\u4E3B\u64CD\u4F5C=web \u7EFF\u5B9E\u5E95 + \u6DF1\u7EFF\u9ED1\u5B57\uFF08\u7EFF\u6E10\u53D8\u7684\u5B9E\u8272\u7B49\u4EF7\u6863\uFF09\uFF1B\u6B21\u8981\u52A8\u4F5C
@@ -2568,6 +2576,11 @@ var ErrorBoundary = class extends import_react6.default.Component {
   }
 };
 var FontStyle = ({ scoped = false }) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("style", { children: `
+    /* \u751F\u50FB\u5B57\u8865\u5B57\u5B57\u4F53\uFF08character_need\uFF0C\u6570\u636E\u5185\u5D4C\uFF09\uFF1A\u5B57\u4F53\u94FE\u5355\u6E90\u2014\u2014\u6BCF\u6761 --femo-font-*
+       \u94FE\u9996\u90FD\u662F 'MyCustomFont'\uFF08themes.js\uFF09\uFF0C\u53EA\u6620\u5C04 5 \u4E2A\u751F\u50FB\u7801\u4F4D\u3001\u9010\u5B57\u56DE\u9000\u4E0D\u622A\u80E1\u3002
+       2026-10-08 \u88C1\u51B3\uFF1A@font-face \u5FC5\u987B\u4F4F FontStyle \u6CE8\u5165\u94FE\uFF0Cdsh \u63D2\u4EF6\u6A21\u5F0F\u6CA1\u6709 css
+       \u7BA1\u9053\uFF08\u6784\u5EFA\u8D70 esbuild \u95E8\u9762\u76F4\u5165\uFF0Cstyles/font.css \u90A3\u6761 vite \u8DEF\u5F84\u5230\u4E0D\u4E86 dsh \u5305\uFF09\u3002 */
+    ${FONT_FACE_CSS}
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
     /* MiSans\uFF08\u5C0F\u7C73\uFF0C\u514D\u8D39\u5546\u7528\uFF09\uFF1A\u4E2D\u6587\u4E3B\u5B57\u4F53\uFF0Cunicode-range \u5B50\u96C6\u6309\u9700\u52A0\u8F7D\uFF1B\u5B57\u91CD\u4E3A\u5B98\u65B9\u65B0\u523B\u5EA6 330-700\u3002
        round12\uFF1A\u53BB\u6389 Heavy\u2014\u2014\u7528\u6237\u53CD\u9988\u52A0\u7C97\u4E2D\u6587\u592A\u7C97\uFF0C800/900 \u5C31\u8FD1\u843D\u5230 Bold(630)\u3002 */
@@ -10754,6 +10767,63 @@ function installFemoLogCapture() {
 
 // ../../femoGen/src/femoPreview.jsx
 var import_react17 = __toESM(require("react"), 1);
+
+// ../../femoGen/src/indentEdit.js
+function editIndent(text, selStart, selEnd, outdent) {
+  const noSel = selStart === selEnd;
+  const from = text.lastIndexOf("\n", selStart - 1) + 1;
+  let to = text.indexOf("\n", selEnd);
+  if (to === -1) to = text.length;
+  if (selEnd > selStart && text[selEnd - 1] === "\n") to = selEnd - 1;
+  const segment = text.slice(from, to);
+  const lines = segment.split("\n");
+  let newLines;
+  let firstDelta = 0;
+  let totalDelta = 0;
+  if (outdent) {
+    let shallow = Infinity;
+    for (const line of lines) {
+      if (line.trim() === "") continue;
+      let w = 0;
+      while (w < line.length && (line[w] === " " || line[w] === "	")) w++;
+      if (w < shallow) shallow = w;
+    }
+    if (shallow === Infinity || shallow === 0) return null;
+    const delta = Math.min(shallow, 4);
+    newLines = lines.map((line) => {
+      let cut = 0;
+      while (cut < delta && cut < line.length && (line[cut] === " " || line[cut] === "	")) cut++;
+      return line.slice(cut);
+    });
+    firstDelta = newLines[0].length - lines[0].length;
+    totalDelta = newLines.join("\n").length - segment.length;
+  } else if (noSel) {
+    const unit = lines[0].slice(0, selStart - from).includes("	") ? "	" : "    ";
+    newLines = [lines[0].slice(0, selStart - from) + unit + lines[0].slice(selStart - from)];
+    firstDelta = unit.length;
+    totalDelta = unit.length;
+  } else {
+    newLines = lines.map((line) => (line.startsWith("	") ? "	" : "    ") + line);
+    firstDelta = (lines[0].startsWith("	") ? "	" : "    ").length;
+    totalDelta = newLines.join("\n").length - segment.length;
+  }
+  const newSegment = newLines.join("\n");
+  if (newSegment === segment) return null;
+  const newText = text.slice(0, from) + newSegment + text.slice(to);
+  let selA;
+  let selB;
+  if (lines.length === 1) {
+    const hi = from + newSegment.length;
+    selA = Math.max(from, Math.min(selStart + firstDelta, hi));
+    selB = noSel ? selA : Math.max(from, Math.min(selEnd + firstDelta, hi));
+  } else {
+    selA = from;
+    selB = to + totalDelta;
+  }
+  return { text: newText, selStart: selA, selEnd: selB, from, to, insert: newSegment };
+}
+
+// ../../femoGen/src/femoPreview.jsx
 var import_jsx_runtime18 = require("react/jsx-runtime");
 var PRIMARY = "var(--femo-primary)";
 var chip = (color, active = false) => ({
@@ -10842,6 +10912,26 @@ function FemoPreview({ value, onChange, error, warnings = [], dirty, onApply, on
       highlightRef.current.style.top = 11 + (errorLine - 1) * lineHeight - scrollTop + "px";
     }
   }, [errorLine, value]);
+  const handleKeyDown = (0, import_react17.useCallback)((e) => {
+    if (e.key !== "Tab" || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+    e.preventDefault();
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const edit = editIndent(ta.value, ta.selectionStart, ta.selectionEnd, e.shiftKey);
+    if (!edit) return;
+    ta.setSelectionRange(edit.from, edit.to);
+    let ok = false;
+    try {
+      ok = document.execCommand("insertText", false, edit.insert);
+    } catch {
+      ok = false;
+    }
+    if (!ok) {
+      ta.value = edit.text;
+      onChange(edit.text);
+    }
+    ta.setSelectionRange(edit.selStart, edit.selEnd);
+  }, [onChange]);
   return /* @__PURE__ */ (0, import_jsx_runtime18.jsxs)(
     "div",
     {
@@ -10992,6 +11082,7 @@ function FemoPreview({ value, onChange, error, warnings = [], dirty, onApply, on
                 onChange: (e) => {
                   onChange(e.target.value);
                 },
+                onKeyDown: handleKeyDown,
                 onScroll: handleScroll,
                 spellCheck: false,
                 style: {
@@ -11309,6 +11400,7 @@ function MobileTitleBar({
                     {
                       onClick: () => onNavigatePath(["mainflow"]),
                       title: "\u56DE\u5230\u4E3B\u753B\u5E03",
+                      "data-femo-crumb-path": "mainflow",
                       style: crumbChip(false),
                       children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("span", { style: ellipsis, children: projName || "FEMO Flow" })
                     }
@@ -11339,6 +11431,7 @@ function MobileTitleBar({
                         {
                           onClick: () => onNavigatePath(locationPath.slice(0, depth + 1)),
                           title: isCurrent ? `\u5F53\u524D\u6240\u5728\u6A21\u5757 ${seg}` : `\u5B9A\u4F4D\u5230\u6A21\u5757 ${seg}`,
+                          "data-femo-crumb-path": locationPath.slice(0, depth + 1).join("/"),
                           style: crumbChip(isCurrent),
                           children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("span", { style: ellipsis, children: seg })
                         }
@@ -12410,7 +12503,11 @@ function MobileLayout({
   // 属性面板「进入子画布」。
   onNodeDoubleTap,
   onNavigatePath,
-  onEnterModuleNode
+  onEnterModuleNode,
+  // 仓库 → 面包屑挪 action（2026-10-05 手机端补齐）：长按仓库 action 卡拖到
+  // 标题栏面包屑芯片上松手，把该 action 定义挪到那个画布的仓库（桌面 HTML5
+  // 拖放同款语义）。签名 moveActionToCanvas(action对象, targetPath)。
+  onMoveLibAction
 }) {
   const [femoVisible, setFemoVisible] = (0, import_react18.useState)(false);
   const [bottomTab, setBottomTab] = (0, import_react18.useState)("library");
@@ -12446,6 +12543,7 @@ function MobileLayout({
   (0, import_react18.useEffect)(() => {
     libRef.current = lib;
   }, [lib]);
+  const crumbHotRef = (0, import_react18.useRef)(null);
   const handlePanelTouchStart = (0, import_react18.useCallback)((e) => {
     if (libDragRef.current) return;
     const t = e.touches[0];
@@ -12504,6 +12602,28 @@ function MobileLayout({
     };
     libTimerRef.current = setTimeout(tryArm, LIB_LONG_PRESS_MS);
   }, []);
+  const crumbHitAt = (0, import_react18.useCallback)((x, y, draggedItem) => {
+    const hit = document.elementFromPoint(x, y);
+    const crumb = hit?.closest?.("[data-femo-crumb-path]") || null;
+    let target = null;
+    if (crumb && draggedItem) {
+      const key = crumb.getAttribute("data-femo-crumb-path");
+      const dp = (draggedItem.path || ["mainflow"]).join("/");
+      if (dp !== key) target = crumb;
+    }
+    if (target !== crumbHotRef.current) {
+      if (crumbHotRef.current) crumbHotRef.current.style.boxShadow = "";
+      crumbHotRef.current = target;
+      if (target) target.style.boxShadow = "0 0 0 2px var(--femo-primary)";
+    }
+    return target;
+  }, []);
+  const clearCrumbHot = (0, import_react18.useCallback)(() => {
+    if (crumbHotRef.current) {
+      crumbHotRef.current.style.boxShadow = "";
+      crumbHotRef.current = null;
+    }
+  }, []);
   const handleLibTouchMove = (0, import_react18.useCallback)((e) => {
     const st = libDragRef.current;
     if (!st) return;
@@ -12514,6 +12634,9 @@ function MobileLayout({
       if (ghostRef.current) {
         ghostRef.current.style.left = `${t.clientX - 50}px`;
         ghostRef.current.style.top = `${t.clientY - 20}px`;
+      }
+      if (st.type === "action" && onMoveLibAction) {
+        crumbHitAt(t.clientX, t.clientY, st.item);
       }
       return;
     }
@@ -12526,23 +12649,34 @@ function MobileLayout({
       clearTimeout(libTimerRef.current);
       libDragRef.current = null;
     }
-  }, []);
+  }, [crumbHitAt, onMoveLibAction]);
   const handleLibTouchCancel = (0, import_react18.useCallback)((e) => {
     clearTimeout(libTimerRef.current);
     if (ghostRef.current) ghostRef.current.style.display = "none";
+    clearCrumbHot();
     setLibArmedKey(null);
     setLibDragActive(false);
     libDragRef.current = null;
-  }, []);
+  }, [clearCrumbHot]);
   const handleLibTouchEnd = (0, import_react18.useCallback)((e) => {
     clearTimeout(libTimerRef.current);
     setLibArmedKey(null);
     setLibDragActive(false);
     if (ghostRef.current) ghostRef.current.style.display = "none";
+    clearCrumbHot();
     const st = libDragRef.current;
     libDragRef.current = null;
     if (!st || st.phase !== "drag") return;
     const t = e.changedTouches[0];
+    if (st.type === "action" && onMoveLibAction) {
+      const crumb = crumbHitAt(t.clientX, t.clientY, st.item);
+      clearCrumbHot();
+      if (crumb) {
+        const targetPath = (crumb.getAttribute("data-femo-crumb-path") || "").split("/").filter(Boolean);
+        if (targetPath.length) onMoveLibAction(st.item, targetPath);
+        return;
+      }
+    }
     const cvRect = cvRef.current?.getBoundingClientRect();
     if (!cvRect) return;
     if (t.clientX < cvRect.left || t.clientX > cvRect.right || t.clientY < cvRect.top || t.clientY > cvRect.bottom) {
@@ -12555,7 +12689,7 @@ function MobileLayout({
     else if (type === "module") onAddModule(item, worldX, worldY);
     else if (type === "special") onAddSpecial(item, worldX, worldY);
     else if (type === "position") onAddPosition(worldX, worldY);
-  }, [pan, scale, cvRef, onAdd, onAddModule, onAddSpecial, onAddPosition]);
+  }, [pan, scale, cvRef, onAdd, onAddModule, onAddSpecial, onAddPosition, crumbHitAt, clearCrumbHot, onMoveLibAction]);
   const selNode = sel?.type === "node" ? nodes.find((n) => n.id === sel.id) : null;
   const selEdge = sel?.type === "edge" ? edges.find((e) => e.id === sel.id) : null;
   const selAction = selNode?.type === "action" ? actionStore?.find((a) => a.id === selNode.actionId) : null;
@@ -12964,8 +13098,632 @@ function useMobile(breakpoint = 768) {
   return isMobile;
 }
 
-// ../../femoGen/src/FemoWorAuto.jsx
+// ../../femo2host/femoGenConnector/engine-client.mjs
+var OBSERVER_ID = "femogen";
+function pickFollowJob(runners, jobs, { hostGrid = "" } = {}) {
+  const rows = Array.isArray(jobs) ? jobs.filter((j) => j && Number.isFinite(Number(j.job_id))) : [];
+  const byRecency = (a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || ""));
+  const byHost = (arr) => {
+    if (!hostGrid) return arr;
+    const own = arr.filter((j) => j.host_refs && Object.prototype.hasOwnProperty.call(j.host_refs, hostGrid));
+    return own.length > 0 ? own : arr;
+  };
+  if (Array.isArray(runners) && runners.length > 0) {
+    const runnerIds = runners.map(Number).filter((n) => Number.isFinite(n) && n > 0);
+    const known = runnerIds.map((id) => rows.find((j) => Number(j.job_id) === id)).filter(Boolean);
+    if (known.length > 0) return byHost(known)[0];
+    if (runnerIds.length > 0) {
+      return { job_id: byHost(runnerIds.map((id) => ({ job_id: id })))[0].job_id, state: "running" };
+    }
+  }
+  const suspended = rows.filter((j) => j.state === "suspended").sort(byRecency);
+  return suspended.length > 0 ? suspended[0] : null;
+}
+function pickJob(jobs, { hostGrid = "" } = {}) {
+  if (!Array.isArray(jobs)) return null;
+  const rows = jobs.filter((j) => j && Number.isFinite(Number(j.job_id)));
+  const byRecency = (a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || ""));
+  const running = rows.filter((j) => j.state === "running").sort(byRecency);
+  if (running.length > 0) {
+    const own = hostGrid ? running.filter((j) => j.host_refs && Object.prototype.hasOwnProperty.call(j.host_refs, hostGrid)) : [];
+    return (own.length > 0 ? own : running)[0];
+  }
+  const suspended = rows.filter((j) => j.state === "suspended").sort(byRecency);
+  return suspended.length > 0 ? suspended[0] : null;
+}
+function unwrapEngineFrame(obj) {
+  if (!obj || typeof obj !== "object" || obj.type !== "event") return null;
+  return { type: String(obj.event || ""), data: obj.data ?? {}, replay: obj.replay === true };
+}
+function sameScriptText(a, b) {
+  const norm = (s) => String(s ?? "").replace(/\r\n/g, "\n").replace(/\s+$/, "");
+  return norm(a) === norm(b) && String(a ?? "").trim().length > 0;
+}
+function createEngineClient({ base = "", relay = "", fetchImpl = fetch, eventSourceImpl = typeof EventSource !== "undefined" ? EventSource : void 0, onLog = () => {
+} } = {}) {
+  let useRelayNow = !base && !!relay;
+  let seq2 = 0;
+  let lastEventAt = 0;
+  const url = (path) => useRelayNow ? `${relay}${path}` : `${base}${path}`;
+  async function cmd(name, args = {}) {
+    seq2 += 1;
+    const payload = { id: seq2, cmd: name, args };
+    const resp = await fetchImpl(url(`/cmd/${name}`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: typeof AbortSignal !== "undefined" && AbortSignal.timeout ? AbortSignal.timeout(2e4) : void 0
+    });
+    const body = await resp.json().catch(() => null);
+    if (body === null) throw new Error(`\u5F15\u64CE\u5E94\u7B54\u4E0D\u662F JSON\uFF08HTTP ${resp.status}\uFF09\uFF1A${name}`);
+    return body;
+  }
+  return {
+    /** 当前是否走在转发路上（诊断/显示用）。 */
+    isRelay: () => useRelayNow,
+    /** 直连被拦时切到伺候方透明转发（画布判死后调；没有 relay 可切=原样）。 */
+    useRelay() {
+      if (!relay) return false;
+      if (!useRelayNow) onLog(`[engine-client] \u76F4\u8FDE\u4E0D\u53EF\u8FBE\uFF0C\u5207\u8F6C\u53D1\u8DEF ${relay}`);
+      useRelayNow = true;
+      return true;
+    },
+    /** 重置回直连（重新发现拿到新基址后调）。 */
+    resetTransport() {
+      useRelayNow = !base && !!relay;
+    },
+    /** 一发引擎命令；返回应答信封原样（调用方查 .ok / .result / .error）。 */
+    cmd,
+    /**
+     * 引擎健康探针；活=true。
+     * 返回值：2026-10-08 起返回真值对象 {ok, runners, ssePing}（旧布尔真值
+     * 语义不变——if 判断照旧成立）；引擎没说 runners/sse_ping 就不给键，
+     * 调用方按「有没有这个键」区分新旧引擎。
+     *   · runners：引擎内存里真在执行的场号清单（盘上台账的 running 会有
+     *     僵尸，跟随目标只认内存真相）。
+     *   · ssePing：SSE 心跳是否已是 JS 可见的 ping 数据帧（画布帧龄判据的
+     *     开关——老引擎只有注释行心跳，帧龄判据必须关着，否则误判空转管道）。
+     */
+    async health() {
+      try {
+        const resp = await fetchImpl(url("/engine/health"), {
+          signal: typeof AbortSignal !== "undefined" && AbortSignal.timeout ? AbortSignal.timeout(5e3) : void 0
+        });
+        const body = await resp.json().catch(() => null);
+        if (body?.ok !== true) return false;
+        const out = { ok: true };
+        if (Array.isArray(body.runners)) out.runners = body.runners;
+        if (body.sse_ping === true) out.ssePing = true;
+        return out;
+      } catch {
+        return false;
+      }
+    },
+    /** 全场 job 清单（元数据行，无剧本正文）；失败回 []。 */
+    async listJobs() {
+      const body = await cmd("list_jobs").catch(() => null);
+      const jobs = body?.ok ? body?.result?.jobs : null;
+      return Array.isArray(jobs) ? jobs : [];
+    },
+    /** 单场档案全量（含剧本正文快照）；无此场/失败回 null。 */
+    async getJobState(jobId) {
+      const body = await cmd("get_job_state", { job_id: Number(jobId) }).catch(() => null);
+      return body?.ok ? body?.result ?? null : null;
+    },
+    /** 暂停（幂等——suspended/finished 照样 {paused:true,state}）。 */
+    async pause(jobId) {
+      return cmd("job_pause", { job_id: Number(jobId) });
+    },
+    /** 续跑：档案里的剧本原文快照由调用方给（三步走的第三步）。 */
+    async resume(jobId, femoText) {
+      return cmd("job_resume", { job_id: Number(jobId), femo: String(femoText ?? "") });
+    },
+    /** 人类席交卷：信封词汇唯一出处=公共层 speech-core——人类席 {chat_text, variables?}。 */
+    async humanInput(jobId, waitKey, text, variables) {
+      const bodyPayload = { chat_text: String(text ?? "") };
+      if (variables && typeof variables === "object" && Object.keys(variables).length > 0) {
+        bodyPayload.variables = variables;
+      }
+      return cmd("human_input", { job_id: Number(jobId), wait_key: String(waitKey ?? ""), body: bodyPayload });
+    },
+    /**
+     * 订阅事件流（观察者身份）。返回 {close()}。
+     * onFrame 收到的是开壳后的 {type,data,replay}；onOpen/onError 直传。
+     * 任何 SSE message（含引擎 ping 心跳帧）都会刷新 lastEventAt——画布
+     * 帧龄判据「同一条管子问话」的依据；onFrame 只收 event 帧（ping 被开壳丢弃）。
+     */
+    openEvents({ onFrame, onOpen, onError } = {}) {
+      if (!eventSourceImpl) throw new Error("EventSource \u4E0D\u53EF\u7528\uFF08\u975E\u6D4F\u89C8\u5668\u73AF\u5883\u4E14\u672A\u6CE8\u5165\u5047\u4EF6\uFF09");
+      const es = new eventSourceImpl(`${url("/engine/events")}?observer=${encodeURIComponent(OBSERVER_ID)}`);
+      es.onopen = () => onOpen?.();
+      es.onmessage = (event) => {
+        lastEventAt = Date.now();
+        let obj;
+        try {
+          obj = JSON.parse(event.data);
+        } catch {
+          return;
+        }
+        const frame = unwrapEngineFrame(obj);
+        if (frame) onFrame?.(frame);
+      };
+      es.onerror = (event) => onError?.(event);
+      return { close: () => es.close() };
+    },
+    /** 事件流最后一帧到达时刻（毫秒，0=这条线从没收到过帧）——帧龄判据用。 */
+    lastEventAt: () => lastEventAt
+  };
+}
+async function discoverEngine({ fetchImpl = fetch, endpoint = "/femo-plugin/engine-base" } = {}) {
+  try {
+    const resp = await fetchImpl(endpoint, {
+      signal: typeof AbortSignal !== "undefined" && AbortSignal.timeout ? AbortSignal.timeout(5e3) : void 0
+    });
+    const body = await resp.json().catch(() => null);
+    if (!body || body.ok !== true) return null;
+    const base = typeof body.base === "string" ? body.base.replace(/\/+$/, "") : "";
+    const relay = typeof body.relay === "string" ? body.relay.replace(/\/+$/, "") : "";
+    if (!base && !relay) return null;
+    return { base, relay, host: typeof body.host === "string" ? body.host : "" };
+  } catch {
+    return null;
+  }
+}
+
+// ../../femoGen/src/watchMirror.js
+function createWatchState() {
+  return {
+    status: "idle",
+    // idle|running|suspended|finished|failed
+    flowPath: ["mainflow"],
+    // 观演跟随的流（module_enter/exit 推栈弹栈）
+    nodeStates: {},
+    // {label: {status, streamingText, output, prompt, ...}}
+    activeLabels: [],
+    // 正在演的节点（呼吸灯）
+    humanWaiting: null,
+    // {label, wait_key, showprompt, prompt, out_vars}——观演面只显示不输入
+    lastNotice: null,
+    // {level, text}——最新一条值得知情的事（重试/作者通知）
+    lastError: ""
+    // flow_error 原话
+  };
+}
+function applyWatchEvent(prev, type, data = {}, { replay = false } = {}) {
+  const s = {
+    ...prev,
+    nodeStates: { ...prev.nodeStates },
+    activeLabels: [...prev.activeLabels]
+  };
+  const label = typeof data.node_name === "string" ? data.node_name : "";
+  const setNode = (lb, patch2) => {
+    if (lb) s.nodeStates[lb] = { ...s.nodeStates[lb] || {}, ...patch2 };
+  };
+  const clearHuman = () => {
+    s.humanWaiting = null;
+  };
+  const retire = () => {
+    s.activeLabels = [];
+    clearHuman();
+  };
+  switch (type) {
+    case "flow_start":
+      if (!replay) return { ...createWatchState(), status: "running" };
+      s.status = "running";
+      break;
+    case "node_start":
+      setNode(label, {
+        status: data.node_type === "ai" ? "ai_streaming" : data.node_type === "human" ? "human_wait" : "running",
+        type: data.node_type,
+        prompt: data.prompt || "",
+        streamingText: "",
+        output: ""
+      });
+      if (label && !s.activeLabels.includes(label)) s.activeLabels.push(label);
+      break;
+    case "ai_token":
+      setNode(label, {
+        status: "ai_streaming",
+        streamingText: (s.nodeStates[label]?.streamingText || "") + (data.token || "")
+      });
+      break;
+    case "ai_done":
+      setNode(label, {
+        status: "ai_done",
+        output: data.output || s.nodeStates[label]?.streamingText || "",
+        streamingText: ""
+      });
+      s.activeLabels = s.activeLabels.filter((l) => l !== label);
+      break;
+    case "human_wait":
+      setNode(label, {
+        status: "human_wait",
+        type: "human",
+        wait_key: data.wait_key || "",
+        showprompt: data.showprompt || null,
+        prompt: data.prompt || "",
+        out_vars: data.out_vars || []
+      });
+      s.humanWaiting = {
+        label,
+        wait_key: data.wait_key || "",
+        showprompt: data.showprompt || null,
+        prompt: data.prompt || "",
+        out_vars: data.out_vars || []
+      };
+      if (label && !s.activeLabels.includes(label)) s.activeLabels.push(label);
+      break;
+    case "human_done":
+      setNode(label, { status: "human_done" });
+      s.activeLabels = s.activeLabels.filter((l) => l !== label);
+      clearHuman();
+      break;
+    case "node_retry":
+      s.lastNotice = { level: "warn", text: `${label ? `\u3010${label}\u3011` : ""}\u91CD\u8BD5\uFF1A${data.message || data.error || "\u8282\u70B9\u91CD\u8BD5"}` };
+      break;
+    // 料包/变量/公告/未知内部信号：观演面无消费者（调试窗另有摘要喂食）
+    case "context_ready":
+    case "func_result":
+    case "assign_result":
+    case "notice_done":
+    case "compile_warnings":
+    case "step":
+    case "heartbeat":
+      break;
+    case "checkpoint": {
+      const cps = data.checkpoints || {};
+      const main = Object.prototype.hasOwnProperty.call(cps, "__main__") ? cps.__main__ : Object.values(cps)[0];
+      if (typeof main === "string" && main) s.activeLabels = [main];
+      break;
+    }
+    case "module_enter":
+      if (data.module_name && !s.flowPath.includes(data.module_name)) {
+        s.flowPath = [...s.flowPath, data.module_name];
+      }
+      break;
+    case "module_exit":
+      s.flowPath = s.flowPath.length > 1 ? s.flowPath.slice(0, -1) : s.flowPath;
+      break;
+    case "flow_paused":
+      s.status = "suspended";
+      break;
+    case "flow_done":
+      s.status = "finished";
+      retire();
+      break;
+    case "flow_error":
+      s.status = "failed";
+      s.lastError = String(data.error || "\u672A\u77E5\u9519\u8BEF");
+      retire();
+      break;
+    case "notify_author": {
+      const sev = data.severity || data.level;
+      s.lastNotice = {
+        level: sev === "fatal" || sev === "agent_error" || sev === "agent_giveup" ? "error" : sev === "warning" || sev === "warn" ? "warn" : "info",
+        text: `${label ? `\u3010${label}\u3011` : ""}${data.message || "\uFF08\u4F5C\u8005\u901A\u77E5\uFF09"}`
+      };
+      break;
+    }
+    case "run_state":
+      s.status = data.state || s.status;
+      if (data.state === "finished" || data.state === "failed") retire();
+      break;
+    case "bridge_run_ended":
+      s.status = data?.ok === false ? "failed" : "finished";
+      retire();
+      break;
+    default:
+      break;
+  }
+  return s;
+}
+
+// ../../femoGen/src/engineWatch.jsx
+var import_react19 = __toESM(require("react"), 1);
 var import_jsx_runtime20 = require("react/jsx-runtime");
+function buildWatchGraph(scriptText) {
+  try {
+    const parsed = parseFEMO(String(scriptText || ""));
+    const g = parsedToGraph(parsed, "mainflow", null);
+    const actionMap = new Map((g.libActions || []).map((a) => [a.id, a]));
+    const graphs = /* @__PURE__ */ new Map();
+    graphs.set("mainflow", { nodes: g.mainflowNodes || [], edges: g.mainflowEdges || [] });
+    for (const mod of g.libModules || []) {
+      graphs.set((mod.path || []).join("/"), { nodes: mod.nodes || [], edges: mod.edges || [] });
+    }
+    return { graphs, actionMap, name: parsed?.meta?.name || "", error: null };
+  } catch (e) {
+    return { graphs: /* @__PURE__ */ new Map(), actionMap: /* @__PURE__ */ new Map(), name: "", error: String(e?.message ?? e) };
+  }
+}
+var STATUS_TEXT = {
+  idle: "\u7A7A\u95F2",
+  running: "\u8FD0\u884C\u4E2D",
+  suspended: "\u5DF2\u6302\u8D77",
+  finished: "\u5DF2\u5B8C\u6210",
+  failed: "\u5931\u8D25"
+};
+var STATUS_COLOR = {
+  idle: "var(--femo-neutral, #888)",
+  running: "var(--femo-success, #2e9e5b)",
+  suspended: "var(--femo-warning, #d99a2b)",
+  finished: "var(--femo-neutral, #888)",
+  failed: "var(--femo-danger, #c44)"
+};
+function ViewSwitcher({ views, currentId, onSelect, fontSize = 12.5 }) {
+  const [open, setOpen] = (0, import_react19.useState)(false);
+  const rootRef = (0, import_react19.useRef)(null);
+  (0, import_react19.useEffect)(() => {
+    if (!open) return void 0;
+    const close = (e) => {
+      if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("touchstart", close);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("touchstart", close);
+    };
+  }, [open]);
+  const cur = views.find((v) => v.id === currentId) || views[0];
+  return /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { ref: rootRef, style: { position: "relative", minWidth: 0 }, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(
+      "button",
+      {
+        onClick: () => setOpen((o) => !o),
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "3px 10px",
+          maxWidth: 420,
+          borderRadius: "var(--femo-radius-sm)",
+          cursor: "pointer",
+          fontSize,
+          fontWeight: 800,
+          fontFamily: "var(--femo-font-sans)",
+          color: "var(--femo-text-1)",
+          border: `1px solid ${open ? "var(--femo-primary)" : "transparent"}`,
+          background: open ? "var(--femo-primary-soft-2, transparent)" : "transparent",
+          whiteSpace: "nowrap",
+          overflow: "hidden"
+        },
+        title: "\u5207\u6362\u89C6\u56FE\uFF1A\u6B63\u5728\u7F16\u8F91\u7684\u7A3F / \u5F15\u64CE\u5728\u8DD1\u7684\u573A",
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { style: { overflow: "hidden", textOverflow: "ellipsis" }, children: cur ? cur.label : "" }),
+          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { style: { fontSize: 9, opacity: 0.7, flexShrink: 0 }, children: "\u25BC" })
+        ]
+      }
+    ),
+    open && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+      "div",
+      {
+        style: {
+          position: "absolute",
+          top: "calc(100% + 4px)",
+          left: 0,
+          zIndex: 60,
+          minWidth: 260,
+          background: "var(--femo-modal-bg, #fff)",
+          border: "1px solid var(--femo-border-strong, #ccc)",
+          borderRadius: "var(--femo-radius-md, 8px)",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+          padding: 4,
+          maxHeight: 320,
+          overflowY: "auto"
+        },
+        children: views.map((v) => {
+          const active = v.id === currentId;
+          return /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(
+            "button",
+            {
+              onClick: () => {
+                setOpen(false);
+                if (!active) onSelect?.(v.id);
+              },
+              style: {
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                width: "100%",
+                padding: "7px 10px",
+                border: "none",
+                borderRadius: "var(--femo-radius-sm, 6px)",
+                cursor: "pointer",
+                background: active ? "var(--femo-primary-soft-2, rgba(0,0,0,0.04))" : "transparent",
+                color: "var(--femo-text-1)",
+                fontSize: 12,
+                fontWeight: active ? 800 : 500,
+                fontFamily: "var(--femo-font-sans)",
+                textAlign: "left",
+                whiteSpace: "nowrap"
+              },
+              children: [
+                /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                  "span",
+                  {
+                    style: { width: 8, height: 8, borderRadius: 99, flexShrink: 0, background: v.status ? STATUS_COLOR[v.status] || STATUS_COLOR.idle : "var(--femo-text-3, #888)" },
+                    title: v.status ? STATUS_TEXT[v.status] || v.status : "\u7F16\u8F91\u89C6\u56FE"
+                  }
+                ),
+                /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { style: { overflow: "hidden", textOverflow: "ellipsis", flex: 1 }, children: v.label }),
+                v.status && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { style: { fontSize: 10.5, color: STATUS_COLOR[v.status] || STATUS_COLOR.idle, flexShrink: 0 }, children: STATUS_TEXT[v.status] || v.status }),
+                active && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { style: { fontSize: 10, color: "var(--femo-primary)", flexShrink: 0 }, children: "\u5F53\u524D" })
+              ]
+            },
+            v.id
+          );
+        })
+      }
+    )
+  ] });
+}
+function WatchView({ jobId, meta, graph, mirror, transport, fixed, onExit, onToggleDebug, views, currentId, onSwitch, theme, embedded }) {
+  const [pan, setPan] = (0, import_react19.useState)({ x: 40, y: 30 });
+  const dragRef = (0, import_react19.useRef)(null);
+  const flowKey = (mirror.flowPath || ["mainflow"]).join("/");
+  const cur = graph.graphs.get(flowKey) || graph.graphs.get("mainflow") || { nodes: [], edges: [] };
+  const nm = (0, import_react19.useMemo)(() => new Map(cur.nodes.map((n) => [n.id, n])), [cur]);
+  const nodeStates = mirror.nodeStates || {};
+  const activeLabels = (0, import_react19.useMemo)(() => new Set(mirror.activeLabels || []), [mirror.activeLabels]);
+  const onPointerDown = (0, import_react19.useCallback)((e) => {
+    if (e.button !== 0 && e.pointerType === "mouse") return;
+    dragRef.current = { sx: e.clientX, sy: e.clientY, ox: pan.x, oy: pan.y };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  }, [pan]);
+  const onPointerMove = (0, import_react19.useCallback)((e) => {
+    const d = dragRef.current;
+    if (!d) return;
+    setPan({ x: d.ox + (e.clientX - d.sx), y: d.oy + (e.clientY - d.sy) });
+  }, []);
+  const endDrag = (0, import_react19.useCallback)(() => {
+    dragRef.current = null;
+  }, []);
+  (0, import_react19.useEffect)(() => {
+    setPan({ x: 40, y: 30 });
+  }, [flowKey]);
+  const shell = embedded ? { position: "relative", flex: 1, minHeight: 0 } : fixed ? { position: "fixed", inset: 0, zIndex: 3e3 } : { position: "absolute", inset: 0, zIndex: 40 };
+  return /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(
+    "div",
+    {
+      "data-femo-theme": theme,
+      style: { ...shell, background: "var(--femo-bg)", display: "flex", flexDirection: "column", overflow: "hidden" },
+      children: [
+        !embedded && /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(
+          "div",
+          {
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "8px 14px",
+              flexShrink: 0,
+              borderBottom: "1px solid var(--femo-border)",
+              background: "var(--femo-panel-bg)"
+            },
+            children: [
+              /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                "span",
+                {
+                  style: { width: 9, height: 9, borderRadius: 99, flexShrink: 0, background: STATUS_COLOR[mirror.status] || STATUS_COLOR.idle },
+                  title: `\u89C2\u6F14\u72B6\u6001\uFF1A${STATUS_TEXT[mirror.status] || mirror.status}`
+                }
+              ),
+              views && views.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(ViewSwitcher, { views, currentId, onSelect: onSwitch }) : /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("span", { style: { fontSize: 12.5, fontWeight: 800, color: "var(--femo-text-1)" }, children: [
+                "\u6B63\u5728\u89C2\u770B Job ",
+                jobId,
+                meta?.scriptName ? ` \xB7 ${meta.scriptName}` : ""
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { style: { fontSize: 11, fontWeight: 700, color: STATUS_COLOR[mirror.status] || STATUS_COLOR.idle }, children: STATUS_TEXT[mirror.status] || mirror.status }),
+              meta?.hostRefs && Object.keys(meta.hostRefs).length > 0 && /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("span", { style: { fontSize: 10.5, color: "var(--femo-text-3)" }, children: [
+                "\u73ED\u5E95\uFF1A",
+                Object.entries(meta.hostRefs).map(([h, s]) => `${h}:${String(s).slice(0, 10)}`).join(" \xB7 ")
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("span", { style: { fontSize: 10.5, color: "var(--femo-text-3)", opacity: 0.8 }, children: [
+                "\u5F15\u64CE",
+                transport
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { style: { flex: 1 } }),
+              onToggleDebug && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                "button",
+                {
+                  onClick: onToggleDebug,
+                  style: { padding: "4px 12px", borderRadius: "var(--femo-radius-sm)", fontSize: 11.5, fontWeight: 700, cursor: "pointer", border: "1px solid var(--femo-border-strong)", background: "var(--femo-surface)", color: "var(--femo-text-2)" },
+                  children: "\u8C03\u8BD5\u7A97"
+                }
+              ),
+              /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                "button",
+                {
+                  onClick: onExit,
+                  style: { padding: "4px 12px", borderRadius: "var(--femo-radius-sm)", fontSize: 11.5, fontWeight: 700, cursor: "pointer", border: "1px solid var(--femo-primary)", background: "var(--femo-primary-soft-2)", color: "var(--femo-primary)" },
+                  children: "\u56DE\u5230\u7F16\u8F91"
+                }
+              )
+            ]
+          }
+        ),
+        (mirror.humanWaiting || mirror.lastNotice || mirror.lastError) && /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { style: { padding: "6px 14px", flexShrink: 0, display: "flex", flexDirection: "column", gap: 4, borderBottom: "1px solid var(--femo-border)", background: "var(--femo-bg-2)" }, children: [
+          mirror.humanWaiting && /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { style: { fontSize: 11.5, color: "var(--femo-warning-strong, #a2701c)" }, children: [
+            "\u23F3 \u3010",
+            mirror.humanWaiting.label,
+            "\u3011\u7B49\u5F85\u4EBA\u7C7B\u8F93\u5165",
+            mirror.humanWaiting.showprompt ? ` \xB7 ${mirror.humanWaiting.showprompt}` : "",
+            mirror.humanWaiting.prompt ? ` \xB7 ${mirror.humanWaiting.prompt}` : "",
+            "\uFF08\u89C2\u770B\u6001\u4E0D\u63D0\u4F9B\u8F93\u5165\u5E2D\uFF09"
+          ] }),
+          mirror.lastError && /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { style: { fontSize: 11.5, color: "var(--femo-danger)" }, children: [
+            "\u2715 ",
+            mirror.lastError
+          ] }),
+          mirror.lastNotice && !mirror.lastError && /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { style: { fontSize: 11, color: mirror.lastNotice.level === "error" ? "var(--femo-danger)" : "var(--femo-text-3)" }, children: [
+            mirror.lastNotice.level === "error" ? "\u2715" : "\u2139\uFE0F",
+            " ",
+            mirror.lastNotice.text
+          ] })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(
+          "div",
+          {
+            style: { flex: 1, position: "relative", overflow: "hidden", cursor: dragRef.current ? "grabbing" : "grab" },
+            onPointerDown,
+            onPointerMove,
+            onPointerUp: endDrag,
+            onPointerCancel: endDrag,
+            children: [
+              /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { style: { position: "absolute", inset: 0, transform: `translate(${pan.x}px, ${pan.y}px)` }, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("svg", { style: { position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", overflow: "visible" }, children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("defs", { children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("marker", { id: "wv-arrow", markerWidth: "8", markerHeight: "6", refX: "7", refY: "3", orient: "auto", children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("polygon", { points: "0 0, 8 3, 0 6", fill: "var(--femo-edge-flow)" }) }) }),
+                  cur.edges.map((e) => {
+                    const s = nm.get(e.src);
+                    const t = nm.get(e.tgt);
+                    if (!s || !t) return null;
+                    if (e.src === e.tgt) {
+                      const ss = getNodeSize2(s);
+                      const cx = s.x + ss.w / 2, cy = s.y + ss.h / 2;
+                      const d = `M${s.x + ss.w},${cy} C${cx + ss.w * 0.8},${s.y - ss.h * 0.4} ${cx + ss.w * 0.8},${s.y - ss.h * 0.4} ${cx},${s.y}`;
+                      return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("path", { d, fill: "none", stroke: "var(--femo-edge)", strokeDasharray: "5,3", markerEnd: "url(#wv-arrow)" }, e.id);
+                    }
+                    const geo = computeEdgeGeometry(e, s, t, { isCycleEdge: false, isParEdge: false });
+                    if (!geo) return null;
+                    return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("g", { children: geo.pathDs.map((d, i) => /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("path", { d, fill: "none", stroke: "var(--femo-edge-flow)", markerEnd: "url(#wv-arrow)" }, i)) }, e.id);
+                  })
+                ] }),
+                cur.nodes.map((n) => {
+                  const enriched = n.type === "action" ? { ...n, action: graph.actionMap.get(n.actionId) } : n;
+                  const st = nodeStates[n.label];
+                  const active = activeLabels.has(n.label);
+                  if (enriched.type === "special") return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(SpecialNodeView, { node: enriched, isActive: active }, enriched.id);
+                  if (enriched.type === "for_out") return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(ForOutNodeView, { node: enriched, forSpecialType: "FOR" }, enriched.id);
+                  if (enriched.type === "par_out") return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(ParOutNodeView, { node: enriched }, enriched.id);
+                  if (enriched.type === "position") return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(PositionNodeView, { node: enriched }, enriched.id);
+                  return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                    ActionNodeView,
+                    {
+                      node: enriched,
+                      nodeState: st,
+                      isActive: active,
+                      errorNodeIds: /* @__PURE__ */ new Set()
+                    },
+                    enriched.id
+                  );
+                })
+              ] }),
+              graph.error && /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { style: { position: "absolute", left: 14, bottom: 12, fontSize: 11, color: "var(--femo-danger)" }, children: [
+                "\u89C2\u6F14\u56FE\u89E3\u6790\u5931\u8D25\uFF1A",
+                graph.error
+              ] })
+            ]
+          }
+        )
+      ]
+    }
+  );
+}
+
+// ../../femoGen/src/FemoWorAuto.jsx
+var import_react_dom2 = require("react-dom");
+var import_jsx_runtime21 = require("react/jsx-runtime");
 installFemoLogCapture();
 var TOOL_CHIP_TONES = {
   // 底色走 --femo-btn-* 按钮专用口（2026-09-21）：浅色=主语义色原值；
@@ -12981,7 +13739,7 @@ var TOOL_CHIP_TONES = {
 };
 function ToolChip({ icon: Icon, children, onClick, tone = "neutral", title, disabled = false }) {
   const t = TOOL_CHIP_TONES[tone] || TOOL_CHIP_TONES.neutral;
-  return /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(
     "button",
     {
       onClick: disabled ? void 0 : onClick,
@@ -13009,8 +13767,8 @@ function ToolChip({ icon: Icon, children, onClick, tone = "neutral", title, disa
         transition: "filter 0.12s, opacity 0.12s"
       },
       children: [
-        Icon ? /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(Icon, { size: 12, style: { flexShrink: 0 } }) : null,
-        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { children })
+        Icon ? /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(Icon, { size: 12, style: { flexShrink: 0 } }) : null,
+        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("span", { children })
       ]
     }
   );
@@ -13024,7 +13782,7 @@ var SHIMMER_LAYERS = [
   { len: 76, op: 0.04, delay: -2.5333 }
 ];
 function EdgeShimmer({ d, w }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("g", { className: "femo-edge-comet", style: { pointerEvents: "none" }, children: SHIMMER_LAYERS.map((L, i) => /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("g", { className: "femo-edge-comet", style: { pointerEvents: "none" }, children: SHIMMER_LAYERS.map((L, i) => /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
     "path",
     {
       d,
@@ -13242,8 +14000,8 @@ var mainCheckpointLabel = (checkpoint) => {
   const first = Object.values(checkpoint)[0];
   return typeof first === "string" && first.length > 0 ? first : null;
 };
-var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = false, onRun, onPause, initialScript, initialCheckpoint, initialRunning = false, sessionStateLoaded = false, onExport, onImport, onListFemoFiles, onPickFemoFile, onForgetFemoFile, savedPath, onBackToShell, onRestoreError, onPersistScript, getRecordScript, sessionId = "", enginePending = false, onEngineRetry, initialJobId, jobIds, initialWaitingHuman, initialLastError } = {}, ref) {
-  const [themeSel, setThemeSel] = (0, import_react19.useState)(() => {
+var FEMOEditor = (0, import_react20.forwardRef)(function FEMOEditor2({ plugin = false, onRun, onPause, initialScript, initialCheckpoint, initialRunning = false, sessionStateLoaded = false, onExport, onImport, onListFemoFiles, onPickFemoFile, onForgetFemoFile, savedPath, onBackToShell, onRestoreError, onPersistScript, getRecordScript, sessionId = "", enginePending = false, onEngineRetry, initialJobId, jobIds, initialWaitingHuman, initialLastError } = {}, ref) {
+  const [themeSel, setThemeSel] = (0, import_react20.useState)(() => {
     try {
       const saved = localStorage.getItem("femo_theme");
       return FEMO_THEMES.some((t) => t.id === saved) ? saved : "auto";
@@ -13251,10 +14009,10 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
       return "auto";
     }
   });
-  const [dsDark, setDsDark] = (0, import_react19.useState)(
+  const [dsDark, setDsDark] = (0, import_react20.useState)(
     () => document.body?.hasAttribute("data-ds-dark-theme") ?? false
   );
-  (0, import_react19.useEffect)(() => {
+  (0, import_react20.useEffect)(() => {
     const obs = new MutationObserver(() => {
       setDsDark(document.body?.hasAttribute("data-ds-dark-theme") ?? false);
     });
@@ -13271,24 +14029,24 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     } catch {
     }
   };
-  const [locationPath, setLocationPath] = (0, import_react19.useState)(["mainflow"]);
+  const [locationPath, setLocationPath] = (0, import_react20.useState)(["mainflow"]);
   const mode = locationPath.length === 1 && locationPath[0] === "mainflow" ? "mainflow" : "module";
   const currentModuleName = locationPath.length > 1 ? locationPath[locationPath.length - 1] : null;
-  const [nodes, setNodes] = (0, import_react19.useState)(makeDefaultNodes("mainflow"));
-  const nodesRef = (0, import_react19.useRef)(nodes);
+  const [nodes, setNodes] = (0, import_react20.useState)(makeDefaultNodes("mainflow"));
+  const nodesRef = (0, import_react20.useRef)(nodes);
   nodesRef.current = nodes;
-  const [edges, setEdges] = (0, import_react19.useState)([]);
-  const edgesRef = (0, import_react19.useRef)(edges);
+  const [edges, setEdges] = (0, import_react20.useState)([]);
+  const edgesRef = (0, import_react20.useRef)(edges);
   edgesRef.current = edges;
-  const [actionStore, setActionStore] = (0, import_react19.useState)([]);
-  const [moduleStore, setModuleStore] = (0, import_react19.useState)([]);
-  const [flowStore, setFlowStore] = (0, import_react19.useState)([]);
-  const [sel, setSel] = (0, import_react19.useState)(null);
-  const [drag, setDrag] = (0, import_react19.useState)(null);
-  const [conn, setConn] = (0, import_react19.useState)(null);
-  const [modal, setModal] = (0, import_react19.useState)(null);
-  const [tab, setTab] = (0, import_react19.useState)("library");
-  const [proj, setProj] = (0, import_react19.useState)({
+  const [actionStore, setActionStore] = (0, import_react20.useState)([]);
+  const [moduleStore, setModuleStore] = (0, import_react20.useState)([]);
+  const [flowStore, setFlowStore] = (0, import_react20.useState)([]);
+  const [sel, setSel] = (0, import_react20.useState)(null);
+  const [drag, setDrag] = (0, import_react20.useState)(null);
+  const [conn, setConn] = (0, import_react20.useState)(null);
+  const [modal, setModal] = (0, import_react20.useState)(null);
+  const [tab, setTab] = (0, import_react20.useState)("library");
+  const [proj, setProj] = (0, import_react20.useState)({
     name: "\u65B0\u7BC7\u7AE0-Neon",
     version: "1.0",
     owner: "1",
@@ -13299,30 +14057,30 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     code: [],
     actors: []
   });
-  const [pan, setPan] = (0, import_react19.useState)({ x: 0, y: 0 });
-  const [scale, setScale] = (0, import_react19.useState)(1);
-  const [rightPanelWidth, setRightPanelWidth] = (0, import_react19.useState)(274);
-  const [isResizingRight, setIsResizingRight] = (0, import_react19.useState)(false);
-  const [spaceHeld, setSpaceHeld] = (0, import_react19.useState)(false);
-  const [isPanning, setIsPanning] = (0, import_react19.useState)(false);
-  const mouseDownPos = (0, import_react19.useRef)({ x: 0, y: 0 });
-  const mouseDownPosRef = (0, import_react19.useRef)({ x: 0, y: 0 });
-  const isMouseDownRef = (0, import_react19.useRef)(false);
-  const isDraggingRef = (0, import_react19.useRef)(false);
-  const [panStart, setPanStart] = (0, import_react19.useState)({ x: 0, y: 0, px: 0, py: 0 });
-  const dragRef = (0, import_react19.useRef)(drag);
-  const connRef = (0, import_react19.useRef)(conn);
-  const isPanningRef = (0, import_react19.useRef)(isPanning);
-  (0, import_react19.useEffect)(() => {
+  const [pan, setPan] = (0, import_react20.useState)({ x: 0, y: 0 });
+  const [scale, setScale] = (0, import_react20.useState)(1);
+  const [rightPanelWidth, setRightPanelWidth] = (0, import_react20.useState)(274);
+  const [isResizingRight, setIsResizingRight] = (0, import_react20.useState)(false);
+  const [spaceHeld, setSpaceHeld] = (0, import_react20.useState)(false);
+  const [isPanning, setIsPanning] = (0, import_react20.useState)(false);
+  const mouseDownPos = (0, import_react20.useRef)({ x: 0, y: 0 });
+  const mouseDownPosRef = (0, import_react20.useRef)({ x: 0, y: 0 });
+  const isMouseDownRef = (0, import_react20.useRef)(false);
+  const isDraggingRef = (0, import_react20.useRef)(false);
+  const [panStart, setPanStart] = (0, import_react20.useState)({ x: 0, y: 0, px: 0, py: 0 });
+  const dragRef = (0, import_react20.useRef)(drag);
+  const connRef = (0, import_react20.useRef)(conn);
+  const isPanningRef = (0, import_react20.useRef)(isPanning);
+  (0, import_react20.useEffect)(() => {
     dragRef.current = drag;
   }, [drag]);
-  (0, import_react19.useEffect)(() => {
+  (0, import_react20.useEffect)(() => {
     connRef.current = conn;
   }, [conn]);
-  (0, import_react19.useEffect)(() => {
+  (0, import_react20.useEffect)(() => {
     isPanningRef.current = isPanning;
   }, [isPanning]);
-  (0, import_react19.useEffect)(() => {
+  (0, import_react20.useEffect)(() => {
     const handler = (e) => {
       if (e.buttons === 0) return;
       if (dragRef.current || connRef.current || isPanningRef.current) {
@@ -13336,19 +14094,19 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     window.addEventListener("mousedown", handler, true);
     return () => window.removeEventListener("mousedown", handler, true);
   }, []);
-  const [femoText, setFemoText] = (0, import_react19.useState)("");
-  const [femoDirty, setFemoDirty] = (0, import_react19.useState)(false);
-  const [graphDirty, setGraphDirty] = (0, import_react19.useState)(false);
-  const lastSyncedGraphRef = (0, import_react19.useRef)("");
-  const [runGuard, setRunGuard] = (0, import_react19.useState)(null);
-  const skipRunGuardRef = (0, import_react19.useRef)(false);
-  const [lastValidFemo, setLastValidFemo] = (0, import_react19.useState)("");
-  const [femoError, setFemoError] = (0, import_react19.useState)(null);
-  const [FEMOrnings, setFEMOrnings] = (0, import_react19.useState)([]);
-  const [debugOpen, setDebugOpen] = (0, import_react19.useState)(false);
-  const [debugLog, setDebugLog] = (0, import_react19.useState)([]);
-  const debugSeqRef = (0, import_react19.useRef)(0);
-  const pushDebug = (0, import_react19.useCallback)((level, kind, text) => {
+  const [femoText, setFemoText] = (0, import_react20.useState)("");
+  const [femoDirty, setFemoDirty] = (0, import_react20.useState)(false);
+  const [graphDirty, setGraphDirty] = (0, import_react20.useState)(false);
+  const lastSyncedGraphRef = (0, import_react20.useRef)("");
+  const [runGuard, setRunGuard] = (0, import_react20.useState)(null);
+  const skipRunGuardRef = (0, import_react20.useRef)(false);
+  const [lastValidFemo, setLastValidFemo] = (0, import_react20.useState)("");
+  const [femoError, setFemoError] = (0, import_react20.useState)(null);
+  const [FEMOrnings, setFEMOrnings] = (0, import_react20.useState)([]);
+  const [debugOpen, setDebugOpen] = (0, import_react20.useState)(false);
+  const [debugLog, setDebugLog] = (0, import_react20.useState)([]);
+  const debugSeqRef = (0, import_react20.useRef)(0);
+  const pushDebug = (0, import_react20.useCallback)((level, kind, text) => {
     setDebugLog((prev) => {
       const entry = {
         id: ++debugSeqRef.current,
@@ -13361,11 +14119,11 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
       return next.length > 200 ? next.slice(0, 200) : next;
     });
   }, []);
-  const [compilerLog, setCompilerLog] = (0, import_react19.useState)([]);
-  const compilerSeqRef = (0, import_react19.useRef)(0);
-  const [hostLog, setHostLog] = (0, import_react19.useState)([]);
-  const hostSeqRef = (0, import_react19.useRef)(0);
-  const appendDiagLine = (0, import_react19.useCallback)((setList, seqRef, msg, ts) => {
+  const [compilerLog, setCompilerLog] = (0, import_react20.useState)([]);
+  const compilerSeqRef = (0, import_react20.useRef)(0);
+  const [hostLog, setHostLog] = (0, import_react20.useState)([]);
+  const hostSeqRef = (0, import_react20.useRef)(0);
+  const appendDiagLine = (0, import_react20.useCallback)((setList, seqRef, msg, ts) => {
     setList((prev) => {
       const entry = {
         id: ++seqRef.current,
@@ -13377,21 +14135,21 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
       return next.length > 300 ? next.slice(0, 300) : next;
     });
   }, []);
-  const pushCompilerLine = (0, import_react19.useCallback)(
+  const pushCompilerLine = (0, import_react20.useCallback)(
     (msg, ts) => appendDiagLine(setCompilerLog, compilerSeqRef, msg, ts),
     [appendDiagLine]
   );
-  const pushHostLine = (0, import_react19.useCallback)(
+  const pushHostLine = (0, import_react20.useCallback)(
     (msg, ts) => appendDiagLine(setHostLog, hostSeqRef, msg, ts),
     [appendDiagLine]
   );
-  const handleDiagFeed = (0, import_react19.useCallback)((d) => {
+  const handleDiagFeed = (0, import_react20.useCallback)((d) => {
     if (!d) return;
     const ts = Date.parse(d.ts);
     if (d.tag === "engine") pushCompilerLine(d.msg, ts);
     else if (d.tag === "host") pushHostLine(d.msg, ts);
   }, [pushCompilerLine, pushHostLine]);
-  (0, import_react19.useEffect)(() => {
+  (0, import_react20.useEffect)(() => {
     if (!debugOpen || !plugin) return void 0;
     let cancelled = false;
     (async () => {
@@ -13423,34 +14181,34 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
       cancelled = true;
     };
   }, [debugOpen, plugin]);
-  const [femogenLog, setFemogenLog] = (0, import_react19.useState)(() => femoLogTail(200).slice().reverse());
-  (0, import_react19.useEffect)(() => subscribeFemoLog((batch) => {
+  const [femogenLog, setFemogenLog] = (0, import_react20.useState)(() => femoLogTail(200).slice().reverse());
+  (0, import_react20.useEffect)(() => subscribeFemoLog((batch) => {
     setFemogenLog((prev) => {
       const next = [...batch.slice().reverse(), ...prev];
       return next.length > 400 ? next.slice(0, 400) : next;
     });
   }), []);
-  const clearFemogenLog = (0, import_react19.useCallback)(() => {
+  const clearFemogenLog = (0, import_react20.useCallback)(() => {
     clearFemoLog();
     setFemogenLog([]);
   }, []);
-  const [bubbleOverlay, setBubbleOverlay] = (0, import_react19.useState)(null);
-  const bubbleOverlayRef = (0, import_react19.useRef)(bubbleOverlay);
+  const [bubbleOverlay, setBubbleOverlay] = (0, import_react20.useState)(null);
+  const bubbleOverlayRef = (0, import_react20.useRef)(bubbleOverlay);
   bubbleOverlayRef.current = bubbleOverlay;
-  const [humanWaits, setHumanWaits] = (0, import_react19.useState)({});
-  const humanWaitsRef = (0, import_react19.useRef)({});
-  const setHumanWaitsBoth = (0, import_react19.useCallback)((updater) => {
+  const [humanWaits, setHumanWaits] = (0, import_react20.useState)({});
+  const humanWaitsRef = (0, import_react20.useRef)({});
+  const setHumanWaitsBoth = (0, import_react20.useCallback)((updater) => {
     setHumanWaits((prev) => {
       const next = typeof updater === "function" ? updater(prev) : updater;
       humanWaitsRef.current = next;
       return next;
     });
   }, []);
-  const [libSel, setLibSel] = (0, import_react19.useState)(null);
-  const [exportBusy, setExportBusy] = (0, import_react19.useState)(false);
-  const [exportToast, setExportToast] = (0, import_react19.useState)(null);
-  const exportToastTimerRef = (0, import_react19.useRef)(null);
-  const showExportToast = (0, import_react19.useCallback)((text) => {
+  const [libSel, setLibSel] = (0, import_react20.useState)(null);
+  const [exportBusy, setExportBusy] = (0, import_react20.useState)(false);
+  const [exportToast, setExportToast] = (0, import_react20.useState)(null);
+  const exportToastTimerRef = (0, import_react20.useRef)(null);
+  const showExportToast = (0, import_react20.useCallback)((text) => {
     if (exportToastTimerRef.current) clearTimeout(exportToastTimerRef.current);
     setExportToast({ text, id: Date.now() });
     pushDebug("info", "\u4FDD\u5B58", text);
@@ -13459,10 +14217,10 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
       exportToastTimerRef.current = null;
     }, 4e3);
   }, [pushDebug]);
-  const [pauseNotice, setStopNotice] = (0, import_react19.useState)(null);
-  const pauseNoticeTimerRef = (0, import_react19.useRef)(null);
-  const pauseConfirmTimerRef = (0, import_react19.useRef)(null);
-  const showPauseNotice = (0, import_react19.useCallback)((level, text) => {
+  const [pauseNotice, setStopNotice] = (0, import_react20.useState)(null);
+  const pauseNoticeTimerRef = (0, import_react20.useRef)(null);
+  const pauseConfirmTimerRef = (0, import_react20.useRef)(null);
+  const showPauseNotice = (0, import_react20.useCallback)((level, text) => {
     if (pauseNoticeTimerRef.current) clearTimeout(pauseNoticeTimerRef.current);
     setStopNotice({ level, text, id: Date.now() });
     pushDebug(level === "error" ? "error" : "warn", "\u6682\u505C", text);
@@ -13471,13 +14229,13 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
       pauseNoticeTimerRef.current = null;
     }, 8e3);
   }, [pushDebug]);
-  const clearPauseConfirmTimer = (0, import_react19.useCallback)(() => {
+  const clearPauseConfirmTimer = (0, import_react20.useCallback)(() => {
     if (pauseConfirmTimerRef.current) {
       clearTimeout(pauseConfirmTimerRef.current);
       pauseConfirmTimerRef.current = null;
     }
   }, []);
-  (0, import_react19.useEffect)(() => {
+  (0, import_react20.useEffect)(() => {
     const handleMouseMove = (e) => {
       if (!isResizingRight) return;
       const rootR = editorRootRef.current?.getBoundingClientRect();
@@ -13497,63 +14255,63 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
       window.removeEventListener("mouseup", handleMouseUp);
     };
   }, [isResizingRight]);
-  const [flowStatus, setFlowStatus] = (0, import_react19.useState)("idle");
-  const flowStatusRef = (0, import_react19.useRef)(flowStatus);
+  const [flowStatus, setFlowStatus] = (0, import_react20.useState)("idle");
+  const flowStatusRef = (0, import_react20.useRef)(flowStatus);
   flowStatusRef.current = flowStatus;
-  const [activeNodeIds, setActiveNodeIds] = (0, import_react19.useState)(/* @__PURE__ */ new Set());
-  const [errorNodeIds, setErrorNodeIds] = (0, import_react19.useState)(/* @__PURE__ */ new Set());
-  const [userApiKey, setUserApiKey] = (0, import_react19.useState)(() => {
+  const [activeNodeIds, setActiveNodeIds] = (0, import_react20.useState)(/* @__PURE__ */ new Set());
+  const [errorNodeIds, setErrorNodeIds] = (0, import_react20.useState)(/* @__PURE__ */ new Set());
+  const [userApiKey, setUserApiKey] = (0, import_react20.useState)(() => {
     try {
       return localStorage.getItem("femo_user_api_key") || "";
     } catch {
       return "";
     }
   });
-  const [userApiProvider, setUserApiProvider] = (0, import_react19.useState)(() => {
+  const [userApiProvider, setUserApiProvider] = (0, import_react20.useState)(() => {
     try {
       return localStorage.getItem("femo_user_api_provider") || "mimo";
     } catch {
       return "mimo";
     }
   });
-  const [userApiUrl, setUserApiUrl] = (0, import_react19.useState)(() => {
+  const [userApiUrl, setUserApiUrl] = (0, import_react20.useState)(() => {
     try {
       return localStorage.getItem("femo_user_api_url") || "";
     } catch {
       return "";
     }
   });
-  const [userApiModel, setUserApiModel] = (0, import_react19.useState)(() => {
+  const [userApiModel, setUserApiModel] = (0, import_react20.useState)(() => {
     try {
       return localStorage.getItem("femo_user_api_model") || "";
     } catch {
       return "";
     }
   });
-  const [apiModelInput, setApiModelInput] = (0, import_react19.useState)(userApiModel);
-  const [runId, setRunId] = (0, import_react19.useState)(null);
-  const [pluginJobId, setPluginJobId] = (0, import_react19.useState)(initialJobId ?? null);
-  (0, import_react19.useEffect)(() => {
+  const [apiModelInput, setApiModelInput] = (0, import_react20.useState)(userApiModel);
+  const [runId, setRunId] = (0, import_react20.useState)(null);
+  const [pluginJobId, setPluginJobId] = (0, import_react20.useState)(initialJobId ?? null);
+  (0, import_react20.useEffect)(() => {
     if (initialJobId !== void 0 && initialJobId !== null) setPluginJobId(initialJobId);
   }, [initialJobId]);
-  const [nodeStates, setNodeStates] = (0, import_react19.useState)({});
-  const eventSourceRef = (0, import_react19.useRef)(null);
-  const humanInputResolveRef = (0, import_react19.useRef)(null);
-  const lastActionAtRef = (0, import_react19.useRef)(0);
-  const [soulModalOpen, setSoulModalOpen] = (0, import_react19.useState)(false);
-  const [soulForm, setSoulForm] = (0, import_react19.useState)({ soul_id: "", soul_name: "", description: "" });
-  const [soulFormError, setSoulFormError] = (0, import_react19.useState)("");
-  const [soulFormSubmitting, setSoulFormSubmitting] = (0, import_react19.useState)(false);
-  const fileInputRef = (0, import_react19.useRef)(null);
-  const [femoFileOpen, setFemoFileOpen] = (0, import_react19.useState)(false);
-  const [femoFileList, setFemoFileList] = (0, import_react19.useState)([]);
-  const [femoFileLoading, setFemoFileLoading] = (0, import_react19.useState)(false);
-  const [femoFileError, setFemoFileError] = (0, import_react19.useState)("");
-  const [femoFileBusyPath, setFemoFileBusyPath] = (0, import_react19.useState)(null);
-  const [femoFileForgetBusy, setFemoFileForgetBusy] = (0, import_react19.useState)(false);
-  const [standaloneSavedPath, setStandaloneSavedPath] = (0, import_react19.useState)(void 0);
+  const [nodeStates, setNodeStates] = (0, import_react20.useState)({});
+  const eventSourceRef = (0, import_react20.useRef)(null);
+  const humanInputResolveRef = (0, import_react20.useRef)(null);
+  const lastActionAtRef = (0, import_react20.useRef)(0);
+  const [soulModalOpen, setSoulModalOpen] = (0, import_react20.useState)(false);
+  const [soulForm, setSoulForm] = (0, import_react20.useState)({ soul_id: "", soul_name: "", description: "" });
+  const [soulFormError, setSoulFormError] = (0, import_react20.useState)("");
+  const [soulFormSubmitting, setSoulFormSubmitting] = (0, import_react20.useState)(false);
+  const fileInputRef = (0, import_react20.useRef)(null);
+  const [femoFileOpen, setFemoFileOpen] = (0, import_react20.useState)(false);
+  const [femoFileList, setFemoFileList] = (0, import_react20.useState)([]);
+  const [femoFileLoading, setFemoFileLoading] = (0, import_react20.useState)(false);
+  const [femoFileError, setFemoFileError] = (0, import_react20.useState)("");
+  const [femoFileBusyPath, setFemoFileBusyPath] = (0, import_react20.useState)(null);
+  const [femoFileForgetBusy, setFemoFileForgetBusy] = (0, import_react20.useState)(false);
+  const [standaloneSavedPath, setStandaloneSavedPath] = (0, import_react20.useState)(void 0);
   const effectiveSavedPath = plugin ? savedPath : standaloneSavedPath;
-  (0, import_react19.useEffect)(() => {
+  (0, import_react20.useEffect)(() => {
     if (plugin) return void 0;
     let gone = false;
     fetch(`${getBackendBaseUrl()}/api/canvas/path`).then((r) => r.json()).then((d) => {
@@ -13565,19 +14323,19 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
       gone = true;
     };
   }, [plugin]);
-  const [dirBrowseOpen, setDirBrowseOpen] = (0, import_react19.useState)(false);
-  const [dirBrowseMode, setDirBrowseMode] = (0, import_react19.useState)("save");
-  const [dirBrowseDir, setDirBrowseDir] = (0, import_react19.useState)("");
-  const [dirBrowseDirs, setDirBrowseDirs] = (0, import_react19.useState)([]);
-  const [dirBrowseFiles, setDirBrowseFiles] = (0, import_react19.useState)([]);
-  const [dirBrowseLoading, setDirBrowseLoading] = (0, import_react19.useState)(false);
-  const [dirBrowseError, setDirBrowseError] = (0, import_react19.useState)("");
-  const [dirBrowseBusy, setDirBrowseBusy] = (0, import_react19.useState)(false);
-  const [saveReminder, setSaveReminder] = (0, import_react19.useState)(null);
-  const cvRef = (0, import_react19.useRef)(null);
-  const onMURef = (0, import_react19.useRef)(null);
-  const onMMRef = (0, import_react19.useRef)(null);
-  (0, import_react19.useEffect)(() => {
+  const [dirBrowseOpen, setDirBrowseOpen] = (0, import_react20.useState)(false);
+  const [dirBrowseMode, setDirBrowseMode] = (0, import_react20.useState)("save");
+  const [dirBrowseDir, setDirBrowseDir] = (0, import_react20.useState)("");
+  const [dirBrowseDirs, setDirBrowseDirs] = (0, import_react20.useState)([]);
+  const [dirBrowseFiles, setDirBrowseFiles] = (0, import_react20.useState)([]);
+  const [dirBrowseLoading, setDirBrowseLoading] = (0, import_react20.useState)(false);
+  const [dirBrowseError, setDirBrowseError] = (0, import_react20.useState)("");
+  const [dirBrowseBusy, setDirBrowseBusy] = (0, import_react20.useState)(false);
+  const [saveReminder, setSaveReminder] = (0, import_react20.useState)(null);
+  const cvRef = (0, import_react20.useRef)(null);
+  const onMURef = (0, import_react20.useRef)(null);
+  const onMMRef = (0, import_react20.useRef)(null);
+  (0, import_react20.useEffect)(() => {
     const active = () => !!(dragRef.current || connRef.current || isPanningRef.current);
     const finish = () => {
       if (active()) onMURef.current?.();
@@ -13612,12 +14370,12 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
       window.removeEventListener("keydown", onKey);
     };
   }, []);
-  const entryRezeroDoneRef = (0, import_react19.useRef)(false);
-  (0, import_react19.useEffect)(() => {
+  const entryRezeroDoneRef = (0, import_react20.useRef)(false);
+  (0, import_react20.useEffect)(() => {
     if (!drag) entryRezeroDoneRef.current = false;
   }, [drag]);
-  const [snapGuides, setSnapGuides] = (0, import_react19.useState)(null);
-  const updateGuides = (0, import_react19.useCallback)((d) => {
+  const [snapGuides, setSnapGuides] = (0, import_react20.useState)(null);
+  const updateGuides = (0, import_react20.useCallback)((d) => {
     const n = d || null;
     setSnapGuides((prev) => {
       if (prev === n) return prev;
@@ -13625,20 +14383,20 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
       return prev.x1 === n.x1 && prev.y1 === n.y1 && prev.x2 === n.x2 && prev.y2 === n.y2 ? prev : n;
     });
   }, []);
-  const editorRootRef = (0, import_react19.useRef)(null);
-  const moduleStackRef = (0, import_react19.useRef)([]);
-  const moduleStoreRef = (0, import_react19.useRef)(moduleStore);
-  const locationPathRef = (0, import_react19.useRef)(locationPath);
-  const restoreDoneRef = (0, import_react19.useRef)(false);
-  const pendingReplayRef = (0, import_react19.useRef)([]);
-  const [canvasOpacity, setCanvasOpacity] = (0, import_react19.useState)(1);
-  (0, import_react19.useEffect)(() => {
+  const editorRootRef = (0, import_react20.useRef)(null);
+  const moduleStackRef = (0, import_react20.useRef)([]);
+  const moduleStoreRef = (0, import_react20.useRef)(moduleStore);
+  const locationPathRef = (0, import_react20.useRef)(locationPath);
+  const restoreDoneRef = (0, import_react20.useRef)(false);
+  const pendingReplayRef = (0, import_react20.useRef)([]);
+  const [canvasOpacity, setCanvasOpacity] = (0, import_react20.useState)(1);
+  (0, import_react20.useEffect)(() => {
     moduleStoreRef.current = moduleStore;
   }, [moduleStore]);
-  (0, import_react19.useEffect)(() => {
+  (0, import_react20.useEffect)(() => {
     locationPathRef.current = locationPath;
   }, [locationPath]);
-  const findModuleByPath = (0, import_react19.useCallback)(
+  const findModuleByPath = (0, import_react20.useCallback)(
     (path) => {
       if (path.length <= 1) return null;
       return moduleStore.find(
@@ -13647,14 +14405,14 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     },
     [moduleStore]
   );
-  const visibleActions = (0, import_react19.useMemo)(() => {
+  const visibleActions = (0, import_react20.useMemo)(() => {
     return actionStore.filter((a) => {
       const ap = a.path || [];
       if (ap.length > locationPath.length) return false;
       return ap.every((seg, i) => seg === locationPath[i]);
     });
   }, [actionStore, locationPath]);
-  const visibleModules = (0, import_react19.useMemo)(() => {
+  const visibleModules = (0, import_react20.useMemo)(() => {
     const anc = moduleStore.filter((m) => {
       const mp = m.path || [];
       return mp.length < locationPath.length && locationPath.every((seg, i) => seg === mp[i]);
@@ -13673,24 +14431,24 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     });
     return [.../* @__PURE__ */ new Set([...anc, ...daughters, ...sisters])];
   }, [moduleStore, locationPath]);
-  const lib = (0, import_react19.useMemo)(
+  const lib = (0, import_react20.useMemo)(
     () => ({
       actions: visibleActions,
       modules: visibleModules
     }),
     [visibleActions, visibleModules]
   );
-  const currentFlow = (0, import_react19.useMemo)(() => {
+  const currentFlow = (0, import_react20.useMemo)(() => {
     return flowStore.find((f) => {
       const fp = f.path || [];
       return fp.length === locationPath.length && fp.every((seg, i) => seg === locationPath[i]);
     });
   }, [flowStore, locationPath]);
-  const flowStoreRef = (0, import_react19.useRef)(flowStore);
-  (0, import_react19.useEffect)(() => {
+  const flowStoreRef = (0, import_react20.useRef)(flowStore);
+  (0, import_react20.useEffect)(() => {
     flowStoreRef.current = flowStore;
   }, [flowStore]);
-  const saveAndNavigateRef = (0, import_react19.useRef)(null);
+  const saveAndNavigateRef = (0, import_react20.useRef)(null);
   saveAndNavigateRef.current = (targetPath) => {
     const currentPath = locationPathRef.current;
     const currentNodes = nodesRef.current;
@@ -13717,16 +14475,16 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
       });
     });
   };
-  const nm = (0, import_react19.useMemo)(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
-  const backEdges = (0, import_react19.useMemo)(() => {
+  const nm = (0, import_react20.useMemo)(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
+  const backEdges = (0, import_react20.useMemo)(() => {
     return findBackEdges(nodes, edges);
   }, [nodes, edges]);
-  const actionMap = (0, import_react19.useMemo)(() => {
+  const actionMap = (0, import_react20.useMemo)(() => {
     const map = /* @__PURE__ */ new Map();
     actionStore.forEach((a) => map.set(a.id, a));
     return map;
   }, [actionStore]);
-  const sortedEdges = (0, import_react19.useMemo)(() => {
+  const sortedEdges = (0, import_react20.useMemo)(() => {
     const forOutNodeIds = new Set(
       nodes.filter((n) => n.type === "for_out" || n.type === "par_out").map((n) => n.id)
     );
@@ -13742,24 +14500,24 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     }
     return [...normal, ...forOutEdges];
   }, [edges, nodes]);
-  const diagMissingEdgeCount = (0, import_react19.useMemo)(
+  const diagMissingEdgeCount = (0, import_react20.useMemo)(
     () => sortedEdges.reduce((acc, e) => nm.get(e.src) && nm.get(e.tgt) ? acc : acc + 1, 0),
     [sortedEdges, nm]
   );
-  (0, import_react19.useEffect)(() => {
+  (0, import_react20.useEffect)(() => {
     if (diagMissingEdgeCount > 0) {
       console.log("[femo-diag] RENDER-DROP edges-with-missing-endpoints=" + diagMissingEdgeCount + " / total=" + sortedEdges.length + " nodes=" + nodes.length);
     }
   }, [diagMissingEdgeCount, sortedEdges.length, nodes.length]);
-  const cycleEdgesMap = (0, import_react19.useMemo)(() => findAllCycleEdges(nodes, edges), [nodes, edges]);
-  const allCycleEdges = (0, import_react19.useMemo)(() => {
+  const cycleEdgesMap = (0, import_react20.useMemo)(() => findAllCycleEdges(nodes, edges), [nodes, edges]);
+  const allCycleEdges = (0, import_react20.useMemo)(() => {
     const all = /* @__PURE__ */ new Set();
     for (const edgeSet of cycleEdgesMap.values()) {
       for (const eid2 of edgeSet) all.add(eid2);
     }
     return all;
   }, [cycleEdgesMap]);
-  const forBrokenEdges = (0, import_react19.useMemo)(() => {
+  const forBrokenEdges = (0, import_react20.useMemo)(() => {
     const broken = /* @__PURE__ */ new Set();
     const adj = /* @__PURE__ */ new Map();
     edges.forEach((e) => {
@@ -13790,11 +14548,11 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     }
     return broken;
   }, [nodes, edges, allCycleEdges]);
-  const parNodeIds = (0, import_react19.useMemo)(
+  const parNodeIds = (0, import_react20.useMemo)(
     () => new Set(nodes.filter((n) => n.specialType === "PAR").map((n) => n.id)),
     [nodes]
   );
-  const parOutNodeMap = (0, import_react19.useMemo)(() => {
+  const parOutNodeMap = (0, import_react20.useMemo)(() => {
     const map = /* @__PURE__ */ new Map();
     nodes.forEach((n) => {
       if (n.type === "par_out" && n.forNodeId) {
@@ -13803,7 +14561,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     });
     return map;
   }, [nodes]);
-  const parCycleEdges = (0, import_react19.useMemo)(() => {
+  const parCycleEdges = (0, import_react20.useMemo)(() => {
     const valid = /* @__PURE__ */ new Set();
     const adj = /* @__PURE__ */ new Map();
     edges.forEach((e) => {
@@ -13854,7 +14612,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     }
     return valid;
   }, [nodes, edges, parNodeIds, parOutNodeMap]);
-  const parBrokenEdges = (0, import_react19.useMemo)(() => {
+  const parBrokenEdges = (0, import_react20.useMemo)(() => {
     const broken = /* @__PURE__ */ new Set();
     const adj = /* @__PURE__ */ new Map();
     edges.forEach((e) => {
@@ -13881,7 +14639,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     }
     return broken;
   }, [nodes, edges, parCycleEdges, parNodeIds, parOutNodeMap]);
-  const portEdgeGroupMap = (0, import_react19.useMemo)(() => {
+  const portEdgeGroupMap = (0, import_react20.useMemo)(() => {
     const groups = {};
     edges.forEach((e) => {
       const s = nm.get(e.src), t = nm.get(e.tgt);
@@ -13910,7 +14668,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     }
     return result;
   }, [edges, nodes, allCycleEdges, nm]);
-  const hasActiveRunningNodes = (0, import_react19.useMemo)(() => {
+  const hasActiveRunningNodes = (0, import_react20.useMemo)(() => {
     if (flowStatus !== "running") return false;
     for (const id of activeNodeIds) {
       const status = nodeStates[id]?.status;
@@ -13920,7 +14678,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     }
     return false;
   }, [flowStatus, activeNodeIds, nodeStates]);
-  const allNames = (0, import_react19.useMemo)(() => {
+  const allNames = (0, import_react20.useMemo)(() => {
     const names = /* @__PURE__ */ new Set();
     actionStore.forEach((a) => names.add(a.name));
     moduleStore.forEach((m) => names.add(m.name));
@@ -13937,7 +14695,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     const r = rect || el.getBoundingClientRect();
     return r.width && el.offsetWidth ? r.width / el.offsetWidth : 1;
   }
-  const xy = (0, import_react19.useCallback)(
+  const xy = (0, import_react20.useCallback)(
     (e) => {
       const r = cvRef.current?.getBoundingClientRect();
       if (!r) return [0, 0];
@@ -13949,7 +14707,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     },
     [pan, scale]
   );
-  const saveToLocalStorage = (0, import_react19.useCallback)(() => {
+  const saveToLocalStorage = (0, import_react20.useCallback)(() => {
     try {
       const updatedFlowStore = [...flowStore];
       const idx = updatedFlowStore.findIndex(
@@ -13981,18 +14739,18 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
       console.warn("\u4FDD\u5B58\u753B\u5E03\u72B6\u6001\u5931\u8D25:", e);
     }
   }, [locationPath, actionStore, moduleStore, proj, flowStore]);
-  (0, import_react19.useEffect)(() => {
+  (0, import_react20.useEffect)(() => {
     const timer = setTimeout(() => {
       saveToLocalStorage();
     }, 10);
     return () => clearTimeout(timer);
   }, [saveToLocalStorage]);
-  (0, import_react19.useEffect)(() => {
+  (0, import_react20.useEffect)(() => {
     if (!plugin) return;
     if (!lastSyncedGraphRef.current) return;
     setGraphDirty(structuralSignature(nodes, edges, actionStore) !== lastSyncedGraphRef.current);
   }, [plugin, nodes, edges, actionStore]);
-  (0, import_react19.useEffect)(() => {
+  (0, import_react20.useEffect)(() => {
     if (plugin) return;
     try {
       const saved = localStorage.getItem("femo_editor_state");
@@ -14012,7 +14770,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
       console.warn("\u52A0\u8F7D\u753B\u5E03\u72B6\u6001\u5931\u8D25:", e);
     }
   }, []);
-  (0, import_react19.useEffect)(() => {
+  (0, import_react20.useEffect)(() => {
     if (!plugin) return;
     try {
       console.log("[femo-diag] restore-effect loaded=" + String(sessionStateLoaded) + " script=" + (initialScript === void 0 ? "undefined" : String(initialScript.length)) + "ch running=" + String(initialRunning) + " ckpt=" + String(initialCheckpoint ?? "none"));
@@ -14037,28 +14795,31 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
       }
     } else {
       restoreDoneRef.current = true;
+      if (pendingCalibrateRef.current) {
+        pendingCalibrateRef.current = false;
+        void engineCalibrate();
+      }
     }
     if (initialCheckpoint) {
       setFlowStatus("paused");
     }
     if (initialRunning) {
       setFlowStatus("running");
-      connectSse();
     }
   }, [plugin, sessionStateLoaded, initialScript, initialCheckpoint, initialRunning]);
-  const lastErrorSeenRef = (0, import_react19.useRef)(null);
-  (0, import_react19.useEffect)(() => {
+  const lastErrorSeenRef = (0, import_react20.useRef)(null);
+  (0, import_react20.useEffect)(() => {
     if (!plugin || !initialLastError) return;
     if (lastErrorSeenRef.current === initialLastError) return;
     lastErrorSeenRef.current = initialLastError;
     pushDebug("error", "\u6062\u590D", `\u4E0A\u6B21\u8FD0\u884C\u62A5\u9519\uFF08Job ${initialJobId ?? "-"}\uFF09\uFF1A${initialLastError}`);
   }, [plugin, initialLastError]);
-  (0, import_react19.useEffect)(() => {
+  (0, import_react20.useEffect)(() => {
     if (!plugin || !initialCheckpoint) return;
     const target = (nodes || []).find((n) => n.label === initialCheckpoint || "[" + n.label + "]" === initialCheckpoint);
     if (target) setActiveNodeIds(/* @__PURE__ */ new Set([target.id]));
   }, [plugin, initialCheckpoint, nodes]);
-  (0, import_react19.useEffect)(() => {
+  (0, import_react20.useEffect)(() => {
     const handleKeyDown = (e) => {
       if (e.code === "Space" && e.target.tagName !== "INPUT" && e.target.tagName !== "TEXTAREA") {
         e.preventDefault();
@@ -14075,7 +14836,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
       window.removeEventListener("keyup", handleKeyUp);
     };
   }, []);
-  (0, import_react19.useEffect)(() => {
+  (0, import_react20.useEffect)(() => {
     const handleGlobalWheel = (e) => {
       if (cvRef.current?.contains(e.target)) {
         if (e.target.closest?.("[data-femo-info-popup]")) return;
@@ -14089,7 +14850,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     document.addEventListener("wheel", handleGlobalWheel, { passive: false, capture: true });
     return () => document.removeEventListener("wheel", handleGlobalWheel, { capture: true });
   }, []);
-  (0, import_react19.useEffect)(() => {
+  (0, import_react20.useEffect)(() => {
     const handleGesture = (e) => {
       if (!cvRef.current?.contains(e.target)) {
         e.preventDefault();
@@ -14104,7 +14865,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
       document.removeEventListener("gestureend", handleGesture);
     };
   }, []);
-  (0, import_react19.useEffect)(() => {
+  (0, import_react20.useEffect)(() => {
     const handleKeyZoom = (e) => {
       if (e.ctrlKey || e.metaKey) {
         const key = e.key;
@@ -14119,7 +14880,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     window.addEventListener("keydown", handleKeyZoom, { passive: false, capture: true });
     return () => window.removeEventListener("keydown", handleKeyZoom, { capture: true });
   }, []);
-  (0, import_react19.useEffect)(() => {
+  (0, import_react20.useEffect)(() => {
     const h = (e) => {
       if ((e.key === "Delete" || e.key === "Backspace") && sel && e.target.tagName !== "INPUT" && e.target.tagName !== "TEXTAREA") {
         if (sel.type === "node") {
@@ -14140,7 +14901,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, [sel, nodes]);
-  (0, import_react19.useEffect)(() => {
+  (0, import_react20.useEffect)(() => {
     const currentFlowStore = flowStoreRef.current;
     const flow = currentFlowStore.find(
       (f) => f.path?.length === locationPath.length && f.path?.every((s, i) => s === locationPath[i])
@@ -14317,7 +15078,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
       }
     ]);
   }
-  const deleteNode = (0, import_react19.useCallback)((nodeId) => {
+  const deleteNode = (0, import_react20.useCallback)((nodeId) => {
     const node = nodesRef.current.find((n) => n.id === nodeId);
     if (!node) return;
     const idsToDelete = /* @__PURE__ */ new Set([nodeId]);
@@ -14336,13 +15097,13 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     setLibSel({ type, id });
     setSel(null);
   }
-  const handleBubbleClick = (0, import_react19.useCallback)((nodeId) => {
+  const handleBubbleClick = (0, import_react20.useCallback)((nodeId) => {
     setBubbleOverlay({ nodeId });
   }, []);
-  const handleBubbleClose = (0, import_react19.useCallback)(() => {
+  const handleBubbleClose = (0, import_react20.useCallback)(() => {
     setBubbleOverlay(null);
   }, []);
-  const handleRunWorkflow = (0, import_react19.useCallback)(async (femOverride, source = "human", opts = {}) => {
+  const handleRunWorkflow = (0, import_react20.useCallback)(async (femOverride, source = "human", opts = {}) => {
     console.log("[handleRunWorkflow] ====== \u51C6\u5907\u542F\u52A8 ======");
     console.log("[handleRunWorkflow] flowStatus:", flowStatus);
     if (flowStatus === "running" && plugin && sessionId) {
@@ -14419,7 +15180,6 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
           await onRun(femo, runOpts);
         }
         setRunId(null);
-        connectSse();
         return;
       }
       const resp = await fetch(getBackendBaseUrl() + "/api/run", {
@@ -14437,30 +15197,6 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
       if (data.error) throw new Error(data.error);
       const newRunId = data.run_id;
       setRunId(newRunId);
-      const es = new EventSource(
-        getBackendBaseUrl() + `/api/run/${newRunId}/stream`
-      );
-      eventSourceRef.current = es;
-      es.onmessage = (event) => {
-        let evt;
-        try {
-          evt = JSON.parse(event.data);
-        } catch (e) {
-          console.error("SSE parse error:", e);
-          return;
-        }
-        if (evt.type === "heartbeat") return;
-        console.log("[SSE onmessage]", event.data);
-        handleWorkflowEvent(evt);
-      };
-      es.onerror = (event) => {
-        console.error("[SSE] \u8FDE\u63A5\u51FA\u9519\u6216\u5173\u95ED", event);
-        console.log("[SSE] readyState:", es.readyState, "(0=CONNECTING, 1=OPEN, 2=CLOSED)");
-        es.close();
-        eventSourceRef.current = null;
-        setFlowStatus("idle");
-        setActiveNodeIds(/* @__PURE__ */ new Set());
-      };
     } catch (err) {
       console.error("Failed to start workflow:", err);
       setFlowStatus("idle");
@@ -14488,27 +15224,19 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     skipRunGuardRef.current = true;
     await handleRunWorkflow(record);
   }
-  const handlePauseWorkflow = (0, import_react19.useCallback)(async () => {
+  const handlePauseWorkflow = (0, import_react20.useCallback)(async () => {
     if (!runId && !plugin) return;
     lastActionAtRef.current = Date.now();
     clearPauseConfirmTimer();
     try {
-      let data;
-      if (plugin) {
-        if (typeof onPause === "function") {
-          data = await onPause(pluginJobId ?? void 0);
-        } else {
-          const qs = new URLSearchParams({ sessionId });
-          if (pluginJobId !== null && pluginJobId !== void 0) qs.set("jobId", String(pluginJobId));
-          const resp = await fetch(`/femo-plugin/pause?${qs.toString()}`, { method: "POST" });
-          data = await resp.json().catch(() => ({}));
-          if (!resp.ok) throw new Error(data?.error ?? `pause HTTP ${resp.status}`);
-        }
-      } else {
-        const resp = await fetch(getBackendBaseUrl() + `/api/run/${runId}/pause`, { method: "POST" });
-        data = await resp.json().catch(() => ({}));
-        if (!resp.ok) throw new Error(data?.error ?? `pause HTTP ${resp.status}`);
-      }
+      const client = engineClientRef.current;
+      const watchedId = activeViewRef.current !== "edit" ? Number(String(activeViewRef.current).slice(4)) : NaN;
+      const target = Number.isFinite(watchedId) && watchedId > 0 ? watchedId : pluginJobId ?? runId;
+      if (!client) throw new Error("\u5F15\u64CE\u76F4\u8FDE\u672A\u5C31\u7EEA\uFF08\u5F15\u64CE\u79BB\u7EBF\u6216\u4F3A\u5019\u65B9\u672A\u7ED9\u5730\u5740\uFF09");
+      if (!target) throw new Error("\u6CA1\u6709\u53EF\u6682\u505C\u7684 Job\uFF08\u672A\u77E5\u573A\u6B21\u53F7\uFF09");
+      const body = await client.pause(target);
+      if (!body?.ok) throw new Error(body?.detail || body?.error || "\u5F15\u64CE\u62D2\u7EDD\u6682\u505C");
+      const data = body.result ?? {};
       if (data && data.paused === false) {
         if (data.state === "suspended") {
           setFlowStatus("paused");
@@ -14545,24 +15273,34 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
       console.error("\u6682\u505C\u5931\u8D25:", err);
       showPauseNotice("error", `\u6682\u505C\u5931\u8D25\uFF1A${err?.message ?? err}`);
     }
-  }, [runId, plugin, onPause, sessionId, pluginJobId, showPauseNotice, clearPauseConfirmTimer]);
-  const handleResumeWorkflow = (0, import_react19.useCallback)(async () => {
+  }, [runId, plugin, pluginJobId, showPauseNotice, clearPauseConfirmTimer]);
+  const handleResumeWorkflow = (0, import_react20.useCallback)(async () => {
     lastActionAtRef.current = Date.now();
-    if (plugin) {
-      await handleRunWorkflow(void 0, "human", { resumeJobId: pluginJobId ?? void 0, reset: false });
+    const client = engineClientRef.current;
+    const watchedIdR = activeViewRef.current !== "edit" ? Number(String(activeViewRef.current).slice(4)) : NaN;
+    const target = Number.isFinite(watchedIdR) && watchedIdR > 0 ? watchedIdR : pluginJobId ?? runId;
+    if (!client) {
+      pushDebug("error", "\u7EE7\u7EED", "\u5F15\u64CE\u76F4\u8FDE\u672A\u5C31\u7EEA\uFF08\u5F15\u64CE\u79BB\u7EBF\u6216\u4F3A\u5019\u65B9\u672A\u7ED9\u5730\u5740\uFF09");
       return;
     }
-    if (!runId) return;
+    if (!target) {
+      pushDebug("error", "\u7EE7\u7EED", "\u6CA1\u6709\u53EF\u7EED\u8DD1\u7684 Job\uFF08\u672A\u77E5\u573A\u6B21\u53F7\uFF09");
+      return;
+    }
     try {
-      await fetch(getBackendBaseUrl() + `/api/run/${runId}/resume`, { method: "POST" });
+      const full = await client.getJobState(target);
+      if (!full || !full.script_text) throw new Error("\u6863\u6848\u8BFB\u4E0D\u5230\u5267\u672C\u5FEB\u7167\uFF08\u8BE5 Job \u4E0D\u5B58\u5728\uFF1F\uFF09");
+      const body = await client.resume(target, full.script_text);
+      if (!body?.ok) throw new Error(body?.detail || body?.error || "\u5F15\u64CE\u62D2\u7EDD\u7EED\u8DD1");
       setFlowStatus("running");
     } catch (err) {
       console.error("\u7EE7\u7EED\u5931\u8D25:", err);
+      pushDebug("error", "\u7EE7\u7EED", `\u7EED\u8DD1\u5931\u8D25\uFF1A${err?.message ?? err}`);
     }
-  }, [runId, plugin, handleRunWorkflow, pluginJobId]);
-  const debugRunAbortRef = (0, import_react19.useRef)(null);
-  const [debugRunning, setDebugRunning] = (0, import_react19.useState)(false);
-  const handleDebugRun = (0, import_react19.useCallback)(async () => {
+  }, [runId, plugin, pluginJobId, pushDebug]);
+  const debugRunAbortRef = (0, import_react20.useRef)(null);
+  const [debugRunning, setDebugRunning] = (0, import_react20.useState)(false);
+  const handleDebugRun = (0, import_react20.useCallback)(async () => {
     if (debugRunAbortRef.current) {
       pushDebug("warn", "\u8C03\u8BD5", "\u4E0A\u4E00\u8F6E\u8C03\u8BD5\u5E72\u8DD1\u4ECD\u5728\u8FDB\u884C\u4E2D");
       return;
@@ -14641,20 +15379,20 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
       setDebugRunning(false);
     }
   }, [plugin, femoText, pushDebug]);
-  const closeRunScopedSse = (0, import_react19.useCallback)(() => {
+  const closeRunScopedSse = (0, import_react20.useCallback)(() => {
     const es = eventSourceRef.current;
     if (es && !String(es.url ?? "").includes("/femo-plugin/events")) {
       es.close();
       eventSourceRef.current = null;
     }
   }, []);
-  const waitingRestoreRef = (0, import_react19.useRef)(null);
-  const currentNodePopRef = (0, import_react19.useRef)(null);
-  const canPopOverlay = (0, import_react19.useCallback)(
+  const waitingRestoreRef = (0, import_react20.useRef)(null);
+  const currentNodePopRef = (0, import_react20.useRef)(null);
+  const canPopOverlay = (0, import_react20.useCallback)(
     () => !plugin || flowStatusRef.current === "running",
     [plugin]
   );
-  const findNodeByLabel = (0, import_react19.useCallback)((label) => {
+  const findNodeByLabel = (0, import_react20.useCallback)((label) => {
     if (!label) return null;
     const hit = (n) => n.label === label || "[" + label + "]" === n.label;
     let node = nodesRef.current.find(hit);
@@ -14670,7 +15408,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     }
     return node || null;
   }, []);
-  const restoreHumanWait = (0, import_react19.useCallback)((wh) => {
+  const restoreHumanWait = (0, import_react20.useCallback)((wh) => {
     if (!wh || !wh.nodeName || !wh.waitKey) return;
     if (waitingRestoreRef.current === wh.waitKey) return;
     const node = findNodeByLabel(wh.nodeName);
@@ -14708,7 +15446,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     setBubbleOverlay({ nodeId: nid2 });
     console.log("[FEMOEditor] waitingHuman \u5FEB\u7167\u6062\u590D:", wh.nodeName, wh.waitKey);
   }, [findNodeByLabel, setHumanWaitsBoth]);
-  const popCurrentNode = (0, import_react19.useCallback)((label) => {
+  const popCurrentNode = (0, import_react20.useCallback)((label) => {
     if (!label || currentNodePopRef.current === label) return;
     const node = findNodeByLabel(label);
     if (!node) return;
@@ -14718,7 +15456,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     console.log("[FEMOEditor] \u63A5\u901A\u6062\u590D\uFF1A\u5F39\u51FA\u5F53\u524D\u8FD0\u884C\u8282\u70B9\u6D6E\u5C42:", label);
     pushDebug("info", "\u6062\u590D", `\u63A5\u901A\uFF1A\u5F39\u51FA\u5F53\u524D\u8FD0\u884C\u8282\u70B9\u300C${label}\u300D`);
   }, [findNodeByLabel, pushDebug]);
-  const followRunningNode = (0, import_react19.useCallback)((label, nodeId) => {
+  const followRunningNode = (0, import_react20.useCallback)((label, nodeId) => {
     if (nodeId === void 0 || nodeId === null) return;
     if (!canPopOverlay()) return;
     if (bubbleOverlayRef.current === null) return;
@@ -14728,7 +15466,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     setBubbleOverlay({ nodeId });
     console.log("[FEMOEditor] \u6D6E\u5C42\u8DDF\u968F\u8FD0\u884C:", label);
   }, [canPopOverlay]);
-  const handleWorkflowEvent = (0, import_react19.useCallback)((evt) => {
+  const handleWorkflowEvent = (0, import_react20.useCallback)((evt) => {
     if (evt.type !== "heartbeat") {
       console.log("[SSE event]", evt);
       console.log("[handleWorkflowEvent] \u6536\u5230\u4E8B\u4EF6", evt);
@@ -14760,6 +15498,18 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
       const sum = summarizeDebugEvent(type, data);
       if (Array.isArray(sum)) sum.forEach((s) => pushDebug(s.level, type, s.text));
       else if (sum) pushDebug(sum.level, type, sum.text);
+    }
+    {
+      const route = engineRouteRef.current;
+      if (route && route(type, data, evt)) return;
+    }
+    if (type === "checkpoint") {
+      const label = mainCheckpointLabel(data?.checkpoints);
+      if (label) {
+        const node = findNodeByLabel(label);
+        if (node) setActiveNodeIds(/* @__PURE__ */ new Set([node.id]));
+      }
+      return;
     }
     if (type === "ai_request" || type === "femo_actor_usage") return;
     if (type === "run_state") {
@@ -15151,7 +15901,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
         break;
     }
   }, [closeRunScopedSse, clearPauseConfirmTimer, pushDebug, findNodeByLabel]);
-  const connectSse = (0, import_react19.useCallback)(() => {
+  const connectSse = (0, import_react20.useCallback)(() => {
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
@@ -15197,28 +15947,260 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
       pushDebug("warn", "SSE", "\u8FDE\u63A5\u51FA\u9519\uFF0C\u7B49\u5F85\u6D4F\u89C8\u5668\u81EA\u52A8\u91CD\u8FDE");
     };
   }, [handleWorkflowEvent, sessionId, pushDebug, handleDiagFeed]);
-  (0, import_react19.useEffect)(() => () => {
+  (0, import_react20.useEffect)(() => () => {
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
     }
   }, []);
-  (0, import_react19.useEffect)(() => {
-    if (!plugin) return;
-    connectSse();
-  }, [plugin, connectSse]);
-  (0, import_react19.useEffect)(() => {
+  const engineClientRef = (0, import_react20.useRef)(null);
+  const engineEventsRef = (0, import_react20.useRef)(null);
+  const engineWatchdogRef = (0, import_react20.useRef)(null);
+  const engineOfflineTimerRef = (0, import_react20.useRef)(null);
+  const engineFailRef = (0, import_react20.useRef)(0);
+  const pendingCalibrateRef = (0, import_react20.useRef)(false);
+  const [engineTransport, setEngineTransport] = (0, import_react20.useState)("\u79BB\u7EBF");
+  const engineTransportRef = (0, import_react20.useRef)("\u79BB\u7EBF");
+  engineTransportRef.current = engineTransport;
+  const engineDirectRef = (0, import_react20.useRef)(false);
+  const [activeViewId, setActiveViewId] = (0, import_react20.useState)("edit");
+  const activeViewRef = (0, import_react20.useRef)("edit");
+  activeViewRef.current = activeViewId;
+  const [watchJobId, setWatchJobId] = (0, import_react20.useState)(null);
+  const watchJobRef = (0, import_react20.useRef)(null);
+  const [editMatchesJob, setEditMatchesJob] = (0, import_react20.useState)(true);
+  const editMatchesJobRef = (0, import_react20.useRef)(true);
+  editMatchesJobRef.current = editMatchesJob;
+  const [watchViews, setWatchViews] = (0, import_react20.useState)({});
+  const watchViewsRef = (0, import_react20.useRef)(watchViews);
+  watchViewsRef.current = watchViews;
+  const watchExitedRef = (0, import_react20.useRef)(null);
+  const femoTextRef = (0, import_react20.useRef)("");
+  femoTextRef.current = femoText;
+  const handleWorkflowEventRef = (0, import_react20.useRef)(null);
+  handleWorkflowEventRef.current = handleWorkflowEvent;
+  const engineRouteRef = (0, import_react20.useRef)(null);
+  const engineCalibratedRef = (0, import_react20.useRef)(false);
+  const enginePendingRef = (0, import_react20.useRef)([]);
+  function ensureWatchView(job) {
+    setWatchViews((prev) => {
+      if (prev[job.job_id]) return prev;
+      const next = { ...prev, [job.job_id]: {
+        jobId: job.job_id,
+        meta: { scriptName: job.script_name || "", hostRefs: job.host_refs || {} },
+        graph: buildWatchGraph(job.script_text),
+        mirror: { ...createWatchState(), status: job.state || "idle" }
+      } };
+      return next;
+    });
+  }
+  async function engineCalibrate() {
+    const client = engineClientRef.current;
+    if (!client) return;
+    const [jobs, h] = await Promise.all([
+      client.listJobs().catch(() => []),
+      client.health().catch(() => false)
+    ]);
+    const runners = h && Array.isArray(h.runners) ? h.runners : null;
+    const target = runners ? pickFollowJob(runners, jobs, { hostGrid: "" }) : pickJob(jobs, { hostGrid: "" });
+    if (!target) {
+      setWatchJobId(null);
+      watchJobRef.current = null;
+      setEditMatchesJob(true);
+      editMatchesJobRef.current = true;
+      engineDirectRef.current = true;
+      if (activeViewRef.current !== "edit") setActiveViewId("edit");
+      engineCalibratedRef.current = true;
+      const queued0 = enginePendingRef.current;
+      enginePendingRef.current = [];
+      for (const f of queued0) handleWorkflowEventRef.current?.({ type: f.type, data: f.data, replay: f.replay });
+      return;
+    }
+    const full = await client.getJobState(target.job_id).catch(() => null);
+    if (!full || full.state === void 0) {
+      watchJobRef.current = null;
+      engineCalibratedRef.current = true;
+      const queuedE = enginePendingRef.current;
+      enginePendingRef.current = [];
+      for (const f of queuedE) handleWorkflowEventRef.current?.({ type: f.type, data: f.data, replay: f.replay });
+      return;
+    }
+    setWatchJobId(target.job_id);
+    watchJobRef.current = target.job_id;
+    const matches = sameScriptText(full.script_text, femoTextRef.current);
+    setEditMatchesJob(matches);
+    editMatchesJobRef.current = matches;
+    engineDirectRef.current = true;
+    if (matches) {
+      setFlowStatus(full.state === "running" ? "running" : full.state === "suspended" ? "paused" : "idle");
+      const label = mainCheckpointLabel(full.checkpoint_labels || {});
+      if (label) {
+        const node = findNodeByLabel(label);
+        if (node) setActiveNodeIds(/* @__PURE__ */ new Set([node.id]));
+      }
+      if (activeViewRef.current !== "edit") setActiveViewId("edit");
+    } else {
+      ensureWatchView(full);
+      if (watchExitedRef.current !== target.job_id) setActiveViewId(`job:${target.job_id}`);
+    }
+    if (runners) {
+      for (const rid of runners) {
+        const ridN = Number(rid);
+        if (!Number.isFinite(ridN) || ridN === Number(target.job_id)) continue;
+        if (watchViewsRef.current[ridN]) continue;
+        const f = await client.getJobState(ridN).catch(() => null);
+        if (f && f.state !== void 0) ensureWatchView(f);
+      }
+    }
+    engineCalibratedRef.current = true;
+    const queued = enginePendingRef.current;
+    enginePendingRef.current = [];
+    for (const f of queued) handleWorkflowEventRef.current?.({ type: f.type, data: f.data, replay: f.replay });
+  }
+  function engineCalibrateWhenReady() {
+    if (!plugin || restoreDoneRef.current) {
+      void engineCalibrate();
+      return;
+    }
+    pendingCalibrateRef.current = true;
+  }
+  function attachEngineEvents(client, disc, state) {
+    return client.openEvents({
+      onOpen: () => {
+        state.opened = true;
+        engineFailRef.current = 0;
+        engineDirectRef.current = true;
+        setEngineTransport(client.isRelay() ? "\u8F6C\u53D1" : "\u76F4\u8FDE");
+        engineCalibrateWhenReady();
+        setTimeout(() => engineCalibrateWhenReady(), 1500);
+      },
+      onFrame: (frame) => {
+        handleWorkflowEventRef.current?.(frame);
+      },
+      onError: () => {
+        if (!state.opened && !client.isRelay() && disc.relay) {
+          client.useRelay();
+          engineEventsRef.current?.close();
+          engineEventsRef.current = attachEngineEvents(client, disc, state);
+        }
+      }
+    });
+  }
+  async function connectEngine() {
+    clearTimeout(engineOfflineTimerRef.current);
+    const disc = await discoverEngine();
+    if (!disc) {
+      engineDirectRef.current = false;
+      setEngineTransport("\u79BB\u7EBF");
+      engineOfflineTimerRef.current = setTimeout(() => {
+        void connectEngine();
+      }, 15e3);
+      return;
+    }
+    const client = createEngineClient({
+      base: disc.base,
+      relay: disc.relay,
+      onLog: (m) => pushDebug("info", "\u5F15\u64CE", m)
+    });
+    engineClientRef.current = client;
+    engineCalibratedRef.current = false;
+    engineEventsRef.current?.close();
+    const state = { opened: false };
+    engineEventsRef.current = attachEngineEvents(client, disc, state);
+    clearInterval(engineWatchdogRef.current);
+    engineWatchdogRef.current = setInterval(async () => {
+      const h = await client.health();
+      if (!h) {
+        engineFailRef.current += 1;
+        if (engineFailRef.current >= 3) {
+          engineFailRef.current = 0;
+          engineDirectRef.current = false;
+          setEngineTransport("\u91CD\u8FDE\u4E2D");
+          engineEventsRef.current?.close();
+          void connectEngine();
+        }
+        return;
+      }
+      engineFailRef.current = 0;
+      if (engineTransportRef.current === "\u91CD\u8FDE\u4E2D") setEngineTransport(client.isRelay() ? "\u8F6C\u53D1" : "\u76F4\u8FDE");
+      if (h.ssePing && state.opened) {
+        const lastAt = client.lastEventAt();
+        if (lastAt > 0 && Date.now() - lastAt > 9e4) {
+          pushDebug("info", "\u5F15\u64CE", "\u76F4\u64AD\u7EBF 90 \u79D2\u65E0\u5E27\uFF08\u7BA1\u9053\u534A\u6B7B\uFF09\u2014\u2014\u6362\u65B0\u7EBF\u91CD\u8BA2");
+          engineEventsRef.current?.close();
+          engineEventsRef.current = attachEngineEvents(client, disc, state);
+        }
+      }
+    }, 2e4);
+  }
+  function engineTeardown() {
+    clearInterval(engineWatchdogRef.current);
+    clearTimeout(engineOfflineTimerRef.current);
+    engineEventsRef.current?.close();
+    engineEventsRef.current = null;
+  }
+  engineRouteRef.current = (type, data, evt) => {
+    if (!engineDirectRef.current) return false;
+    if (!engineCalibratedRef.current) {
+      if (enginePendingRef.current.length >= 400) enginePendingRef.current.shift();
+      enginePendingRef.current.push({ type, data, replay: evt?.replay === true });
+      return true;
+    }
+    const jid = Number(data?.job_id);
+    const known = Number.isFinite(jid) && jid > 0;
+    const feedRegistered = () => {
+      if (!known) return;
+      setWatchViews((prev) => {
+        const v = prev[jid];
+        if (!v) return prev;
+        return { ...prev, [jid]: { ...v, mirror: applyWatchEvent(v.mirror, type, data, { replay: evt?.replay === true }) } };
+      });
+    };
+    if (editMatchesJobRef.current) {
+      if (!known || jid === watchJobRef.current) return false;
+      feedRegistered();
+      return true;
+    }
+    if (watchJobRef.current == null) {
+      feedRegistered();
+      return known;
+    }
+    if (known && jid !== watchJobRef.current) {
+      if (type === "flow_start" && evt?.replay !== true) void engineCalibrate();
+      feedRegistered();
+      return true;
+    }
+    feedRegistered();
+    return true;
+  };
+  (0, import_react20.useEffect)(() => {
+    void connectEngine();
+    return () => engineTeardown();
+  }, []);
+  (0, import_react20.useEffect)(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      if (engineDirectRef.current) engineCalibrateWhenReady();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
+  (0, import_react20.useEffect)(() => {
     if (!plugin || !restoreDoneRef.current) return;
     if (pendingReplayRef.current.length === 0) return;
     const queued = pendingReplayRef.current;
     pendingReplayRef.current = [];
     console.log("[FEMOEditor] \u6062\u590D\u5B8C\u6210\uFF0C\u8865\u653E\u7F13\u51B2\u4E8B\u4EF6:", queued.length);
     for (const evt of queued) handleWorkflowEvent(evt);
+    if (pendingCalibrateRef.current) {
+      pendingCalibrateRef.current = false;
+      void engineCalibrate();
+    }
   }, [plugin, nodes, flowStore, handleWorkflowEvent]);
-  const attachSeqRef = (0, import_react19.useRef)(0);
-  const [attachSnapshot, setAttachSnapshot] = (0, import_react19.useState)(null);
+  const attachSeqRef = (0, import_react20.useRef)(0);
+  const [attachSnapshot, setAttachSnapshot] = (0, import_react20.useState)(null);
   const sameAttach = (a, b) => a !== null && b !== null && a.running === b.running && a.checkpoint === b.checkpoint && (a.waitingHuman?.waitKey ?? "") === (b.waitingHuman?.waitKey ?? "");
-  (0, import_react19.useEffect)(() => {
+  (0, import_react20.useEffect)(() => {
     if (!plugin) return;
     const next = {
       running: initialRunning === true,
@@ -15227,7 +16209,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     };
     setAttachSnapshot((prev) => sameAttach(prev, next) ? prev : { ...next, seq: ++attachSeqRef.current });
   }, [plugin, initialRunning, initialCheckpoint, initialWaitingHuman]);
-  (0, import_react19.useEffect)(() => {
+  (0, import_react20.useEffect)(() => {
     if (!plugin || attachSnapshot === null) return;
     if (!restoreDoneRef.current) return;
     if (attachSnapshot.running !== true) return;
@@ -15238,7 +16220,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     }
     popCurrentNode(attachSnapshot.checkpoint);
   }, [plugin, attachSnapshot, nodes, flowStore, restoreHumanWait, popCurrentNode]);
-  const submitHumanInput = (0, import_react19.useCallback)(
+  const submitHumanInput = (0, import_react20.useCallback)(
     async (nodeId, chatText, assignments) => {
       const setWaitError = (msg) => {
         setHumanWaitsBoth((prev) => prev[nodeId] ? { ...prev, [nodeId]: { ...prev[nodeId], inputError: msg } } : prev);
@@ -15254,32 +16236,20 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
       };
       const hasChat = chatText && chatText.trim();
       const hasVars = assignments && Object.keys(assignments).length > 0;
-      if (!plugin && !runId) return fail("\u63D0\u4EA4\u5931\u8D25\uFF1A\u8FD0\u884C\u672A\u542F\u52A8\uFF08\u72EC\u7ACB\u6A21\u5F0F\u7F3A runId\uFF09\u3002");
       if (!hasChat && !hasVars) return false;
       const waitKey = humanWaitsRef.current[nodeId]?.wait_key || nodeStates[nodeId]?.wait_key;
       console.log("[submitHumanInput] nodeId:", nodeId, "waitKey:", waitKey, "chatText:", chatText);
       if (!waitKey) {
         return fail("\u63D0\u4EA4\u5931\u8D25\uFF1A\u5F15\u64CE\u7B49\u5F85\u72B6\u6001\u672A\u540C\u6B65\uFF08\u7F3A wait_key\uFF09\u3002\u8BF7\u56DE\u5230\u5BF9\u8BDD\u7A97\u53E3\u8F93\u5165\uFF0C\u6216\u91CD\u65B0\u8FD0\u884C\u3002");
       }
-      const payload = {
-        sessionId,
-        wait_key: waitKey,
-        chat_text: chatText || "",
-        variables: assignments || {}
-      };
-      console.log("[submitHumanInput] payload:", JSON.stringify(payload));
+      const client = engineClientRef.current;
+      const targetJob = watchJobRef.current ?? pluginJobId ?? runId;
+      if (!client) return fail("\u63D0\u4EA4\u5931\u8D25\uFF1A\u5F15\u64CE\u76F4\u8FDE\u672A\u5C31\u7EEA\uFF08\u5F15\u64CE\u79BB\u7EBF\uFF09\u3002");
+      if (!targetJob) return fail("\u63D0\u4EA4\u5931\u8D25\uFF1A\u672A\u77E5\u573A\u6B21\u53F7\uFF08Job \u672A\u767B\u8BB0\uFF09\u3002");
       try {
-        const resp = await fetch(plugin ? "/femo-plugin/human-input" : getBackendBaseUrl() + `/api/run/${runId}/human-input`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        const data = await resp.json().catch(() => null);
-        if (!resp.ok) {
-          return fail(`\u63D0\u4EA4\u5931\u8D25\uFF1AHTTP ${resp.status}${data?.error ? ` ${data.error}` : ""}`);
-        }
-        if (data && data.delivered === false) {
-          return fail(`\u63D0\u4EA4\u672A\u9001\u8FBE\u5F15\u64CE\uFF08${data.note || "no active job"}\uFF09\u3002\u53EF\u56DE\u5BF9\u8BDD\u7A97\u53E3\u8F93\u5165\uFF0C\u6216\u91CD\u8BD5\u3002`);
+        const body = await client.humanInput(targetJob, waitKey, chatText || "", assignments || {});
+        if (!body?.ok) {
+          return fail(`\u63D0\u4EA4\u672A\u9001\u8FBE\u5F15\u64CE\uFF08${body?.detail || body?.error || "\u672A\u77E5\u62D2\u7EDD"}\uFF09\u3002\u53EF\u56DE\u5BF9\u8BDD\u7A97\u53E3\u8F93\u5165\uFF0C\u6216\u91CD\u8BD5\u3002`);
         }
       } catch (err) {
         return fail(`\u63D0\u4EA4\u5931\u8D25\uFF1A${String(err?.message ?? err)}`);
@@ -15303,7 +16273,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     [runId, nodeStates, plugin, sessionId]
     // nodeStates/sessionId 加入依赖
   );
-  const saveCurrentFlow = (0, import_react19.useCallback)(() => {
+  const saveCurrentFlow = (0, import_react20.useCallback)(() => {
     setFlowStore((prev) => {
       const exists = prev.findIndex(
         (f) => f.path?.length === locationPath.length && f.path?.every((s, i) => s === locationPath[i])
@@ -15326,7 +16296,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     saveCurrentFlow();
     setLocationPath(mod.path);
   }
-  const onMM = (0, import_react19.useCallback)(
+  const onMM = (0, import_react20.useCallback)(
     (e) => {
       if (drag) {
         const z = effectiveZoom(cvRef.current);
@@ -15365,7 +16335,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     },
     [drag, conn, xy, isPanning, panStart, scale]
   );
-  const handleWheel = (0, import_react19.useCallback)(
+  const handleWheel = (0, import_react20.useCallback)(
     (e) => {
       e.stopPropagation();
       e.nativeEvent?.stopImmediatePropagation?.();
@@ -15392,7 +16362,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     },
     [scale, pan]
   );
-  const onMU = (0, import_react19.useCallback)(() => {
+  const onMU = (0, import_react20.useCallback)(() => {
     if (drag) {
       const draggedNode = nodesRef.current.find((n) => n.id === drag.id);
       if (draggedNode && (draggedNode.specialType === "START" || draggedNode.specialType === "IN") && !entryRezeroDoneRef.current) {
@@ -15428,13 +16398,13 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     isDraggingRef.current = false;
     isMouseDownRef.current = false;
   }, [drag, nodesRef]);
-  (0, import_react19.useEffect)(() => {
+  (0, import_react20.useEffect)(() => {
     onMURef.current = onMU;
   });
-  (0, import_react19.useEffect)(() => {
+  (0, import_react20.useEffect)(() => {
     onMMRef.current = onMM;
   });
-  const onCanvasDown = (0, import_react19.useCallback)(
+  const onCanvasDown = (0, import_react20.useCallback)(
     (e) => {
       if (!e.target?.dataset?.canvasBg && e.target !== cvRef.current) return;
       if (drag || isPanning || conn) {
@@ -15524,12 +16494,76 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
   function patchAction(actionId2, patch2) {
     setActionStore((prev) => prev.map((a) => a.id === actionId2 ? { ...a, ...patch2 } : a));
   }
+  const libDragItemRef = (0, import_react20.useRef)(null);
+  const [crumbDropHover, setCrumbDropHover] = (0, import_react20.useState)(null);
+  (0, import_react20.useEffect)(() => {
+    const clear = () => {
+      libDragItemRef.current = null;
+      setCrumbDropHover(null);
+    };
+    window.addEventListener("dragend", clear);
+    window.addEventListener("drop", clear);
+    return () => {
+      window.removeEventListener("dragend", clear);
+      window.removeEventListener("drop", clear);
+    };
+  }, []);
   function handleLibDragStart(e, type, idOrType) {
     e.dataTransfer.setData(
       "application/femo-item",
       JSON.stringify({ type, id: idOrType })
     );
-    e.dataTransfer.effectAllowed = "copy";
+    e.dataTransfer.effectAllowed = "copyMove";
+    libDragItemRef.current = { type, id: idOrType };
+  }
+  function moveActionToCanvas(action, targetPath) {
+    if (!action || !Array.isArray(targetPath) || !targetPath.length) return;
+    const ap = action.path || ["mainflow"];
+    const same = ap.length === targetPath.length && ap.every((s, i) => s === targetPath[i]);
+    if (same) return;
+    setActionStore(
+      (prev) => prev.map((a) => a.id === action.id ? { ...a, path: [...targetPath] } : a)
+    );
+    const toName = targetPath.length === 1 ? "\u4E3B\u6D41\u7A0B" : `\u6A21\u5757\u300C${targetPath[targetPath.length - 1]}\u300D`;
+    showExportToast(`\u2713 \u5DF2\u628A\u300C${action.name}\u300D\u632A\u5230 ${toName}\u7684\u4ED3\u5E93`);
+  }
+  function crumbDropProps(targetPath) {
+    const key = targetPath.join("/");
+    const wouldMove = () => {
+      const item = libDragItemRef.current;
+      if (item?.type !== "action") return false;
+      const action = actionStore.find((a) => a.id === item.id);
+      if (!action) return false;
+      const ap = action.path || ["mainflow"];
+      return !(ap.length === targetPath.length && ap.every((s, i) => s === targetPath[i]));
+    };
+    return {
+      onDragOver: (e) => {
+        if (libDragItemRef.current?.type !== "action") return;
+        if (!wouldMove()) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        setCrumbDropHover((prev) => prev === key ? prev : key);
+      },
+      onDragLeave: () => {
+        setCrumbDropHover((prev) => prev === key ? null : prev);
+      },
+      onDrop: (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setCrumbDropHover(null);
+        libDragItemRef.current = null;
+        let data;
+        try {
+          data = JSON.parse(e.dataTransfer.getData("application/femo-item"));
+        } catch {
+          return;
+        }
+        if (data?.type !== "action" || !data.id) return;
+        const action = actionStore.find((a) => a.id === data.id);
+        if (action) moveActionToCanvas(action, targetPath);
+      }
+    };
   }
   function handleCanvasDragOver(e) {
     e.preventDefault();
@@ -15879,7 +16913,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     lastSyncedGraphRef.current = structuralSignature(nodes, edges, actionStore);
     if (typeof onPersistScript === "function") onPersistScript(out);
   }
-  const handleGraphToFemoRef = (0, import_react19.useRef)(handleGraphToFemo);
+  const handleGraphToFemoRef = (0, import_react20.useRef)(handleGraphToFemo);
   handleGraphToFemoRef.current = handleGraphToFemo;
   function handleApplyFemo() {
     console.log("[handleApplyFemo] \u5F00\u59CB, femoText \u957F\u5EA6:", femoText?.length);
@@ -15902,7 +16936,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
   const selEdge = sel?.type === "edge" ? edges.find((e) => e.id === sel.id) : null;
   const selAction = selNode?.type === "action" ? actionStore.find((a) => a.id === selNode.actionId) : null;
   const isMobile = useMobile(768);
-  const [mobileFs, setMobileFs] = (0, import_react19.useState)(false);
+  const [mobileFs, setMobileFs] = (0, import_react20.useState)(false);
   const themeName = FEMO_THEMES.find((t) => t.id === themeSel)?.name || themeSel;
   const actorNames = (proj.actors || []).map((a) => a.name.replace("@", ""));
   function getTempConnLine() {
@@ -15968,10 +17002,24 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
     if (!selNode || !selAction) return;
     setModal({ type: "editNode", action: selAction, nodeId: selNode.id });
   };
+  const activeWatchView = activeViewId !== "edit" ? watchViews[Number(String(activeViewId).slice(4))] : null;
+  const switcherViews = [
+    { id: "edit", label: "\u6B63\u5728\u7F16\u8F91\uFF08\u672A\u8DD1\u7684\u7A3F\uFF09", status: null },
+    ...Object.keys(watchViews).map(Number).sort((a, b) => b - a).map((jid) => ({ id: `job:${jid}`, label: `Job ${jid}${watchViews[jid].meta?.scriptName ? ` \xB7 ${watchViews[jid].meta.scriptName}` : ""}`, status: watchViews[jid].mirror?.status || "idle" }))
+  ];
+  function handleSwitchView(id) {
+    if (id === "edit") {
+      watchExitedRef.current = watchJobRef.current;
+      setActiveViewId("edit");
+      return;
+    }
+    watchExitedRef.current = null;
+    setActiveViewId(id);
+  }
   if (isMobile) {
-    return /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(ErrorBoundary, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(FontStyle, { scoped: plugin }),
-      /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(ErrorBoundary, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(FontStyle, { scoped: plugin }),
+      /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
         "input",
         {
           ref: fileInputRef,
@@ -15981,7 +17029,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
           onChange: handleImportFile
         }
       ),
-      runGuard !== null && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("div", { style: { position: "fixed", inset: 0, zIndex: 1e3, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center" }, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { style: {
+      runGuard !== null && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("div", { style: { position: "fixed", inset: 0, zIndex: 1e3, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center" }, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { style: {
         maxWidth: 430,
         width: "calc(100% - 48px)",
         padding: "18px 20px",
@@ -15992,13 +17040,13 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
         fontSize: 13,
         lineHeight: 1.6
       }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("div", { style: { fontWeight: 700, marginBottom: 6 }, children: "\u26A0\uFE0F \u6709\u672A\u843D\u76D8\u4FEE\u6539" }),
-        /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { style: { color: "var(--femo-text-secondary, #666)", marginBottom: 14 }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("div", { style: { fontWeight: 700, marginBottom: 6 }, children: "\u26A0\uFE0F \u6709\u672A\u843D\u76D8\u4FEE\u6539" }),
+        /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { style: { color: "var(--femo-text-secondary, #666)", marginBottom: 14 }, children: [
           runGuard.textDirty && runGuard.graphDirty ? "\u6587\u672C\u548C\u753B\u5E03\u56FE\u90FD\u88AB\u4FEE\u6539\u8FC7\uFF0C\u4E14\u4E92\u76F8\u4E0D\u7EDF\u4E00\u3002" : runGuard.textDirty ? "\u6587\u672C\u88AB\u4FEE\u6539\u8FC7\uFF0C\u5C1A\u672A\u5E94\u7528\u5230\u753B\u5E03\u548C record\u3002" : "\u753B\u5E03\u56FE\u88AB\u4FEE\u6539\u8FC7\uFF0C\u5C1A\u672A\u5E94\u7528\u5230\u6587\u672C\u548C record\u3002",
           "\u5EFA\u8BAE\u56DE\u53BB\u6309\u5BF9\u5E94\u7684\u7EDF\u4E00\u6309\u94AE\uFF08\u6587\u672C\u751F\u56FE / \u56FE\u751F\u6587\u672C\uFF09\u5E94\u7528\u4F60\u8981\u7684\u7248\u672C\uFF1B \u4E5F\u53EF\u4EE5\u653E\u5F03\u8FD9\u4E9B\u4FEE\u6539\uFF0C\u4EE5\u6700\u540E\u4FDD\u5B58\u7684 record \u4E3A\u51C6\u76F4\u63A5\u8FD0\u884C\u3002"
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" }, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" }, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
             "button",
             {
               onClick: () => setRunGuard(null),
@@ -16006,7 +17054,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
               children: "\u56DE\u53BB\u6838\u67E5"
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
             "button",
             {
               onClick: discardChangesAndRun,
@@ -16016,7 +17064,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
           )
         ] })
       ] }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
         MobileLayout,
         {
           theme,
@@ -16057,13 +17105,13 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
           handleCanvasDrop,
           setGuides: updateGuides,
           canvasOpacity,
-          canvasContent: /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(import_jsx_runtime20.Fragment, { children: [
-            /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(
+          canvasContent: /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(import_jsx_runtime21.Fragment, { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(
               "svg",
               {
                 style: { position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", overflow: "visible", zIndex: 24 },
                 children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("defs", { children: [["a", "var(--femo-edge-flow)"], ["as", "var(--femo-edge-sel)"], ["a_for", "var(--femo-edge)"], ["al", "var(--femo-danger)"], ["aj", "var(--femo-warning)"]].map(([id, col]) => /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("marker", { id, markerWidth: "8", markerHeight: "6", refX: "7", refY: "3", orient: "auto", children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("polygon", { points: "0 0, 8 3, 0 6", fill: col }) }, id)) }),
+                  /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("defs", { children: [["a", "var(--femo-edge-flow)"], ["as", "var(--femo-edge-sel)"], ["a_for", "var(--femo-edge)"], ["al", "var(--femo-danger)"], ["aj", "var(--femo-warning)"]].map(([id, col]) => /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("marker", { id, markerWidth: "8", markerHeight: "6", refX: "7", refY: "3", orient: "auto", children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("polygon", { points: "0 0, 8 3, 0 6", fill: col }) }, id)) }),
                   sortedEdges.map((e) => {
                     const s = nm.get(e.src), t = nm.get(e.tgt);
                     if (!s || !t) return null;
@@ -16076,13 +17124,13 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                       const ss = getNodeSize2(s);
                       const cx = s.x + ss.w / 2, cy = s.y + ss.h / 2;
                       const pathD = `M${s.x + ss.w},${cy} C${cx + ss.w * 0.8},${s.y - ss.h * 0.4} ${cx + ss.w * 0.8},${s.y - ss.h * 0.4} ${cx},${s.y}`;
-                      return /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("g", { children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("path", { d: pathD, fill: "none", stroke: "transparent", "data-edge-id": e.id, strokeWidth: 18, style: { cursor: "pointer", pointerEvents: "stroke" }, onClick: (ev) => {
+                      return /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("g", { children: [
+                        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("path", { d: pathD, fill: "none", stroke: "transparent", "data-edge-id": e.id, strokeWidth: 18, style: { cursor: "pointer", pointerEvents: "stroke" }, onClick: (ev) => {
                           ev.stopPropagation();
                           setSel({ type: "edge", id: e.id });
                         } }),
-                        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("path", { d: pathD, fill: "none", stroke: isSel ? "var(--femo-edge-sel)" : "var(--femo-edge)", strokeDasharray: "5,3", markerEnd: `url(#${isSel ? "as" : "a_for"})`, style: { pointerEvents: "none", strokeWidth: isSel ? "var(--femo-edge-w-sel)" : "var(--femo-edge-w-thin)" } }),
-                        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(EdgeShimmer, { d: pathD, w: 0.85 })
+                        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("path", { d: pathD, fill: "none", stroke: isSel ? "var(--femo-edge-sel)" : "var(--femo-edge)", strokeDasharray: "5,3", markerEnd: `url(#${isSel ? "as" : "a_for"})`, style: { pointerEvents: "none", strokeWidth: isSel ? "var(--femo-edge-w-sel)" : "var(--femo-edge-w-thin)" } }),
+                        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(EdgeShimmer, { d: pathD, w: 0.85 })
                       ] }, e.id);
                     }
                     const geo = computeEdgeGeometry(e, s, t, {
@@ -16097,16 +17145,16 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                     const stroke = isSel ? "var(--femo-edge-sel)" : isParBroken || isForBroken ? "var(--femo-danger)" : isCycleEdge || isParCycle ? "var(--femo-edge)" : "var(--femo-edge-flow)";
                     const dashed = isParBroken || isForBroken ? "5,3" : null;
                     const markerId = isSel ? "as" : isParBroken || isForBroken ? "al" : isCycleEdge || isParCycle ? "a_for" : "a";
-                    return /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("g", { children: [
-                      pathDs.map((d, i) => /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("path", { d, fill: "none", stroke: "transparent", "data-edge-id": e.id, strokeWidth: 18, style: { cursor: "pointer", pointerEvents: "stroke" }, onClick: (ev) => {
+                    return /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("g", { children: [
+                      pathDs.map((d, i) => /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("path", { d, fill: "none", stroke: "transparent", "data-edge-id": e.id, strokeWidth: 18, style: { cursor: "pointer", pointerEvents: "stroke" }, onClick: (ev) => {
                         ev.stopPropagation();
                         setSel({ type: "edge", id: e.id });
                       } }, i)),
-                      pathDs.map((d, i) => /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("g", { children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("path", { d, fill: "none", stroke, strokeDasharray: dashed, markerEnd: `url(#${markerId})`, style: { pointerEvents: "none", strokeWidth: isSel ? "var(--femo-edge-w-sel)" : "var(--femo-edge-w-thin)" } }),
-                        !(isParBroken || isForBroken) && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(EdgeShimmer, { d, w: 0.85 })
+                      pathDs.map((d, i) => /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("g", { children: [
+                        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("path", { d, fill: "none", stroke, strokeDasharray: dashed, markerEnd: `url(#${markerId})`, style: { pointerEvents: "none", strokeWidth: isSel ? "var(--femo-edge-w-sel)" : "var(--femo-edge-w-thin)" } }),
+                        !(isParBroken || isForBroken) && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(EdgeShimmer, { d, w: 0.85 })
                       ] }, `v${i}`)),
-                      e.cond && labelPos && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                      e.cond && labelPos && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                         "text",
                         {
                           x: labelPos.x,
@@ -16124,12 +17172,12 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                   }),
                   conn && (() => {
                     const d = getTempConnLine();
-                    return d ? /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("path", { d, fill: "none", stroke: "var(--femo-primary)", strokeWidth: 2, strokeDasharray: "6,3", style: { pointerEvents: "none" } }) : null;
+                    return d ? /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("path", { d, fill: "none", stroke: "var(--femo-primary)", strokeWidth: 2, strokeDasharray: "6,3", style: { pointerEvents: "none" } }) : null;
                   })()
                 ]
               }
             ),
-            /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(SnapGuides, { guides: snapGuides, scale }),
+            /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(SnapGuides, { guides: snapGuides, scale }),
             nodes.map((n) => {
               const enrichedNode = n.type === "action" ? { ...n, action: actionMap.get(n.actionId) } : n;
               const commonProps = {
@@ -16149,17 +17197,17 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                 onPortUp: (e, dir) => handlePortUp(e, enrichedNode.id, dir),
                 onBodyMouseUp: (e) => handleBodyMouseUp(e, enrichedNode.id)
               };
-              if (enrichedNode.type === "special") return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(SpecialNodeView, { node: enrichedNode, ...commonProps, isActive: activeNodeIds.has(enrichedNode.id) }, enrichedNode.id);
+              if (enrichedNode.type === "special") return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(SpecialNodeView, { node: enrichedNode, ...commonProps, isActive: activeNodeIds.has(enrichedNode.id) }, enrichedNode.id);
               if (enrichedNode.type === "for_out") {
                 const motherNode = enrichedNode.forNodeId ? nm.get(enrichedNode.forNodeId) : null;
-                return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(ForOutNodeView, { node: enrichedNode, sel: sel?.type === "node" && sel.id === enrichedNode.id, forSpecialType: motherNode?.specialType || "FOR", onBodyMouseUp: (e) => handleBodyMouseUp(e, enrichedNode.id), onBubbleClick: (nid2) => {
+                return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(ForOutNodeView, { node: enrichedNode, sel: sel?.type === "node" && sel.id === enrichedNode.id, forSpecialType: motherNode?.specialType || "FOR", onBodyMouseUp: (e) => handleBodyMouseUp(e, enrichedNode.id), onBubbleClick: (nid2) => {
                   setDrag(null);
                   setConn(null);
                   setIsPanning(false);
                   setSel({ type: "node", id: nid2 });
                 }, onPortDown: (e, dir, x, y) => handlePortDown(e, enrichedNode.id, dir, x, y), onPortUp: (e, dir) => handlePortUp(e, enrichedNode.id, dir) }, enrichedNode.id);
               }
-              if (enrichedNode.type === "par_out") return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(ParOutNodeView, { node: enrichedNode, sel: sel?.type === "node" && sel.id === enrichedNode.id, onBody: (e) => {
+              if (enrichedNode.type === "par_out") return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(ParOutNodeView, { node: enrichedNode, sel: sel?.type === "node" && sel.id === enrichedNode.id, onBody: (e) => {
                 e.stopPropagation();
                 if (drag || isPanning || conn) {
                   setDrag(null);
@@ -16170,8 +17218,8 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                 setSel({ type: "node", id: enrichedNode.id });
                 setDrag({ id: enrichedNode.id, sx: e.clientX, sy: e.clientY, ox: enrichedNode.x, oy: enrichedNode.y });
               }, onPortDown: (e, dir, x, y) => handlePortDown(e, enrichedNode.id, dir, x, y), onPortUp: (e, dir) => handlePortUp(e, enrichedNode.id, dir), onBodyMouseUp: (e) => handleBodyMouseUp(e, enrichedNode.id) }, enrichedNode.id);
-              if (enrichedNode.type === "position") return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(PositionNodeView, { node: enrichedNode, ...commonProps }, enrichedNode.id);
-              return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(ActionNodeView, { node: enrichedNode, ...commonProps, onBubbleClick: handleBubbleClick, onActionPatch: patchAction, nodeState: nodeStates[enrichedNode.id], isActive: activeNodeIds.has(enrichedNode.id), errorNodeIds, onDbl: () => {
+              if (enrichedNode.type === "position") return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(PositionNodeView, { node: enrichedNode, ...commonProps }, enrichedNode.id);
+              return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(ActionNodeView, { node: enrichedNode, ...commonProps, onBubbleClick: handleBubbleClick, onActionPatch: patchAction, nodeState: nodeStates[enrichedNode.id], isActive: activeNodeIds.has(enrichedNode.id), errorNodeIds, onDbl: () => {
                 if (enrichedNode.type === "action" && enrichedNode.action) setModal({ type: "editNode", action: enrichedNode.action, nodeId: enrichedNode.id });
                 else if (enrichedNode.type === "module") {
                   const mod = enrichedNode.modDef;
@@ -16210,6 +17258,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
             const mod = nm.get(nodeId)?.modDef;
             if (mod) editModule(mod);
           },
+          onMoveLibAction: moveActionToCanvas,
           onDragStart: handleLibDragStart,
           onSelectLib: handleSelectLib,
           onNewModule: (name) => {
@@ -16275,7 +17324,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
           onEditAction: handleEditSelAction
         }
       ),
-      modal && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+      modal && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
         ActionModal,
         {
           init: modal.type !== "new" ? modal.action : null,
@@ -16304,7 +17353,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
           onClose: () => setModal(null)
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
         SoulModal,
         {
           open: soulModalOpen,
@@ -16313,7 +17362,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
           createUrl: plugin ? "/femo-plugin/souls" : getBackendBaseUrl() + "/api/souls/create"
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
         FemoFileList,
         {
           open: femoFileOpen,
@@ -16327,7 +17376,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
           onClose: () => setFemoFileOpen(false)
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
         FemoDirBrowse,
         {
           open: dirBrowseOpen,
@@ -16347,12 +17396,48 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
           onClose: () => setDirBrowseOpen(false)
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(FemoSaveReminder, { reminder: saveReminder, onChoice: resolveSaveReminder })
+      /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(FemoSaveReminder, { reminder: saveReminder, onChoice: resolveSaveReminder }),
+      activeWatchView && (0, import_react_dom2.createPortal)(
+        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+          WatchView,
+          {
+            jobId: activeWatchView.jobId,
+            meta: activeWatchView.meta,
+            graph: activeWatchView.graph,
+            mirror: activeWatchView.mirror,
+            transport: engineTransport,
+            fixed: true,
+            onExit: () => {
+              watchExitedRef.current = activeWatchView.jobId;
+              setActiveViewId("edit");
+            },
+            views: switcherViews,
+            currentId: activeViewId,
+            onSwitch: handleSwitchView,
+            theme
+          }
+        ),
+        document.body
+      ),
+      !activeWatchView && switcherViews.length > 1 && (0, import_react_dom2.createPortal)(
+        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+          "div",
+          {
+            "data-femo-theme": theme,
+            style: { position: "fixed", left: 10, bottom: 14, zIndex: 3e3 },
+            children: /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { style: { display: "flex", alignItems: "center", gap: 6, padding: "5px 8px", borderRadius: 999, background: "var(--femo-panel-bg, #fff)", border: "1px solid var(--femo-border-strong, #ccc)", boxShadow: "0 4px 14px rgba(0,0,0,0.18)" }, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("span", { style: { width: 8, height: 8, borderRadius: 99, flexShrink: 0, background: "var(--femo-warning, #d99a2b)" } }),
+              /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(ViewSwitcher, { views: switcherViews, currentId: "edit", onSelect: handleSwitchView, fontSize: 11.5 })
+            ] })
+          }
+        ),
+        document.body
+      )
     ] });
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(ErrorBoundary, { children: [
-    /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(FontStyle, { scoped: plugin }),
-    /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(ErrorBoundary, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(FontStyle, { scoped: plugin }),
+    /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(
       "div",
       {
         ref: editorRootRef,
@@ -16369,7 +17454,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
           overflow: "hidden"
         },
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(
+          /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(
             "div",
             {
               style: {
@@ -16384,7 +17469,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                 // 调试窗口浮层的定位锚（absolute inset:0 盖住边栏）
               },
               children: [
-                /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(
+                /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(
                   "div",
                   {
                     style: {
@@ -16397,7 +17482,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                       flexShrink: 0
                     },
                     children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(
+                      /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(
                         "div",
                         {
                           style: {
@@ -16407,12 +17492,12 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                             letterSpacing: "-0.03em"
                           },
                           children: [
-                            /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { style: { color: "var(--femo-primary)" }, children: "FEMO" }),
+                            /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("span", { style: { color: "var(--femo-primary)" }, children: "FEMO" }),
                             " Generator"
                           ]
                         }
                       ),
-                      /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                      /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                         "div",
                         {
                           style: {
@@ -16427,10 +17512,10 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                     ]
                   }
                 ),
-                /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("div", { style: { display: "flex", borderBottom: "var(--femo-border-w) solid var(--femo-border)" }, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("div", { style: { display: "flex", borderBottom: "var(--femo-border-w) solid var(--femo-border)" }, children: [
                   ["library", "\u7EC4\u4EF6\u5E93"],
                   ["project", "\u9879\u76EE\u8BBE\u7F6E"]
-                ].map(([k, v]) => /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                ].map(([k, v]) => /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                   "button",
                   {
                     onClick: () => setTab(k),
@@ -16453,7 +17538,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                   },
                   k
                 )) }),
-                /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("div", { style: { flex: 1, overflow: "auto", padding: "13px 13px" }, children: tab === "library" ? /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("div", { style: { flex: 1, overflow: "auto", padding: "13px 13px" }, children: tab === "library" ? /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                   LibPanel,
                   {
                     lib,
@@ -16501,7 +17586,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                   const currentMod = moduleStore.find(
                     (m) => m.path.length === locationPath.length && m.path.every((s, i) => s === locationPath[i])
                   );
-                  if (!currentMod) return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("div", { style: { color: "var(--femo-text-4-weak)", fontSize: 12 }, children: "\u672A\u627E\u5230\u6A21\u5757" });
+                  if (!currentMod) return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("div", { style: { color: "var(--femo-text-4-weak)", fontSize: 12 }, children: "\u672A\u627E\u5230\u6A21\u5757" });
                   const modAsProj = {
                     ...currentMod.meta,
                     name: currentMod.name,
@@ -16509,7 +17594,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                     code: currentMod.code || [],
                     actors: []
                   };
-                  return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                  return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                     ProjPanel,
                     {
                       proj: modAsProj,
@@ -16524,7 +17609,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                       }
                     }
                   );
-                })() : /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                })() : /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                   ProjPanel,
                   {
                     proj,
@@ -16534,14 +17619,14 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                     onChange: setProj
                   }
                 ) }),
-                /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { style: {
+                /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { style: {
                   borderTop: "var(--femo-border-w) solid var(--femo-border)",
                   padding: "10px 13px",
                   display: "flex",
                   gap: 8,
                   flexShrink: 0
                 }, children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                  /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                     "button",
                     {
                       onClick: cycleTheme,
@@ -16568,10 +17653,10 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                         minWidth: 0,
                         overflow: "hidden"
                       },
-                      children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(FaPalette, { size: 12, style: { flexShrink: 0 } })
+                      children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(FaPalette, { size: 12, style: { flexShrink: 0 } })
                     }
                   ),
-                  /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                  /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                     "button",
                     {
                       onClick: () => {
@@ -16602,10 +17687,10 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                         minWidth: 0,
                         overflow: "hidden"
                       },
-                      children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(FaUserPlus, { size: 12, style: { flexShrink: 0 } })
+                      children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(FaUserPlus, { size: 12, style: { flexShrink: 0 } })
                     }
                   ),
-                  /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(
+                  /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(
                     "button",
                     {
                       onClick: () => setDebugOpen(true),
@@ -16634,8 +17719,8 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                         position: "relative"
                       },
                       children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(FaTerminal, { size: 12, style: { flexShrink: 0 } }),
-                        debugLog.some((e) => e.level === "error") && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(FaTerminal, { size: 12, style: { flexShrink: 0 } }),
+                        debugLog.some((e) => e.level === "error") && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                           "span",
                           {
                             style: {
@@ -16654,7 +17739,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                     }
                   )
                 ] }),
-                debugOpen && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                debugOpen && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                   DebugPanel,
                   {
                     entries: debugLog,
@@ -16673,17 +17758,45 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
               ]
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(
+          /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(
             "div",
             {
               style: {
                 flex: 1,
                 display: "flex",
                 flexDirection: "column",
-                minWidth: 0
+                minWidth: 0,
+                position: "relative"
+                // 【刀2】观演覆盖层的定位锚
               },
               children: [
-                /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(
+                activeViewId === "edit" && switcherViews.length > 1 && /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { style: { display: "flex", alignItems: "center", gap: 10, padding: "4px 14px", flexShrink: 0, borderBottom: "1px solid var(--femo-border)", background: "var(--femo-warning-soft, rgba(217,154,43,0.12))" }, children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("span", { style: { width: 8, height: 8, borderRadius: 99, flexShrink: 0, background: "var(--femo-warning, #d99a2b)" } }),
+                  /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("span", { style: { fontSize: 11.5, color: "var(--femo-text-2)" }, children: [
+                    editMatchesJob ? "\u5F15\u64CE\u6709\u573A\u6B21\u53EF\u770B" : `\u5F15\u64CE\u5728\u8DD1 Job ${watchJobId}\uFF08\u4E0E\u5F53\u524D\u7F16\u8F91\u7A3F\u4E0D\u662F\u540C\u4E00\u7248\uFF09`,
+                    "\u2014\u2014"
+                  ] }),
+                  /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(ViewSwitcher, { views: switcherViews, currentId: "edit", onSelect: handleSwitchView, fontSize: 11.5 })
+                ] }),
+                activeViewId !== "edit" && switcherViews.length > 1 && (() => {
+                  const watchedN = Number(String(activeViewId).slice(4));
+                  const watchedEntry = watchViews[watchedN];
+                  const wStatus = watchedEntry?.mirror?.status || "idle";
+                  return /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { style: { display: "flex", alignItems: "center", gap: 10, padding: "4px 14px", flexShrink: 0, borderBottom: "1px solid var(--femo-border)", background: "var(--femo-warning-soft, rgba(217,154,43,0.12))" }, children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("span", { style: { width: 8, height: 8, borderRadius: 99, flexShrink: 0, background: STATUS_COLOR[wStatus] || STATUS_COLOR.idle }, title: `\u89C2\u6F14\u72B6\u6001\uFF1A${STATUS_TEXT[wStatus] || wStatus}` }),
+                    /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("span", { style: { fontSize: 11.5, color: "var(--femo-text-2)" }, children: [
+                      "\u6B63\u5728\u89C2\u770B Job ",
+                      watchedN,
+                      watchedEntry?.meta?.scriptName ? ` \xB7 ${watchedEntry.meta.scriptName}` : "",
+                      "\uFF08\u72B6\u6001\uFF1A",
+                      STATUS_TEXT[wStatus] || wStatus,
+                      editMatchesJob ? " \xB7 \u4E0E\u5F53\u524D\u7F16\u8F91\u7A3F\u540C\u4E00\u7248" : " \xB7 \u4E0E\u5F53\u524D\u7F16\u8F91\u7A3F\u4E0D\u662F\u540C\u4E00\u7248",
+                      "\uFF09\u2014\u2014"
+                    ] }),
+                    /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(ViewSwitcher, { views: switcherViews, currentId: activeViewId, onSelect: handleSwitchView, fontSize: 11.5 })
+                  ] });
+                })(),
+                /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(
                   "div",
                   {
                     style: {
@@ -16699,10 +17812,11 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                       flexShrink: 0
                     },
                     children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { style: { fontSize: 11.5, color: "var(--femo-text-3)", fontWeight: 600 }, children: "\u4F4D\u7F6E" }),
-                      /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                      /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("span", { style: { fontSize: 11.5, color: "var(--femo-text-3)", fontWeight: 600 }, children: "\u4F4D\u7F6E" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                         "button",
                         {
+                          ...crumbDropProps(["mainflow"]),
                           onClick: () => {
                             if (locationPath.length !== 1 || locationPath[0] !== "mainflow") {
                               saveCurrentFlow();
@@ -16717,45 +17831,51 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                             fontSize: 12,
                             fontWeight: 700,
                             fontFamily: "var(--femo-font-sans)",
-                            border: `var(--femo-border-w-strong) solid ${mode === "mainflow" ? "var(--femo-primary)" : "var(--femo-border-strong)"}`,
-                            background: mode === "mainflow" ? "var(--femo-primary-soft-2)" : "var(--femo-surface)",
-                            color: mode === "mainflow" ? "var(--femo-primary)" : "var(--femo-text-3)",
+                            border: `var(--femo-border-w-strong) solid ${crumbDropHover === "mainflow" || mode === "mainflow" ? "var(--femo-primary)" : "var(--femo-border-strong)"}`,
+                            background: crumbDropHover === "mainflow" || mode === "mainflow" ? "var(--femo-primary-soft-2)" : "var(--femo-surface)",
+                            color: crumbDropHover === "mainflow" || mode === "mainflow" ? "var(--femo-primary)" : "var(--femo-text-3)",
                             opacity: mode === "mainflow" ? 0.7 : 1
                           },
                           children: "\u4E3B\u6D41\u7A0B"
                         }
                       ),
-                      locationPath.map((seg, idx) => /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(import_react19.default.Fragment, { children: [
-                        idx > 0 && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
-                          "span",
-                          {
-                            style: { color: "var(--femo-text-4)", fontSize: 12, fontWeight: 600 },
-                            children: ">"
-                          }
-                        ),
-                        idx === 0 ? null : /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
-                          "button",
-                          {
-                            onClick: () => {
-                              saveCurrentFlow();
-                              const newPath = locationPath.slice(0, idx + 1);
-                              setLocationPath(newPath);
-                            },
-                            style: {
-                              padding: "4px 10px",
-                              borderRadius: "var(--femo-radius-sm)",
-                              cursor: "pointer",
-                              fontSize: 12,
-                              fontWeight: 700,
-                              border: `var(--femo-border-w-strong) solid var(--femo-border-strong)`,
-                              background: "var(--femo-surface)",
-                              color: "var(--femo-text-3)"
-                            },
-                            children: seg
-                          }
-                        )
-                      ] }, idx)),
-                      mode === "module" && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                      locationPath.map((seg, idx) => {
+                        const segPath = locationPath.slice(0, idx + 1);
+                        const segKey = segPath.join("/");
+                        const crumbHot = crumbDropHover === segKey;
+                        return /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(import_react20.default.Fragment, { children: [
+                          idx > 0 && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+                            "span",
+                            {
+                              style: { color: "var(--femo-text-4)", fontSize: 12, fontWeight: 600 },
+                              children: ">"
+                            }
+                          ),
+                          idx === 0 ? null : /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+                            "button",
+                            {
+                              ...crumbDropProps(segPath),
+                              onClick: () => {
+                                saveCurrentFlow();
+                                const newPath = locationPath.slice(0, idx + 1);
+                                setLocationPath(newPath);
+                              },
+                              style: {
+                                padding: "4px 10px",
+                                borderRadius: "var(--femo-radius-sm)",
+                                cursor: "pointer",
+                                fontSize: 12,
+                                fontWeight: 700,
+                                border: `var(--femo-border-w-strong) solid ${crumbHot ? "var(--femo-primary)" : "var(--femo-border-strong)"}`,
+                                background: crumbHot ? "var(--femo-primary-soft-2)" : "var(--femo-surface)",
+                                color: crumbHot ? "var(--femo-primary)" : "var(--femo-text-3)"
+                              },
+                              children: seg
+                            }
+                          )
+                        ] }, idx);
+                      }),
+                      mode === "module" && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                         "button",
                         {
                           onClick: () => {
@@ -16775,8 +17895,8 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                         }
                       ),
                       " ",
-                      /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("div", { style: { flex: 1 } }),
-                      exportToast !== null && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                      /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("div", { style: { flex: 1 } }),
+                      exportToast !== null && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                         "div",
                         {
                           style: {
@@ -16800,7 +17920,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                         },
                         exportToast.id
                       ),
-                      pauseNotice !== null && /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(
+                      pauseNotice !== null && /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(
                         "div",
                         {
                           style: {
@@ -16831,7 +17951,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                         // 【2026-09-19 冷启动补拉】芯片可点：宿主自动 2s 轮询为主，
                         // 这里给用户一个立即重探的抓手（点了重拉 session-state，
                         // 引擎就绪即换回运行/继续键，不再永远卡在加载态）。
-                        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                           ToolChip,
                           {
                             icon: FaSpinner,
@@ -16846,7 +17966,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                             children: "\u5F15\u64CE\u542F\u52A8\u4E2D\u2026"
                           }
                         )
-                      ) : /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                      ) : /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                         ToolChip,
                         {
                           icon: FaPlay,
@@ -16856,7 +17976,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                           children: "\u8FD0\u884C"
                         }
                       )),
-                      /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                      /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                         ToolChip,
                         {
                           icon: FaStop,
@@ -16866,7 +17986,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                           children: "\u505C\u6B62"
                         }
                       ),
-                      flowStatus === "paused" && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                      flowStatus === "paused" && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                         ToolChip,
                         {
                           icon: FaForward,
@@ -16876,7 +17996,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                           children: "\u7EE7\u7EED"
                         }
                       ),
-                      /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                      /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                         "input",
                         {
                           ref: fileInputRef,
@@ -16886,7 +18006,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                           onChange: handleImportFile
                         }
                       ),
-                      /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                      /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                         ToolChip,
                         {
                           icon: FaFolderOpen,
@@ -16896,7 +18016,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                           children: "\u6253\u5F00"
                         }
                       ),
-                      /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                      /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                         ToolChip,
                         {
                           icon: FaFloppyDisk,
@@ -16910,7 +18030,23 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                     ]
                   }
                 ),
-                /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                activeWatchView ? /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("div", { style: { flex: 1, position: "relative", overflow: "hidden", background: "var(--femo-bg)" }, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+                  WatchView,
+                  {
+                    jobId: activeWatchView.jobId,
+                    meta: activeWatchView.meta,
+                    graph: activeWatchView.graph,
+                    mirror: activeWatchView.mirror,
+                    transport: engineTransport,
+                    embedded: true,
+                    onExit: () => {
+                      watchExitedRef.current = activeWatchView.jobId;
+                      setActiveViewId("edit");
+                    },
+                    onToggleDebug: () => setDebugOpen(true),
+                    theme
+                  }
+                ) }) : /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                   "div",
                   {
                     ref: cvRef,
@@ -16938,7 +18074,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                     },
                     onDragOver: handleCanvasDragOver,
                     onDrop: handleCanvasDrop,
-                    children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                    children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                       "div",
                       {
                         "data-canvas-bg": "true",
@@ -16948,7 +18084,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                           position: "absolute",
                           inset: 0
                         },
-                        children: /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(
+                        children: /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(
                           "div",
                           {
                             "data-canvas-bg": "true",
@@ -16959,7 +18095,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                               inset: 0
                             },
                             children: [
-                              /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(
+                              /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(
                                 "svg",
                                 {
                                   style: {
@@ -16972,13 +18108,13 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                                     zIndex: 24
                                   },
                                   children: [
-                                    /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("defs", { children: [
+                                    /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("defs", { children: [
                                       ["a", "var(--femo-edge-flow)"],
                                       ["as", "var(--femo-edge-sel)"],
                                       ["a_for", "var(--femo-edge)"],
                                       ["al", "var(--femo-danger)"],
                                       ["aj", "var(--femo-warning)"]
-                                    ].map(([id, col]) => /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                                    ].map(([id, col]) => /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                                       "marker",
                                       {
                                         id,
@@ -16987,7 +18123,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                                         refX: "7",
                                         refY: "3",
                                         orient: "auto",
-                                        children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("polygon", { points: "0 0, 8 3, 0 6", fill: col })
+                                        children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("polygon", { points: "0 0, 8 3, 0 6", fill: col })
                                       },
                                       id
                                     )) }),
@@ -17009,8 +18145,8 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                                         const pathD = `M${startX},${startY} C${midX},${midY} ${midX},${midY} ${endX},${endY}`;
                                         const isSel2 = sel?.type === "edge" && sel.id === e.id;
                                         console.log("[SVG self-loop] edge.id=", e.id, "pathD=", pathD);
-                                        return /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("g", { children: [
-                                          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                                        return /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("g", { children: [
+                                          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                                             "path",
                                             {
                                               d: pathD,
@@ -17026,7 +18162,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                                               }
                                             }
                                           ),
-                                          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                                          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                                             "path",
                                             {
                                               d: pathD,
@@ -17036,7 +18172,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                                               style: { strokeWidth: isSel2 ? "var(--femo-edge-w-sel)" : "var(--femo-edge-w)" }
                                             }
                                           ),
-                                          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(EdgeShimmer, { d: pathD, w: 1 })
+                                          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(EdgeShimmer, { d: pathD, w: 1 })
                                         ] }, e.id);
                                       }
                                       const isParCycle = parCycleEdges.has(e.id);
@@ -17057,8 +18193,8 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                                       const col = isParBroken ? "var(--femo-danger)" : isParCycle ? "var(--femo-edge)" : isForOutEdge ? "var(--femo-edge)" : isCycleEdge ? "var(--femo-edge)" : isForBrokenFinal ? "var(--femo-danger)" : isSel ? "var(--femo-edge-sel)" : "var(--femo-edge-flow)";
                                       const mkr = isParBroken ? "al" : isParCycle ? "a_for" : isForBrokenFinal ? "al" : isSel ? "as" : isForOutEdge || isCycleEdge ? "a_for" : "a";
                                       const dashArray = isParBroken || isForBrokenFinal ? "5,3" : "none";
-                                      return /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("g", { children: [
-                                        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                                      return /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("g", { children: [
+                                        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                                           "path",
                                           {
                                             d: geo.pathDs[geo.midIdx],
@@ -17073,8 +18209,8 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                                             }
                                           }
                                         ),
-                                        geo.pathDs.map((pathD, i) => /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("g", { children: [
-                                          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                                        geo.pathDs.map((pathD, i) => /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("g", { children: [
+                                          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                                             "path",
                                             {
                                               d: pathD,
@@ -17085,9 +18221,9 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                                               style: { pointerEvents: "none", strokeWidth: isSel ? "var(--femo-edge-w-sel)" : "var(--femo-edge-w)" }
                                             }
                                           ),
-                                          !isParBroken && !isForBrokenFinal && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(EdgeShimmer, { d: pathD, w: 1 })
+                                          !isParBroken && !isForBrokenFinal && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(EdgeShimmer, { d: pathD, w: 1 })
                                         ] }, i)),
-                                        e.cond && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                                        e.cond && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                                           "text",
                                           {
                                             x: geo.labelPos.x,
@@ -17103,7 +18239,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                                         ),
                                         !isBack && edges.filter((x) => x.src === e.src).length > 1 && (() => {
                                           const sp = geo.srcPorts[geo.midIdx];
-                                          return sp ? /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                                          return sp ? /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                                             "circle",
                                             {
                                               cx: sp.x,
@@ -17118,7 +18254,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                                     }),
                                     conn && (() => {
                                       const pathD = getTempConnLine();
-                                      return pathD ? /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                                      return pathD ? /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                                         "path",
                                         {
                                           d: pathD,
@@ -17133,7 +18269,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                                   ]
                                 }
                               ),
-                              /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(SnapGuides, { guides: snapGuides, scale: scale * effectiveZoom(cvRef.current) }),
+                              /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(SnapGuides, { guides: snapGuides, scale: scale * effectiveZoom(cvRef.current) }),
                               nodes.map((n) => {
                                 const enrichedNode = n.type === "action" ? { ...n, action: actionMap.get(n.actionId) } : n;
                                 const commonProps = {
@@ -17160,7 +18296,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                                   onBodyMouseUp: (e) => handleBodyMouseUp(e, enrichedNode.id)
                                 };
                                 if (enrichedNode.type === "special") {
-                                  return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                                  return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                                     SpecialNodeView,
                                     {
                                       node: enrichedNode,
@@ -17173,7 +18309,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                                 if (enrichedNode.type === "for_out") {
                                   const isSel = sel?.type === "node" && sel.id === enrichedNode.id;
                                   const motherNode = enrichedNode.forNodeId ? nm.get(enrichedNode.forNodeId) : null;
-                                  return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                                  return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                                     ForOutNodeView,
                                     {
                                       node: enrichedNode,
@@ -17194,7 +18330,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                                 }
                                 if (enrichedNode.type === "par_out") {
                                   const isSel = sel?.type === "node" && sel.id === enrichedNode.id;
-                                  return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                                  return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                                     ParOutNodeView,
                                     {
                                       node: enrichedNode,
@@ -17218,9 +18354,9 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                                   );
                                 }
                                 if (enrichedNode.type === "position") {
-                                  return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(PositionNodeView, { node: enrichedNode, ...commonProps }, enrichedNode.id);
+                                  return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(PositionNodeView, { node: enrichedNode, ...commonProps }, enrichedNode.id);
                                 }
-                                return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                                return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                                   ActionNodeView,
                                   {
                                     node: enrichedNode,
@@ -17246,7 +18382,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                                   enrichedNode.id
                                 );
                               }),
-                              nodes.filter((n) => n.type !== "special").length === 0 && !conn && /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(
+                              nodes.filter((n) => n.type !== "special").length === 0 && !conn && /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(
                                 "div",
                                 {
                                   style: {
@@ -17259,7 +18395,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                                     pointerEvents: "none"
                                   },
                                   children: [
-                                    /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                                    /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                                       "div",
                                       {
                                         style: {
@@ -17270,7 +18406,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                                         children: "\u4ECE\u7EC4\u4EF6\u5E93\u6DFB\u52A0 Action \u5230\u753B\u5E03"
                                       }
                                     ),
-                                    /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                                    /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                                       "div",
                                       {
                                         style: { fontSize: 11.5, color: "var(--femo-text-4-weak)", marginTop: 6 },
@@ -17290,7 +18426,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
               ]
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(
+          /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(
             "div",
             {
               style: {
@@ -17303,7 +18439,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                 position: "relative"
               },
               children: [
-                /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                   "div",
                   {
                     onMouseDown: () => setIsResizingRight(true),
@@ -17318,7 +18454,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                     }
                   }
                 ),
-                /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(
+                /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(
                   "div",
                   {
                     style: {
@@ -17327,7 +18463,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                       minHeight: 160
                     },
                     children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                      /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                         "div",
                         {
                           style: {
@@ -17341,8 +18477,8 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                           children: selNode ? "\u8282\u70B9\u5C5E\u6027" : selEdge ? "\u8FDE\u7EBF\u5C5E\u6027" : "\u5C5E\u6027\u9762\u677F"
                         }
                       ),
-                      selNode ? /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(import_jsx_runtime20.Fragment, { children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                      selNode ? /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(import_jsx_runtime21.Fragment, { children: [
+                        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                           "div",
                           {
                             style: {
@@ -17354,12 +18490,12 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                             children: selNode.label
                           }
                         ),
-                        selNode.type === "special" ? /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(import_jsx_runtime20.Fragment, { children: [
-                          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(PR, { k: "\u7C7B\u578B", v: selNode.specialType }),
-                          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(PR, { k: "\u7C7B\u522B", v: "\u7279\u6B8A\u8282\u70B9" }),
-                          (selNode.specialType === "FOR" || selNode.specialType === "PAR") && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(F, { label: "\u53D8\u5316\u5143\u7D20", hint: selNode.specialType === "PAR" ? "\u5E76\u884C\u904D\u5386\u5217\u8868" : "\u5217\u8868\u5168\u90E8\u5FAA\u73AF\u4E00\u904D\u540E\u8D70\u51FA\u53E3", children: /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { style: { display: "flex", alignItems: "center", gap: 4 }, children: [
-                            /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { style: { fontSize: 12.5, color: "var(--femo-text-2)", fontWeight: 600 }, children: selNode.specialType === "PAR" ? "par" : "for" }),
-                            /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                        selNode.type === "special" ? /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(import_jsx_runtime21.Fragment, { children: [
+                          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(PR, { k: "\u7C7B\u578B", v: selNode.specialType }),
+                          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(PR, { k: "\u7C7B\u522B", v: "\u7279\u6B8A\u8282\u70B9" }),
+                          (selNode.specialType === "FOR" || selNode.specialType === "PAR") && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(F, { label: "\u53D8\u5316\u5143\u7D20", hint: selNode.specialType === "PAR" ? "\u5E76\u884C\u904D\u5386\u5217\u8868" : "\u5217\u8868\u5168\u90E8\u5FAA\u73AF\u4E00\u904D\u540E\u8D70\u51FA\u53E3", children: /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { style: { display: "flex", alignItems: "center", gap: 4 }, children: [
+                            /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("span", { style: { fontSize: 12.5, color: "var(--femo-text-2)", fontWeight: 600 }, children: selNode.specialType === "PAR" ? "par" : "for" }),
+                            /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                               "input",
                               {
                                 value: selNode.forCondition || "",
@@ -17373,7 +18509,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                               }
                             )
                           ] }) }),
-                          (selNode.specialType === "START" || selNode.specialType === "IN") && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                          (selNode.specialType === "START" || selNode.specialType === "IN") && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                             "div",
                             {
                               style: {
@@ -17388,7 +18524,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                               children: "\u5165\u53E3\u8282\u70B9\uFF08\u552F\u4E00\uFF09"
                             }
                           ),
-                          SINK_ONLY.has(selNode.specialType) && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                          SINK_ONLY.has(selNode.specialType) && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                             "div",
                             {
                               style: {
@@ -17403,9 +18539,9 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                               children: "\u7EC8\u7AEF\u8282\u70B9\uFF08\u4EC5\u5165\uFF09"
                             }
                           )
-                        ] }) : selNode.type === "position" ? /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(import_jsx_runtime20.Fragment, { children: [
-                          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(PR, { k: "\u7C7B\u522B", v: "\u7A7A\u8282\u70B9 (POSITION)" }),
-                          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                        ] }) : selNode.type === "position" ? /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(import_jsx_runtime21.Fragment, { children: [
+                          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(PR, { k: "\u7C7B\u522B", v: "\u7A7A\u8282\u70B9 (POSITION)" }),
+                          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                             "div",
                             {
                               style: {
@@ -17420,25 +18556,25 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                               children: "\u4EC5\u5360\u4F4D\uFF0C\u65E0\u5185\u5BB9"
                             }
                           )
-                        ] }) : /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(import_jsx_runtime20.Fragment, { children: [
-                          selNode.action ? /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(import_jsx_runtime20.Fragment, { children: [
-                            selNode.label && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(PR, { k: "\u8282\u70B9\u540D", v: selNode.label.replace(/[\[\]]/g, "") }),
-                            /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(PR, { k: "Action \u540D", v: selNode.action.name || "?" }),
-                            /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                        ] }) : /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(import_jsx_runtime21.Fragment, { children: [
+                          selNode.action ? /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(import_jsx_runtime21.Fragment, { children: [
+                            selNode.label && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(PR, { k: "\u8282\u70B9\u540D", v: selNode.label.replace(/[\[\]]/g, "") }),
+                            /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(PR, { k: "Action \u540D", v: selNode.action.name || "?" }),
+                            /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                               PR,
                               {
                                 k: "\u7C7B\u578B",
                                 v: `@${selNode.action.executorType || "ai"}`
                               }
                             ),
-                            selNode.action.executorActor && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(PR, { k: "\u6267\u884C\u8005", v: selNode.action.executorActor }),
-                            selNode.action.scope && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(PR, { k: "Scope", v: selNode.action.scope }),
-                            selNode.action.outVars && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(PR, { k: "out", v: selNode.action.outVars })
+                            selNode.action.executorActor && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(PR, { k: "\u6267\u884C\u8005", v: selNode.action.executorActor }),
+                            selNode.action.scope && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(PR, { k: "Scope", v: selNode.action.scope }),
+                            selNode.action.outVars && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(PR, { k: "out", v: selNode.action.outVars })
                           ] }) : null,
-                          selNode.type === "module" && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(PR, { k: "\u5F15\u7528", v: `&${selNode.modRef}` })
+                          selNode.type === "module" && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(PR, { k: "\u5F15\u7528", v: `&${selNode.modRef}` })
                         ] }),
-                        /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { style: { display: "flex", gap: 6, marginTop: 12 }, children: [
-                          selNode.type === "action" && selNode.action && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                        /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { style: { display: "flex", gap: 6, marginTop: 12 }, children: [
+                          selNode.type === "action" && selNode.action && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                             "button",
                             {
                               onClick: () => setModal({
@@ -17455,7 +18591,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                               children: "\u7F16\u8F91"
                             }
                           ),
-                          !(selNode.type === "special" && (selNode.specialType === "START" || selNode.specialType === "IN")) && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                          !(selNode.type === "special" && (selNode.specialType === "START" || selNode.specialType === "IN")) && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                             "button",
                             {
                               onClick: () => {
@@ -17479,10 +18615,10 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                             }
                           )
                         ] })
-                      ] }) : selEdge ? /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(import_jsx_runtime20.Fragment, { children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(PR, { k: "\u6765\u6E90", v: nm.get(selEdge.src)?.label || "?" }),
-                        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(PR, { k: "\u76EE\u6807", v: nm.get(selEdge.tgt)?.label || "?" }),
-                        backEdges.has(selEdge.id) && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                      ] }) : selEdge ? /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(import_jsx_runtime21.Fragment, { children: [
+                        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(PR, { k: "\u6765\u6E90", v: nm.get(selEdge.src)?.label || "?" }),
+                        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(PR, { k: "\u76EE\u6807", v: nm.get(selEdge.tgt)?.label || "?" }),
+                        backEdges.has(selEdge.id) && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                           "div",
                           {
                             style: {
@@ -17502,7 +18638,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                             (e) => e.tgt === selEdge.tgt && !backEdges.has(e.id)
                           );
                           if (inEdges.length > 1) {
-                            return /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(
+                            return /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(
                               "div",
                               {
                                 style: {
@@ -17524,7 +18660,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                           }
                           return null;
                         })(),
-                        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(F, { label: "if \u6761\u4EF6", hint: "\u5982 game_over == false", children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(F, { label: "if \u6761\u4EF6", hint: "\u5982 game_over == false", children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                           "input",
                           {
                             value: selEdge.cond || "",
@@ -17537,7 +18673,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                             style: inp
                           }
                         ) }),
-                        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                           "button",
                           {
                             onClick: () => {
@@ -17563,9 +18699,9 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                           item = lib.modules.find((m) => m.id === libSel.id);
                         }
                         if (!item)
-                          return /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("div", { style: { color: "var(--femo-text-4-weak)" }, children: "\u672A\u627E\u5230\u9879" });
-                        return /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(import_jsx_runtime20.Fragment, { children: [
-                          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                          return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("div", { style: { color: "var(--femo-text-4-weak)" }, children: "\u672A\u627E\u5230\u9879" });
+                        return /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(import_jsx_runtime21.Fragment, { children: [
+                          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                             "div",
                             {
                               style: {
@@ -17577,13 +18713,13 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                               children: libSel.type === "module" ? `&${item.name}` : item.name
                             }
                           ),
-                          libSel.type === "action" ? /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(import_jsx_runtime20.Fragment, { children: [
-                            /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(PR, { k: "\u7C7B\u578B", v: `@${item.executorType}` }),
-                            item.executorActor && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(PR, { k: "\u6267\u884C\u8005", v: item.executorActor }),
-                            item.scope && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(PR, { k: "Scope", v: item.scope }),
-                            item.outVars && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(PR, { k: "out", v: item.outVars })
-                          ] }) : /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(PR, { k: "\u6A21\u5757", v: item.name }),
-                          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                          libSel.type === "action" ? /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(import_jsx_runtime21.Fragment, { children: [
+                            /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(PR, { k: "\u7C7B\u578B", v: `@${item.executorType}` }),
+                            item.executorActor && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(PR, { k: "\u6267\u884C\u8005", v: item.executorActor }),
+                            item.scope && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(PR, { k: "Scope", v: item.scope }),
+                            item.outVars && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(PR, { k: "out", v: item.outVars })
+                          ] }) : /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(PR, { k: "\u6A21\u5757", v: item.name }),
+                          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                             "button",
                             {
                               onClick: () => {
@@ -17596,21 +18732,21 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                             }
                           )
                         ] });
-                      })() : /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)(
+                      })() : /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)(
                         "div",
                         {
                           style: { color: "var(--femo-text-4-weak)", fontSize: 11.5, lineHeight: 1.7 },
                           children: [
                             "\u70B9\u51FB\u8282\u70B9\u6216\u8FDE\u7EBF\u67E5\u770B\u5C5E\u6027",
-                            /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("br", {}),
-                            /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("span", { style: { fontSize: 10.5 }, children: "\u53CC\u51FB\u8282\u70B9\u53EF\u7F16\u8F91 Action" })
+                            /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("br", {}),
+                            /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("span", { style: { fontSize: 10.5 }, children: "\u53CC\u51FB\u8282\u70B9\u53EF\u7F16\u8F91 Action" })
                           ]
                         }
                       )
                     ]
                   }
                 ),
-                (plugin ? savedPath === void 0 : standaloneSavedPath === null) && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("div", { style: {
+                (plugin ? savedPath === void 0 : standaloneSavedPath === null) && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("div", { style: {
                   fontSize: 11,
                   color: "var(--femo-warning-strong)",
                   background: "var(--femo-warning-soft)",
@@ -17620,7 +18756,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                   marginBottom: 4,
                   lineHeight: 1.4
                 }, children: "\u26A0 \u811A\u672C\u672A\u4FDD\u5B58\u3002\u5916\u63A5\u4F9D\u8D56\u6587\u4EF6\u53EA\u652F\u6301\u7EDD\u5BF9\u5730\u5740\u3002" }),
-                /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+                /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                   FemoPreview,
                   {
                     value: femoText,
@@ -17640,7 +18776,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
             }
           ),
           " ",
-          modal && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+          modal && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
             ActionModal,
             {
               init: modal.type !== "new" ? modal.action : null,
@@ -17682,7 +18818,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
               onClose: () => setModal(null)
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
             BubbleOverlay,
             {
               bubbleOverlay,
@@ -17694,7 +18830,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
               submitHumanInput
             }
           ),
-          runGuard !== null && /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("div", { style: { position: "fixed", inset: 0, zIndex: 500, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center" }, children: /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { style: {
+          runGuard !== null && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("div", { style: { position: "fixed", inset: 0, zIndex: 500, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center" }, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { style: {
             maxWidth: 430,
             width: "calc(100% - 48px)",
             padding: "18px 20px",
@@ -17705,13 +18841,13 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
             fontSize: 13,
             lineHeight: 1.6
           }, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("div", { style: { fontWeight: 700, marginBottom: 6 }, children: "\u26A0\uFE0F \u6709\u672A\u843D\u76D8\u4FEE\u6539" }),
-            /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { style: { color: "var(--femo-text-secondary, #666)", marginBottom: 14 }, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("div", { style: { fontWeight: 700, marginBottom: 6 }, children: "\u26A0\uFE0F \u6709\u672A\u843D\u76D8\u4FEE\u6539" }),
+            /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { style: { color: "var(--femo-text-secondary, #666)", marginBottom: 14 }, children: [
               runGuard.textDirty && runGuard.graphDirty ? "\u6587\u672C\u548C\u753B\u5E03\u56FE\u90FD\u88AB\u4FEE\u6539\u8FC7\uFF0C\u4E14\u4E92\u76F8\u4E0D\u7EDF\u4E00\u3002" : runGuard.textDirty ? "\u6587\u672C\u88AB\u4FEE\u6539\u8FC7\uFF0C\u5C1A\u672A\u5E94\u7528\u5230\u753B\u5E03\u548C record\u3002" : "\u753B\u5E03\u56FE\u88AB\u4FEE\u6539\u8FC7\uFF0C\u5C1A\u672A\u5E94\u7528\u5230\u6587\u672C\u548C record\u3002",
               "\u5EFA\u8BAE\u56DE\u53BB\u6309\u5BF9\u5E94\u7684\u7EDF\u4E00\u6309\u94AE\uFF08\u6587\u672C\u751F\u56FE / \u56FE\u751F\u6587\u672C\uFF09\u5E94\u7528\u4F60\u8981\u7684\u7248\u672C\uFF1B \u4E5F\u53EF\u4EE5\u653E\u5F03\u8FD9\u4E9B\u4FEE\u6539\uFF0C\u4EE5\u6700\u540E\u4FDD\u5B58\u7684 record \u4E3A\u51C6\u76F4\u63A5\u8FD0\u884C\u3002"
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" }, children: [
-              /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+            /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" }, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                 "button",
                 {
                   onClick: () => setRunGuard(null),
@@ -17719,7 +18855,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
                   children: "\u56DE\u53BB\u6838\u67E5"
                 }
               ),
-              /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+              /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
                 "button",
                 {
                   onClick: discardChangesAndRun,
@@ -17729,7 +18865,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
               )
             ] })
           ] }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
             SoulModal,
             {
               open: soulModalOpen,
@@ -17740,7 +18876,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
               createUrl: plugin ? "/femo-plugin/souls" : getBackendBaseUrl() + "/api/souls/create"
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
             FemoFileList,
             {
               open: femoFileOpen,
@@ -17754,7 +18890,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
               onClose: () => setFemoFileOpen(false)
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
             FemoDirBrowse,
             {
               open: dirBrowseOpen,
@@ -17774,7 +18910,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
               onClose: () => setDirBrowseOpen(false)
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(FemoSaveReminder, { reminder: saveReminder, onChoice: resolveSaveReminder })
+          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(FemoSaveReminder, { reminder: saveReminder, onChoice: resolveSaveReminder })
         ]
       }
     ),
@@ -17784,7 +18920,7 @@ var FEMOEditor = (0, import_react19.forwardRef)(function FEMOEditor2({ plugin = 
 var FemoWorAuto_default = FEMOEditor;
 
 // client/client-ui/editor-page.tsx
-var import_jsx_runtime21 = require("react/jsx-runtime");
+var import_jsx_runtime22 = require("react/jsx-runtime");
 async function readJsonOrThrow(resp, what) {
   const text = await resp.text();
   if (text.trim().length === 0) {
@@ -17876,13 +19012,13 @@ function mountFemoEditorPage(createInjected) {
   el.style.cssText = "position:fixed;left:0;top:0;width:100vw;height:100vh;visibility:hidden;pointer-events:none;z-index:0";
   document.body.appendChild(el);
   pageRootEl = el;
-  (0, import_client.createRoot)(el).render(/* @__PURE__ */ (0, import_jsx_runtime21.jsx)(EditorPageRoot, { injectedFactory: createInjected }));
+  (0, import_client.createRoot)(el).render(/* @__PURE__ */ (0, import_jsx_runtime22.jsx)(EditorPageRoot, { injectedFactory: createInjected }));
   console.log("[femo-page] editor page root mounted (single-instance keep-alive)");
 }
 function EditorPageRoot({ injectedFactory }) {
-  const [, force] = (0, import_react20.useState)(0);
+  const [, force] = (0, import_react21.useState)(0);
   const target = pageState.target;
-  (0, import_react20.useEffect)(() => {
+  (0, import_react21.useEffect)(() => {
     const listener = () => {
       applyPagePlacement();
       force((x) => x + 1);
@@ -17893,7 +19029,7 @@ function EditorPageRoot({ injectedFactory }) {
       pageListeners.delete(listener);
     };
   }, []);
-  (0, import_react20.useEffect)(() => {
+  (0, import_react21.useEffect)(() => {
     if (target === null) return;
     const release = femoStreamAcquire({ background: true });
     const unsubscribe = subscribeControlEvents(handleControlEvent);
@@ -17902,7 +19038,7 @@ function EditorPageRoot({ injectedFactory }) {
       release();
     };
   }, [target]);
-  return /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("div", { style: { width: "100%", height: "100%", background: "transparent" }, children: target !== null && /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("div", { style: { width: "100%", height: "100%", background: "transparent" }, children: target !== null && /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
     FemoEditorPage,
     {
       sessionId: target,
@@ -17920,11 +19056,11 @@ var conflictBtnStyle = {
   border: "1px solid var(--dsw-alias-border-l2, #ddd)"
 };
 function FemoEditorPage({ sessionId, injected }) {
-  const [state, setState] = (0, import_react20.useState)(null);
-  const [conflict, setConflict] = (0, import_react20.useState)(null);
-  const [editorNotice, setEditorNotice] = (0, import_react20.useState)(null);
-  const lastRestoreErrorRef = (0, import_react20.useRef)(null);
-  const onRestoreError = (0, import_react20.useCallback)((message) => {
+  const [state, setState] = (0, import_react21.useState)(null);
+  const [conflict, setConflict] = (0, import_react21.useState)(null);
+  const [editorNotice, setEditorNotice] = (0, import_react21.useState)(null);
+  const lastRestoreErrorRef = (0, import_react21.useRef)(null);
+  const onRestoreError = (0, import_react21.useCallback)((message) => {
     if (lastRestoreErrorRef.current === message) return;
     lastRestoreErrorRef.current = message;
     setEditorNotice(message);
@@ -17936,7 +19072,7 @@ function FemoEditorPage({ sessionId, injected }) {
       console.warn("[femo-plugin] editor-error \u4E0A\u62A5\u5931\u8D25:", error);
     });
   }, [sessionId]);
-  const getRecordScript = (0, import_react20.useCallback)(async () => {
+  const getRecordScript = (0, import_react21.useCallback)(async () => {
     try {
       const response = await fetch(`/femo-plugin/session-state?sessionId=${encodeURIComponent(sessionId)}`);
       const data = await response.json();
@@ -17945,7 +19081,7 @@ function FemoEditorPage({ sessionId, injected }) {
       return void 0;
     }
   }, [sessionId]);
-  const loadSessionState = (0, import_react20.useCallback)(async () => {
+  const loadSessionState = (0, import_react21.useCallback)(async () => {
     console.log(`[femo-page] loadSessionState start sid=${sessionId}`);
     const response = await fetch(`/femo-plugin/session-state?sessionId=${encodeURIComponent(sessionId)}`);
     const data = await response.json();
@@ -17974,7 +19110,7 @@ function FemoEditorPage({ sessionId, injected }) {
       console.log(`[femo-page] state loaded sid=${sessionId} script=${data.script === void 0 ? "undefined" : String(data.script.length) + "ch"} rev=${String(data.rev ?? 0)} jobId=${String(data.jobId ?? "-")} pending=${data.pending === true}`);
     }
   }, [sessionId]);
-  (0, import_react20.useEffect)(() => {
+  (0, import_react21.useEffect)(() => {
     setState(null);
     setConflict(null);
     setEditorNotice(null);
@@ -17987,7 +19123,7 @@ function FemoEditorPage({ sessionId, injected }) {
   }, [sessionId, loadSessionState]);
   const enginePendingNow = state?.pending === true;
   const retryEngineProbe = loadSessionState;
-  (0, import_react20.useEffect)(() => {
+  (0, import_react21.useEffect)(() => {
     if (!enginePendingNow) return;
     console.log("[femo-page] engine pending \u2014 polling every 2s until bridge ready");
     const timer = setInterval(() => {
@@ -18078,7 +19214,7 @@ function FemoEditorPage({ sessionId, injected }) {
   const onPause = async (jobId) => {
     return await injected.pauseScript(sessionId, jobId);
   };
-  const [saveReminder, setSaveReminder] = (0, import_react20.useState)(null);
+  const [saveReminder, setSaveReminder] = (0, import_react21.useState)(null);
   const onExport = async (femo, name) => {
     const norm = (s) => s.replace(/\r\n/g, "\n");
     const currentPath = state?.scriptPath;
@@ -18170,8 +19306,8 @@ function FemoEditorPage({ sessionId, injected }) {
     const data = await readJsonOrThrow(resp, "\u4ECE\u6E05\u5355\u79FB\u9664");
     if (data.ok !== true) throw new Error(data.error ?? "\u4ECE\u6E05\u5355\u79FB\u9664\u5931\u8D25");
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { style: { width: "100%", height: "100%" }, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("div", { style: { width: "100%", height: "100%" }, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
       FemoWorAuto_default,
       {
         plugin: true,
@@ -18200,8 +19336,8 @@ function FemoEditorPage({ sessionId, injected }) {
         onRestoreError
       }
     ),
-    conflict !== null && (0, import_react_dom2.createPortal)(
-      /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("div", { style: {
+    conflict !== null && (0, import_react_dom3.createPortal)(
+      /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("div", { style: {
         position: "fixed",
         inset: 0,
         zIndex: 300,
@@ -18209,7 +19345,7 @@ function FemoEditorPage({ sessionId, injected }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center"
-      }, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { style: {
+      }, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("div", { style: {
         maxWidth: 420,
         width: "calc(100% - 48px)",
         padding: "18px 20px",
@@ -18220,11 +19356,11 @@ function FemoEditorPage({ sessionId, injected }) {
         fontSize: 13,
         lineHeight: 1.6
       }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("div", { style: { fontWeight: 700, marginBottom: 6 }, children: "\u2694\uFE0F FEMO\u811A\u672C\u51B2\u7A81" }),
-        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("div", { style: { color: "var(--dsw-alias-label-secondary, #666)", marginBottom: 14 }, children: "\u672C\u7A97\u53E3\u7684\u7F16\u8F91\u548C\u5176\u4ED6\u7A97\u53E3/\u8BBE\u5907\u7684\u4FDD\u5B58\u51B2\u7A81\u4E86\uFF08\u5BF9\u65B9\u5148\u5199\u5165\uFF09\u3002\u4EE5\u54EA\u4E2A\u4E3A\u51C6\uFF1F" }),
-        /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" }, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("button", { onClick: resolveConflictByReload, style: conflictBtnStyle, children: "\u52A0\u8F7D\u6700\u65B0\u7248\u672C" }),
-          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("div", { style: { fontWeight: 700, marginBottom: 6 }, children: "\u2694\uFE0F FEMO\u811A\u672C\u51B2\u7A81" }),
+        /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("div", { style: { color: "var(--dsw-alias-label-secondary, #666)", marginBottom: 14 }, children: "\u672C\u7A97\u53E3\u7684\u7F16\u8F91\u548C\u5176\u4ED6\u7A97\u53E3/\u8BBE\u5907\u7684\u4FDD\u5B58\u51B2\u7A81\u4E86\uFF08\u5BF9\u65B9\u5148\u5199\u5165\uFF09\u3002\u4EE5\u54EA\u4E2A\u4E3A\u51C6\uFF1F" }),
+        /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" }, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("button", { onClick: resolveConflictByReload, style: conflictBtnStyle, children: "\u52A0\u8F7D\u6700\u65B0\u7248\u672C" }),
+          /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
             "button",
             {
               onClick: resolveConflictByOverride,
@@ -18236,8 +19372,8 @@ function FemoEditorPage({ sessionId, injected }) {
       ] }) }),
       document.body
     ),
-    saveReminder !== null && (0, import_react_dom2.createPortal)(
-      /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("div", { style: {
+    saveReminder !== null && (0, import_react_dom3.createPortal)(
+      /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("div", { style: {
         position: "fixed",
         inset: 0,
         zIndex: 300,
@@ -18245,7 +19381,7 @@ function FemoEditorPage({ sessionId, injected }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center"
-      }, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { style: {
+      }, children: /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("div", { style: {
         maxWidth: 420,
         width: "calc(100% - 48px)",
         padding: "18px 20px",
@@ -18256,14 +19392,14 @@ function FemoEditorPage({ sessionId, injected }) {
         fontSize: 13,
         lineHeight: 1.6
       }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("div", { style: { fontWeight: 700, marginBottom: 6 }, children: "\u{1F4E4} \u4F60\u5E76\u672A\u6539\u52A8\u6587\u672C" }),
-        /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { style: { color: "var(--dsw-alias-label-secondary, #666)", marginBottom: 14, wordBreak: "break-all" }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("div", { style: { fontWeight: 700, marginBottom: 6 }, children: "\u{1F4E4} \u4F60\u5E76\u672A\u6539\u52A8\u6587\u672C" }),
+        /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("div", { style: { color: "var(--dsw-alias-label-secondary, #666)", marginBottom: 14, wordBreak: "break-all" }, children: [
           "\u5F53\u524D\u7F16\u8F91\u5668\u6587\u672C\u548C ",
           saveReminder.path,
           " \u91CC\u4FDD\u5B58\u7684\u7248\u672C\u4E00\u6837\u3002\u53EF\u4EE5\u4F9D\u7136\u4FDD\u5B58\uFF08\u8986\u76D6\u5199\u56DE\u539F\u6587\u4EF6\uFF09\u3001\u53E6\u5B58\u4E3A\u65B0\u6587\u4EF6\uFF0C\u6216\u8FD4\u56DE\u753B\u5E03\uFF08\u82E5\u4F60\u662F\u5FD8\u4E86\u5148\u300C\u56FE\u5230\u6587\u672C\u300D\u628A\u753B\u5E03\u6539\u52A8\u5E94\u7528\u8FC7\u6765\uFF09\u3002"
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" }, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("div", { style: { display: "flex", gap: 8, justifyContent: "flex-end" }, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
             "button",
             {
               onClick: () => {
@@ -18275,7 +19411,7 @@ function FemoEditorPage({ sessionId, injected }) {
               children: "\u8FD4\u56DE\u7F16\u8F91\u753B\u5E03"
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
             "button",
             {
               onClick: () => {
@@ -18287,7 +19423,7 @@ function FemoEditorPage({ sessionId, injected }) {
               children: "\u53E6\u5B58\u4E3A"
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
             "button",
             {
               onClick: () => {
@@ -18303,8 +19439,8 @@ function FemoEditorPage({ sessionId, injected }) {
       ] }) }),
       document.body
     ),
-    editorNotice !== null && (0, import_react_dom2.createPortal)(
-      /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { style: {
+    editorNotice !== null && (0, import_react_dom3.createPortal)(
+      /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("div", { style: {
         position: "fixed",
         left: 12,
         right: 12,
@@ -18323,11 +19459,11 @@ function FemoEditorPage({ sessionId, injected }) {
         fontSize: 12.5,
         lineHeight: 1.55
       }, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { style: { flex: 1 }, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("div", { style: { fontWeight: 700, marginBottom: 2 }, children: "\u26A0\uFE0F FEMO\u811A\u672C\u6062\u590D\u5931\u8D25\uFF08\u5DF2\u4E0A\u62A5\u4E3B\u6A21\u578B\uFF09" }),
-          /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("div", { style: { color: "var(--dsw-alias-label-secondary, #666)", whiteSpace: "pre-wrap" }, children: editorNotice })
+        /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("div", { style: { flex: 1 }, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("div", { style: { fontWeight: 700, marginBottom: 2 }, children: "\u26A0\uFE0F FEMO\u811A\u672C\u6062\u590D\u5931\u8D25\uFF08\u5DF2\u4E0A\u62A5\u4E3B\u6A21\u578B\uFF09" }),
+          /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("div", { style: { color: "var(--dsw-alias-label-secondary, #666)", whiteSpace: "pre-wrap" }, children: editorNotice })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime22.jsx)(
           "button",
           {
             onClick: () => setEditorNotice(null),
@@ -18343,7 +19479,7 @@ function FemoEditorPage({ sessionId, injected }) {
 }
 
 // client/client-ui/editor-view.tsx
-var import_jsx_runtime22 = (
+var import_jsx_runtime23 = (
   // data-conversation-composer-overlay：dsh 本体 CSS 据此给 viewArea
   // 确定高度（flex: 1 1 0 + min-height: 0 + overflow: hidden），宿主编辑
   // 器 DOM 以 absolute inset:0 落在本容器内。
@@ -18356,8 +19492,8 @@ function FemoEditorView(props) {
     return typeof summary?.parentId === "string" ? summary.parentId : void 0;
   });
   const sessionId = typeof rawSessionId === "string" && rawSessionId.startsWith("femo-proj-") && typeof motherId === "string" ? motherId : rawSessionId;
-  const anchorRef = (0, import_react21.useRef)(null);
-  (0, import_react21.useLayoutEffect)(() => {
+  const anchorRef = (0, import_react22.useRef)(null);
+  (0, import_react22.useLayoutEffect)(() => {
     const el = anchorRef.current;
     if (el === null) return;
     editorPageRegisterAnchor(sessionId, el);
@@ -18365,7 +19501,7 @@ function FemoEditorView(props) {
       editorPageUnregisterAnchor(sessionId, el);
     };
   }, [sessionId]);
-  (0, import_react21.useEffect)(() => {
+  (0, import_react22.useEffect)(() => {
     const scrollBody = document.querySelector("[data-conversation-scroll]");
     const seat = scrollBody?.querySelector("[data-composer-seat]") ?? null;
     if (seat === null) return;
@@ -18374,12 +19510,12 @@ function FemoEditorView(props) {
       seat.style.display = "";
     };
   }, []);
-  return /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("div", { ref: anchorRef, "data-conversation-composer-overlay": "", style: { position: "relative", height: "100%" } });
+  return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { ref: anchorRef, "data-conversation-composer-overlay": "", style: { position: "relative", height: "100%" } });
 }
 
 // client/client-ui/view-button.tsx
-var import_react22 = require("react");
-var import_jsx_runtime23 = require("react/jsx-runtime");
+var import_react23 = require("react");
+var import_jsx_runtime24 = require("react/jsx-runtime");
 var FEMO_EDITOR_TAB_LABEL = "FEMO";
 var CHAT_TAB_LABELS = ["\u5BF9\u8BDD", "Chat"];
 var pendingTabTransfer = null;
@@ -18390,11 +19526,11 @@ function readActiveTabKind() {
 function FemoViewButton({ useSession, useSessions, openSession, warmCatalog, listProjectionWindows }) {
   const sessionId = useSession((snapshot2) => snapshot2.sessionId);
   const view = useView(sessionId);
-  const [open, setOpen] = (0, import_react22.useState)(false);
-  const [proj, setProj] = (0, import_react22.useState)({ actors: {} });
-  const [hint, setHint] = (0, import_react22.useState)(null);
-  const hintSeq = (0, import_react22.useRef)(0);
-  const showHint = (0, import_react22.useCallback)((text) => {
+  const [open, setOpen] = (0, import_react23.useState)(false);
+  const [proj, setProj] = (0, import_react23.useState)({ actors: {} });
+  const [hint, setHint] = (0, import_react23.useState)(null);
+  const hintSeq = (0, import_react23.useRef)(0);
+  const showHint = (0, import_react23.useCallback)((text) => {
     hintSeq.current += 1;
     const seq2 = hintSeq.current;
     setHint({ text, seq: seq2 });
@@ -18402,7 +19538,7 @@ function FemoViewButton({ useSession, useSessions, openSession, warmCatalog, lis
       if (hintSeq.current === seq2) setHint(null);
     }, 8e3);
   }, []);
-  const refreshWindows = (0, import_react22.useCallback)(async (sid) => {
+  const refreshWindows = (0, import_react23.useCallback)(async (sid) => {
     try {
       const windows = await listProjectionWindows(sid);
       setProj(windows);
@@ -18431,8 +19567,8 @@ function FemoViewButton({ useSession, useSessions, openSession, warmCatalog, lis
     return sessionId.startsWith("femo-proj-") && typeof summary?.parentId === "string";
   });
   const isProjWindow = typeof sessionId === "string" && sessionId.startsWith("femo-proj-");
-  const [related, setRelated] = (0, import_react22.useState)(false);
-  (0, import_react22.useEffect)(() => {
+  const [related, setRelated] = (0, import_react23.useState)(false);
+  (0, import_react23.useEffect)(() => {
     if (isProjWindow || typeof sessionId !== "string") return;
     let stopped = false;
     let timer = 0;
@@ -18453,16 +19589,16 @@ function FemoViewButton({ useSession, useSessions, openSession, warmCatalog, lis
     };
   }, [sessionId, isProjWindow]);
   const viewEligible = isProjWindow && mainSid !== void 0 || related;
-  (0, import_react22.useEffect)(() => {
+  (0, import_react23.useEffect)(() => {
     if (mainSid === void 0) return;
     editorPageOpenSession(mainSid);
     return () => {
       editorPageCloseSession(mainSid);
     };
   }, [mainSid]);
-  const [scriptActors, setScriptActors] = (0, import_react22.useState)([]);
-  const actorsFetchSeq = (0, import_react22.useRef)(0);
-  const refreshActors = (0, import_react22.useCallback)((sid) => {
+  const [scriptActors, setScriptActors] = (0, import_react23.useState)([]);
+  const actorsFetchSeq = (0, import_react23.useRef)(0);
+  const refreshActors = (0, import_react23.useCallback)((sid) => {
     const seq2 = ++actorsFetchSeq.current;
     console.log(`[femo-diag] GET /actors?sessionId=${sid} (seq=${seq2})`);
     void fetch(`/femo-plugin/actors?sessionId=${encodeURIComponent(sid)}`).then((response) => response.json()).then((data) => {
@@ -18480,20 +19616,20 @@ function FemoViewButton({ useSession, useSessions, openSession, warmCatalog, lis
       console.log(`[femo-diag] /actors fetch failed: ${String(error)}`);
     });
   }, []);
-  (0, import_react22.useEffect)(() => {
+  (0, import_react23.useEffect)(() => {
     if (!viewEligible || mainSid === void 0) return;
     refreshActors(mainSid);
     return () => {
       actorsFetchSeq.current += 1;
     };
   }, [viewEligible, mainSid, refreshActors]);
-  (0, import_react22.useEffect)(() => {
+  (0, import_react23.useEffect)(() => {
     if (!open || !viewEligible || mainSid === void 0) return;
     refreshActors(mainSid);
     warmCatalog?.(mainSid);
     void refreshWindows(mainSid);
   }, [open, viewEligible, mainSid, refreshActors, warmCatalog, refreshWindows]);
-  (0, import_react22.useEffect)(() => {
+  (0, import_react23.useEffect)(() => {
     if (!viewEligible || mainSid === void 0) return;
     void refreshWindows(mainSid);
   }, [viewEligible, mainSid, refreshWindows, scriptActors.length]);
@@ -18525,8 +19661,8 @@ function FemoViewButton({ useSession, useSessions, openSession, warmCatalog, lis
     })();
   };
   const snapshot = useSession((s) => s);
-  const rootRef = (0, import_react22.useRef)(null);
-  (0, import_react22.useEffect)(() => {
+  const rootRef = (0, import_react23.useRef)(null);
+  (0, import_react23.useEffect)(() => {
     if (!open) return;
     const closeOutside = (event) => {
       if (event.target instanceof Node && !rootRef.current?.contains(event.target)) {
@@ -18538,7 +19674,7 @@ function FemoViewButton({ useSession, useSessions, openSession, warmCatalog, lis
       document.removeEventListener("pointerdown", closeOutside);
     };
   }, [open]);
-  (0, import_react22.useEffect)(() => {
+  (0, import_react23.useEffect)(() => {
     const STYLE_ID = "femo-plugin-proj-mother-name";
     let style = document.getElementById(STYLE_ID);
     if (style === null) {
@@ -18552,7 +19688,7 @@ function FemoViewButton({ useSession, useSessions, openSession, warmCatalog, lis
       style.textContent = "";
     };
   }, [sessionId]);
-  (0, import_react22.useEffect)(() => {
+  (0, import_react23.useEffect)(() => {
     if (pendingTabTransfer === null || !femoFamily) return;
     const { kind, expiresAt } = pendingTabTransfer;
     if (Date.now() > expiresAt) {
@@ -18586,7 +19722,7 @@ function FemoViewButton({ useSession, useSessions, openSession, warmCatalog, lis
       window.clearInterval(timer);
     };
   }, [sessionId, femoFamily]);
-  const { chatActors } = (0, import_react22.useMemo)(() => {
+  const { chatActors } = (0, import_react23.useMemo)(() => {
     const actors2 = /* @__PURE__ */ new Set();
     for (const node of snapshot.chat?.nodes?.values() ?? []) {
       if (node.kind !== "femo-role") continue;
@@ -18612,7 +19748,7 @@ function FemoViewButton({ useSession, useSessions, openSession, warmCatalog, lis
     return typeof sessionId === "string" && sessionId.startsWith("femo-proj-") ? "god" : void 0;
   })();
   const label = activeViewId === "god" ? "\u4E0A\u5E1D\u89C6\u89D2" : activeViewId === "stage" ? "FEMO\u5185\u89C6\u89D2" : activeViewId === "offstage" ? "FEMO\u5916 \xB7 \u4E3B\u6A21\u578B" : activeViewId ?? "\u4E0A\u5E1D\u89C6\u89D2";
-  const menu = open ? /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("div", { style: {
+  const menu = open ? /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { style: {
     position: "absolute",
     top: "100%",
     left: "0",
@@ -18634,7 +19770,7 @@ function FemoViewButton({ useSession, useSessions, openSession, warmCatalog, lis
     // 判 blank（Hero 态隐藏整个 header，点进去连视角菜单都消失换不回来）。
     ...actors.length > 0 ? [{ id: "stage", label: "FEMO\u5185\u89C6\u89D2", Icon: FaClapperboard }] : [],
     ...actors.map((actor) => ({ id: actor, label: actor, Icon: FaUserSecret }))
-  ].map((item) => /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(
+  ].map((item) => /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)(
     "button",
     {
       type: "button",
@@ -18656,14 +19792,14 @@ function FemoViewButton({ useSession, useSessions, openSession, warmCatalog, lis
         whiteSpace: "nowrap"
       },
       children: [
-        /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(item.Icon, { size: 14 }),
-        /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { children: item.label })
+        /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(item.Icon, { size: 14 }),
+        /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { children: item.label })
       ]
     },
     item.id
   )) }) : null;
-  return /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)("div", { ref: rootRef, style: { position: "relative" }, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { ref: rootRef, style: { position: "relative" }, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)(
       "button",
       {
         type: "button",
@@ -18686,14 +19822,14 @@ function FemoViewButton({ useSession, useSessions, openSession, warmCatalog, lis
           whiteSpace: "nowrap"
         },
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(FaEye, { size: 12 }),
-          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { children: label }),
-          /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("span", { style: { display: "inline-flex", alignItems: "center", transform: open ? "rotate(180deg)" : void 0, transition: "transform 150ms ease" }, children: /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(IconChevronDown, {}) })
+          /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(FaEye, { size: 12 }),
+          /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { children: label }),
+          /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { style: { display: "inline-flex", alignItems: "center", transform: open ? "rotate(180deg)" : void 0, transition: "transform 150ms ease" }, children: /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(IconChevronDown, {}) })
         ]
       }
     ),
     menu,
-    hint !== null && /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(
+    hint !== null && /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)(
       "div",
       {
         style: {
@@ -18730,7 +19866,7 @@ function FemoSubagentCount({ useSession, useSessions, useSessionStatus, openChil
     return void 0;
   });
   if (mainSid === void 0) return null;
-  return /* @__PURE__ */ (0, import_jsx_runtime23.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(
     CatalogDropdown,
     {
       rootSessionId: mainSid,
@@ -18748,8 +19884,8 @@ function FemoSubagentCount({ useSession, useSessions, useSessionStatus, openChil
 }
 
 // client/client-ui/cast-button.tsx
-var import_react23 = require("react");
-var import_jsx_runtime24 = require("react/jsx-runtime");
+var import_react24 = require("react");
+var import_jsx_runtime25 = require("react/jsx-runtime");
 function FemoCastButton({ useSession, useSessions }) {
   const sessionId = useSession((snapshot) => snapshot.sessionId);
   const mainSid = useSessions((state) => {
@@ -18758,13 +19894,13 @@ function FemoCastButton({ useSession, useSessions }) {
     const summary = state.byId[sessionId];
     return summary?.parentId === void 0 ? sessionId : void 0;
   });
-  const [open, setOpen] = (0, import_react23.useState)(false);
-  const [data, setData] = (0, import_react23.useState)({ bindings: {}, souls: [] });
-  const [busy, setBusy] = (0, import_react23.useState)(false);
-  const [hint, setHint] = (0, import_react23.useState)(null);
-  const hintSeq = (0, import_react23.useRef)(0);
-  const rootRef = (0, import_react23.useRef)(null);
-  const showHint = (0, import_react23.useCallback)((text) => {
+  const [open, setOpen] = (0, import_react24.useState)(false);
+  const [data, setData] = (0, import_react24.useState)({ bindings: {}, souls: [] });
+  const [busy, setBusy] = (0, import_react24.useState)(false);
+  const [hint, setHint] = (0, import_react24.useState)(null);
+  const hintSeq = (0, import_react24.useRef)(0);
+  const rootRef = (0, import_react24.useRef)(null);
+  const showHint = (0, import_react24.useCallback)((text) => {
     hintSeq.current += 1;
     const seq2 = hintSeq.current;
     setHint({ text, seq: seq2 });
@@ -18772,17 +19908,17 @@ function FemoCastButton({ useSession, useSessions }) {
       if (hintSeq.current === seq2) setHint(null);
     }, 8e3);
   }, []);
-  const reload = (0, import_react23.useCallback)(async () => {
+  const reload = (0, import_react24.useCallback)(async () => {
     const response = await fetch("/femo-plugin/cast");
     const json = await response.json();
     if (json.ok !== true) throw new Error(json.error ?? "cast fetch failed");
     setData({ bindings: json.bindings ?? {}, souls: json.souls ?? [] });
   }, []);
-  (0, import_react23.useEffect)(() => {
+  (0, import_react24.useEffect)(() => {
     if (mainSid === void 0) return;
     void reload().catch(() => void 0);
   }, [mainSid, reload]);
-  (0, import_react23.useEffect)(() => {
+  (0, import_react24.useEffect)(() => {
     if (!open) return;
     const closeOutside = (event) => {
       if (event.target instanceof Node && !rootRef.current?.contains(event.target)) {
@@ -18794,7 +19930,7 @@ function FemoCastButton({ useSession, useSessions }) {
       document.removeEventListener("pointerdown", closeOutside);
     };
   }, [open]);
-  const act = (0, import_react23.useCallback)(async (action, soulId) => {
+  const act = (0, import_react24.useCallback)(async (action, soulId) => {
     if (busy || mainSid === void 0) return;
     setBusy(true);
     try {
@@ -18818,7 +19954,7 @@ function FemoCastButton({ useSession, useSessions }) {
   if (mainSid === void 0) return null;
   const currentSoul = Object.entries(data.bindings).find(([, entry]) => entry.sid === mainSid)?.[0];
   const souls = data.souls.filter((soul) => soul.soul_id !== "human");
-  const menu = open ? /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { style: {
+  const menu = open ? /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("div", { style: {
     position: "absolute",
     top: "100%",
     left: "0",
@@ -18833,13 +19969,13 @@ function FemoCastButton({ useSession, useSessions }) {
     zIndex: 100,
     fontSize: "13px"
   }, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { style: { padding: "5px 10px 3px", fontSize: 11, color: "var(--dsw-alias-label-tertiary, #999)", whiteSpace: "nowrap" }, children: "\u63D0\u540D\u540E\u672C\u4F1A\u8BDD\u51FA\u6F14\u8BE5\u89D2\u8272\uFF08\u4E0D\u62C9\u5B50\u4EE3\u7406\uFF09\uFF1B\u540C\u89D2\u591A\u7968\u65F6\u6700\u540E\u4E00\u6B21\u6307\u6D3E\u7B97\u6570" }),
-    souls.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { style: { padding: "6px 10px", color: "var(--dsw-alias-label-tertiary, #999)" }, children: "\u89D2\u8272\u5E93\u4E3A\u7A7A" }),
+    /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("div", { style: { padding: "5px 10px 3px", fontSize: 11, color: "var(--dsw-alias-label-tertiary, #999)", whiteSpace: "nowrap" }, children: "\u63D0\u540D\u540E\u672C\u4F1A\u8BDD\u51FA\u6F14\u8BE5\u89D2\u8272\uFF08\u4E0D\u62C9\u5B50\u4EE3\u7406\uFF09\uFF1B\u540C\u89D2\u591A\u7968\u65F6\u6700\u540E\u4E00\u6B21\u6307\u6D3E\u7B97\u6570" }),
+    souls.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("div", { style: { padding: "6px 10px", color: "var(--dsw-alias-label-tertiary, #999)" }, children: "\u89D2\u8272\u5E93\u4E3A\u7A7A" }),
     souls.map((soul) => {
       const holder = data.bindings[soul.soul_id];
       const isMine = holder !== void 0 && holder.sid === mainSid;
       const isTaken = holder !== void 0 && !isMine;
-      return /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)(
+      return /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)(
         "button",
         {
           type: "button",
@@ -18863,17 +19999,17 @@ function FemoCastButton({ useSession, useSessions }) {
             whiteSpace: "nowrap"
           },
           children: [
-            isMine ? /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(FaCircleCheck, { size: 13 }) : /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(FaMasksTheater, { size: 13 }),
-            /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { children: soul.soul_name || soul.soul_id }),
-            isTaken && /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { style: { marginLeft: "auto", fontSize: 11, color: "var(--dsw-alias-label-tertiary, #999)" }, children: "\u4ED6\u5E2D\u63D0\u540D" })
+            isMine ? /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(FaCircleCheck, { size: 13 }) : /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(FaMasksTheater, { size: 13 }),
+            /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("span", { children: soul.soul_name || soul.soul_id }),
+            isTaken && /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("span", { style: { marginLeft: "auto", fontSize: 11, color: "var(--dsw-alias-label-tertiary, #999)" }, children: "\u4ED6\u5E2D\u63D0\u540D" })
           ]
         },
         soul.soul_id
       );
     })
   ] }) : null;
-  return /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)("div", { ref: rootRef, style: { position: "relative" }, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime24.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("div", { ref: rootRef, style: { position: "relative" }, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)(
       "button",
       {
         type: "button",
@@ -18897,14 +20033,14 @@ function FemoCastButton({ useSession, useSessions }) {
           whiteSpace: "nowrap"
         },
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(FaMasksTheater, { size: 12 }),
-          currentSoul !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { children: currentSoul }),
-          /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("span", { style: { display: "inline-flex", alignItems: "center", transform: open ? "rotate(180deg)" : void 0, transition: "transform 150ms ease" }, children: /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(IconChevronDown, {}) })
+          /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(FaMasksTheater, { size: 12 }),
+          currentSoul !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("span", { children: currentSoul }),
+          /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("span", { style: { display: "inline-flex", alignItems: "center", transform: open ? "rotate(180deg)" : void 0, transition: "transform 150ms ease" }, children: /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(IconChevronDown, {}) })
         ]
       }
     ),
     menu,
-    hint !== null && /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(
+    hint !== null && /* @__PURE__ */ (0, import_jsx_runtime25.jsx)(
       "div",
       {
         style: {
@@ -18930,37 +20066,37 @@ function FemoCastButton({ useSession, useSessions }) {
 }
 
 // client/client-ui/composer.tsx
-var import_react29 = require("react");
+var import_react30 = require("react");
 
 // client/client-ui/composer-common.tsx
-var import_react24 = require("react");
 var import_react25 = require("react");
+var import_react26 = require("react");
 function useProjectionValue(face2, key) {
-  const subscribe = (0, import_react24.useCallback)((onChanged) => {
+  const subscribe = (0, import_react25.useCallback)((onChanged) => {
     return face2?.projections?.faceOf(key).subscribe(onChanged) ?? (() => {
     });
   }, [face2, key]);
-  const getSnapshot = (0, import_react24.useCallback)(() => {
+  const getSnapshot = (0, import_react25.useCallback)(() => {
     return face2?.projections?.faceOf(key).getSnapshot() ?? void 0;
   }, [face2, key]);
-  return (0, import_react25.useSyncExternalStore)(subscribe, getSnapshot);
+  return (0, import_react26.useSyncExternalStore)(subscribe, getSnapshot);
 }
 function useMainSnapshot(face2) {
-  const subscribe = (0, import_react24.useCallback)((onChanged) => {
+  const subscribe = (0, import_react25.useCallback)((onChanged) => {
     return face2?.subscribe?.(onChanged) ?? (() => {
     });
   }, [face2]);
-  const getSnapshot = (0, import_react24.useCallback)(() => {
+  const getSnapshot = (0, import_react25.useCallback)(() => {
     return face2?.getSnapshot?.();
   }, [face2]);
-  return (0, import_react25.useSyncExternalStore)(subscribe, getSnapshot);
+  return (0, import_react26.useSyncExternalStore)(subscribe, getSnapshot);
 }
 function fill(template, params) {
   return template.replace(/\{(\w+)\}/gu, (_, name) => params[name] ?? "");
 }
 
 // client/client-ui/composer-stats.tsx
-var import_jsx_runtime25 = require("react/jsx-runtime");
+var import_jsx_runtime26 = require("react/jsx-runtime");
 function formatTokens3(n) {
   const scaled = (v) => v >= 100 ? String(Math.round(v)) : String(Math.round(v * 10) / 10);
   if (n < 1e3) return String(n);
@@ -19056,9 +20192,9 @@ function StatsRow({ face: face2 }) {
     }));
   }
   if (groups.length === 0) return null;
-  return /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("div", { className: "femo-comp-stats", children: groups.map((group, i) => /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("span", { children: [
-    i > 0 && /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)(import_jsx_runtime25.Fragment, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime25.jsx)("span", { className: "femo-comp-stats-sep", "aria-hidden": true, children: "|" }),
+  return /* @__PURE__ */ (0, import_jsx_runtime26.jsx)("div", { className: "femo-comp-stats", children: groups.map((group, i) => /* @__PURE__ */ (0, import_jsx_runtime26.jsxs)("span", { children: [
+    i > 0 && /* @__PURE__ */ (0, import_jsx_runtime26.jsxs)(import_jsx_runtime26.Fragment, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime26.jsx)("span", { className: "femo-comp-stats-sep", "aria-hidden": true, children: "|" }),
       " "
     ] }),
     group
@@ -19066,9 +20202,9 @@ function StatsRow({ face: face2 }) {
 }
 
 // client/client-ui/composer-ring.tsx
-var import_react26 = require("react");
+var import_react27 = require("react");
 var import_dsh_client_ui_primitives2 = require("@deepseek-ai/dsh-client-ui-primitives");
-var import_jsx_runtime26 = require("react/jsx-runtime");
+var import_jsx_runtime27 = require("react/jsx-runtime");
 function contextOccupancy(pressure) {
   const usedTokens = pressure?.projectedTokens ?? pressure?.pressureTokens;
   if (usedTokens === void 0 || pressure?.contextWindow === void 0) return null;
@@ -19087,12 +20223,12 @@ var METER_ROWS = [
 ];
 var METER_ARIA = "\u4E0A\u4E0B\u6587\u5DF2\u7528 {percent}";
 function ContextRing({ data }) {
-  const [open, setOpen] = (0, import_react26.useState)(false);
-  const rootRef = (0, import_react26.useRef)(null);
+  const [open, setOpen] = (0, import_react27.useState)(false);
+  const rootRef = (0, import_react27.useRef)(null);
   const percent = data.percent;
   const reading = `${percent}%`;
   const aria = fill(METER_ARIA, { percent: reading });
-  (0, import_react26.useEffect)(() => {
+  (0, import_react27.useEffect)(() => {
     if (!open) return;
     const onPointerDown = (e) => {
       if (e.target instanceof Node && rootRef.current?.contains(e.target) === true) return;
@@ -19112,8 +20248,8 @@ function ContextRing({ data }) {
   const breakdownTotal = breakdown === void 0 ? 0 : breakdown.systemTokens + breakdown.toolsTokens + breakdown.messageTokens;
   const parts = breakdown === void 0 || breakdownTotal === 0 ? [{ key: "total", tintClass: void 0, width: percent }] : METER_ROWS.map((row) => ({ key: row.key, tintClass: row.tintClass, width: percent * breakdown[row.key] / breakdownTotal }));
   const segments = parts.filter((part) => part.width > 0);
-  return /* @__PURE__ */ (0, import_jsx_runtime26.jsxs)("span", { ref: rootRef, className: "femo-comp-meter", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime26.jsx)(import_dsh_client_ui_primitives2.Tooltip, { label: aria, side: "top", delayMs: 200, disabled: open, children: /* @__PURE__ */ (0, import_jsx_runtime26.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime27.jsxs)("span", { ref: rootRef, className: "femo-comp-meter", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime27.jsx)(import_dsh_client_ui_primitives2.Tooltip, { label: aria, side: "top", delayMs: 200, disabled: open, children: /* @__PURE__ */ (0, import_jsx_runtime27.jsx)(
       "button",
       {
         type: "button",
@@ -19124,9 +20260,9 @@ function ContextRing({ data }) {
         onClick: () => {
           setOpen(!open);
         },
-        children: /* @__PURE__ */ (0, import_jsx_runtime26.jsxs)("svg", { viewBox: "0 0 14 14", width: "14", height: "14", "aria-hidden": true, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime26.jsx)("circle", { className: "femo-comp-meter-track", cx: "7", cy: "7", r: METER_RADIUS }),
-          /* @__PURE__ */ (0, import_jsx_runtime26.jsx)(
+        children: /* @__PURE__ */ (0, import_jsx_runtime27.jsxs)("svg", { viewBox: "0 0 14 14", width: "14", height: "14", "aria-hidden": true, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("circle", { className: "femo-comp-meter-track", cx: "7", cy: "7", r: METER_RADIUS }),
+          /* @__PURE__ */ (0, import_jsx_runtime27.jsx)(
             "circle",
             {
               className: "femo-comp-meter-fill",
@@ -19140,13 +20276,13 @@ function ContextRing({ data }) {
         ] })
       }
     ) }),
-    open && /* @__PURE__ */ (0, import_jsx_runtime26.jsxs)("div", { className: "femo-comp-meter-panel", role: "dialog", "aria-label": fill(METER_ARIA, { percent: "" }).trim(), children: [
-      /* @__PURE__ */ (0, import_jsx_runtime26.jsxs)("div", { className: "femo-comp-meter-header", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime26.jsx)("span", { className: "femo-comp-meter-headline", children: "\u4E0A\u4E0B\u6587\u5DF2\u7528" }),
-        /* @__PURE__ */ (0, import_jsx_runtime26.jsx)("span", { className: "femo-comp-meter-percent", children: reading }),
-        /* @__PURE__ */ (0, import_jsx_runtime26.jsx)("span", { className: "femo-comp-meter-figures", children: `~${formatTokens(data.usedTokens)} / ${formatTokens(data.contextWindow)}` })
+    open && /* @__PURE__ */ (0, import_jsx_runtime27.jsxs)("div", { className: "femo-comp-meter-panel", role: "dialog", "aria-label": fill(METER_ARIA, { percent: "" }).trim(), children: [
+      /* @__PURE__ */ (0, import_jsx_runtime27.jsxs)("div", { className: "femo-comp-meter-header", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("span", { className: "femo-comp-meter-headline", children: "\u4E0A\u4E0B\u6587\u5DF2\u7528" }),
+        /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("span", { className: "femo-comp-meter-percent", children: reading }),
+        /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("span", { className: "femo-comp-meter-figures", children: `~${formatTokens(data.usedTokens)} / ${formatTokens(data.contextWindow)}` })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime26.jsx)("div", { className: "femo-comp-meter-bar", children: segments.map((segment) => /* @__PURE__ */ (0, import_jsx_runtime26.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("div", { className: "femo-comp-meter-bar", children: segments.map((segment) => /* @__PURE__ */ (0, import_jsx_runtime27.jsx)(
         "div",
         {
           className: segment.tintClass === void 0 ? "femo-comp-meter-segment" : `femo-comp-meter-segment ${segment.tintClass}`,
@@ -19154,13 +20290,13 @@ function ContextRing({ data }) {
         },
         segment.key
       )) }),
-      data.note !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime26.jsx)("div", { className: "femo-comp-meter-headline", children: data.note }),
-      breakdown !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime26.jsx)("dl", { className: "femo-comp-meter-rows", children: METER_ROWS.map((row) => /* @__PURE__ */ (0, import_jsx_runtime26.jsxs)("div", { className: "femo-comp-meter-row", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime26.jsxs)("dt", { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime26.jsx)("span", { className: `femo-comp-meter-swatch ${row.tintClass}`, "aria-hidden": true }),
+      data.note !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("div", { className: "femo-comp-meter-headline", children: data.note }),
+      breakdown !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("dl", { className: "femo-comp-meter-rows", children: METER_ROWS.map((row) => /* @__PURE__ */ (0, import_jsx_runtime27.jsxs)("div", { className: "femo-comp-meter-row", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime27.jsxs)("dt", { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("span", { className: `femo-comp-meter-swatch ${row.tintClass}`, "aria-hidden": true }),
           row.label
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime26.jsx)("dd", { children: `~${formatTokens(breakdown[row.key])}` })
+        /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("dd", { children: `~${formatTokens(breakdown[row.key])}` })
       ] }, row.key)) })
     ] })
   ] });
@@ -19170,12 +20306,12 @@ function GodContextRing({ face: face2 }) {
   const breakdown = useProjectionValue(face2, "contextBreakdown");
   const data = contextOccupancy(pressure);
   if (data === null) return null;
-  return /* @__PURE__ */ (0, import_jsx_runtime26.jsx)(ContextRing, { data: breakdown === void 0 ? data : { ...data, breakdown } });
+  return /* @__PURE__ */ (0, import_jsx_runtime27.jsx)(ContextRing, { data: breakdown === void 0 ? data : { ...data, breakdown } });
 }
 function ActorContextRing({ mainSid, actorKey }) {
   const usage = useActorUsage(mainSid, actorKey);
   if (usage === void 0 || usage.contextWindow <= 0) return null;
-  return /* @__PURE__ */ (0, import_jsx_runtime26.jsx)(ContextRing, { data: {
+  return /* @__PURE__ */ (0, import_jsx_runtime27.jsx)(ContextRing, { data: {
     percent: Math.min(100, Math.round(usage.usedTokens / usage.contextWindow * 100)),
     usedTokens: usage.usedTokens,
     contextWindow: usage.contextWindow,
@@ -19184,27 +20320,27 @@ function ActorContextRing({ mainSid, actorKey }) {
 }
 
 // client/client-ui/composer-permission.tsx
-var import_react27 = require("react");
+var import_react28 = require("react");
 var import_dsh_client_ui_primitives3 = require("@deepseek-ai/dsh-client-ui-primitives");
-var import_jsx_runtime27 = require("react/jsx-runtime");
+var import_jsx_runtime28 = require("react/jsx-runtime");
 var FULL_ACCESS = "danger-full-access";
 var SHIELD_OUTLINE = "M8.20554 0.899994L14.7901 3.36857V7.01026C14.7901 12 11.0466 14.2103 8.20554 15.3C5.36446 14.2103 1.62012 12 1.62012 7.01026V3.36857L8.20554 0.899994Z";
 var permissionGlyphs = {
-  "read-only": /* @__PURE__ */ (0, import_jsx_runtime27.jsxs)("svg", { width: "16", height: "16", viewBox: "0 0 16 16", fill: "none", "aria-hidden": true, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("path", { d: SHIELD_OUTLINE, stroke: "currentColor", strokeWidth: "1.31831", strokeLinejoin: "round" }),
-    /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("path", { d: "M12.1654 5.7552L8.9447 9.41475C8.73044 9.65816 8.53628 9.8804 8.35774 10.0423C8.1713 10.2114 7.94235 10.3717 7.64016 10.4254C7.48207 10.4535 7.32 10.4552 7.16151 10.4294C6.85843 10.3801 6.62728 10.2223 6.43836 10.0559C6.25752 9.89653 6.06037 9.67732 5.84264 9.43705L4.72925 8.20897L5.63557 7.38707L6.74897 8.61594C6.98603 8.87755 7.12974 9.03533 7.24673 9.13839C7.31033 9.19443 7.34485 9.21476 7.35823 9.22122C7.38068 9.22484 7.40352 9.22515 7.42593 9.22122C7.40522 9.22502 7.42893 9.23294 7.53583 9.136C7.65132 9.03126 7.79316 8.87139 8.02643 8.60638L11.2479 4.94763L12.1654 5.7552Z", fill: "currentColor" })
+  "read-only": /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("svg", { width: "16", height: "16", viewBox: "0 0 16 16", fill: "none", "aria-hidden": true, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("path", { d: SHIELD_OUTLINE, stroke: "currentColor", strokeWidth: "1.31831", strokeLinejoin: "round" }),
+    /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("path", { d: "M12.1654 5.7552L8.9447 9.41475C8.73044 9.65816 8.53628 9.8804 8.35774 10.0423C8.1713 10.2114 7.94235 10.3717 7.64016 10.4254C7.48207 10.4535 7.32 10.4552 7.16151 10.4294C6.85843 10.3801 6.62728 10.2223 6.43836 10.0559C6.25752 9.89653 6.06037 9.67732 5.84264 9.43705L4.72925 8.20897L5.63557 7.38707L6.74897 8.61594C6.98603 8.87755 7.12974 9.03533 7.24673 9.13839C7.31033 9.19443 7.34485 9.21476 7.35823 9.22122C7.38068 9.22484 7.40352 9.22515 7.42593 9.22122C7.40522 9.22502 7.42893 9.23294 7.53583 9.136C7.65132 9.03126 7.79316 8.87139 8.02643 8.60638L11.2479 4.94763L12.1654 5.7552Z", fill: "currentColor" })
   ] }),
-  "workspace-write": /* @__PURE__ */ (0, import_jsx_runtime27.jsxs)("svg", { width: "16", height: "16", viewBox: "0 0 16 16", fill: "none", "aria-hidden": true, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("path", { d: "M8.08887 0.251709C8.20479 0.23085 8.32486 0.241168 8.43652 0.282959L15.0215 2.75171C15.2787 2.84819 15.4492 3.09414 15.4492 3.3689V7.0105C15.4492 7.10986 15.4441 7.2081 15.4414 7.30542C15.0285 7.07175 14.5905 6.87695 14.1309 6.73022V3.82495L8.20508 1.60327L2.2793 3.82495V7.0105C2.27936 9.7171 3.4745 11.5379 5.02734 12.7947C5.01025 12.9942 5 13.1962 5 13.4001C5.00001 13.7617 5.02722 14.1169 5.08008 14.4636C2.91555 13.0393 0.961014 10.752 0.960938 7.0105V3.3689C0.960938 3.09417 1.13146 2.84821 1.38867 2.75171L7.97461 0.282959L8.08887 0.251709Z", fill: "currentColor" }),
-    /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("path", { d: "M11.3525 5.64688V6.85688H5V5.64688H11.3525Z", fill: "currentColor" }),
-    /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("path", { d: "M9.5824 8.29376V9.50376H5V8.29376H9.5824Z", fill: "currentColor" }),
-    /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("path", { d: "M14.6647 15.6852H10.0338C10.3878 15.3751 10.7567 15.0517 11.0772 14.7706C11.2531 14.6164 11.4144 14.4746 11.5511 14.3547H14.6647V15.6852Z", fill: "currentColor" }),
-    /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("path", { d: "M8.14852 14.1308L7.33925 15.4976C7.22458 15.6912 7.42245 15.9194 7.63037 15.8333L9.09785 15.2254L15.0399 10.0719L14.0905 8.97733L8.14852 14.1308Z", fill: "currentColor" })
+  "workspace-write": /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("svg", { width: "16", height: "16", viewBox: "0 0 16 16", fill: "none", "aria-hidden": true, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("path", { d: "M8.08887 0.251709C8.20479 0.23085 8.32486 0.241168 8.43652 0.282959L15.0215 2.75171C15.2787 2.84819 15.4492 3.09414 15.4492 3.3689V7.0105C15.4492 7.10986 15.4441 7.2081 15.4414 7.30542C15.0285 7.07175 14.5905 6.87695 14.1309 6.73022V3.82495L8.20508 1.60327L2.2793 3.82495V7.0105C2.27936 9.7171 3.4745 11.5379 5.02734 12.7947C5.01025 12.9942 5 13.1962 5 13.4001C5.00001 13.7617 5.02722 14.1169 5.08008 14.4636C2.91555 13.0393 0.961014 10.752 0.960938 7.0105V3.3689C0.960938 3.09417 1.13146 2.84821 1.38867 2.75171L7.97461 0.282959L8.08887 0.251709Z", fill: "currentColor" }),
+    /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("path", { d: "M11.3525 5.64688V6.85688H5V5.64688H11.3525Z", fill: "currentColor" }),
+    /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("path", { d: "M9.5824 8.29376V9.50376H5V8.29376H9.5824Z", fill: "currentColor" }),
+    /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("path", { d: "M14.6647 15.6852H10.0338C10.3878 15.3751 10.7567 15.0517 11.0772 14.7706C11.2531 14.6164 11.4144 14.4746 11.5511 14.3547H14.6647V15.6852Z", fill: "currentColor" }),
+    /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("path", { d: "M8.14852 14.1308L7.33925 15.4976C7.22458 15.6912 7.42245 15.9194 7.63037 15.8333L9.09785 15.2254L15.0399 10.0719L14.0905 8.97733L8.14852 14.1308Z", fill: "currentColor" })
   ] }),
-  [FULL_ACCESS]: /* @__PURE__ */ (0, import_jsx_runtime27.jsxs)("svg", { width: "16", height: "16", viewBox: "0 0 16 16", fill: "none", "aria-hidden": true, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("path", { d: SHIELD_OUTLINE, stroke: "currentColor", strokeWidth: "1.31831", strokeLinejoin: "round" }),
-    /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("path", { d: "M9.10094 4.5V8.75939H7.59888V4.5H9.10094Z", fill: "currentColor" }),
-    /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("path", { d: "M9.10094 9.8114V11.5H7.59888V9.8114H9.10094Z", fill: "currentColor" })
+  [FULL_ACCESS]: /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("svg", { width: "16", height: "16", viewBox: "0 0 16 16", fill: "none", "aria-hidden": true, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("path", { d: SHIELD_OUTLINE, stroke: "currentColor", strokeWidth: "1.31831", strokeLinejoin: "round" }),
+    /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("path", { d: "M9.10094 4.5V8.75939H7.59888V4.5H9.10094Z", fill: "currentColor" }),
+    /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("path", { d: "M9.10094 9.8114V11.5H7.59888V9.8114H9.10094Z", fill: "currentColor" })
   ] })
 };
 function displayName(name) {
@@ -19221,11 +20357,11 @@ var ACCESS_CONFIRM_CANCEL = "\u53D6\u6D88";
 var ACCESS_CONFIRM_ENABLE = "\u542F\u7528 Full access";
 function PermissionMenu({ face: face2, disabled }) {
   const value = useProjectionValue(face2, "permissions");
-  const [open, setOpen] = (0, import_react27.useState)(false);
-  const [pick2, setPick] = (0, import_react27.useState)(null);
-  const [confirmation, setConfirmation] = (0, import_react27.useState)(null);
-  const [acknowledged, setAcknowledged] = (0, import_react27.useState)(false);
-  (0, import_react27.useEffect)(() => {
+  const [open, setOpen] = (0, import_react28.useState)(false);
+  const [pick2, setPick] = (0, import_react28.useState)(null);
+  const [confirmation, setConfirmation] = (0, import_react28.useState)(null);
+  const [acknowledged, setAcknowledged] = (0, import_react28.useState)(false);
+  (0, import_react28.useEffect)(() => {
     if (!disabled && value !== void 0) return;
     setOpen(false);
     setAcknowledged(false);
@@ -19265,8 +20401,8 @@ function PermissionMenu({ face: face2, disabled }) {
     closeConfirmation();
     submit(id);
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime27.jsxs)(import_jsx_runtime27.Fragment, { children: [
-    /* @__PURE__ */ (0, import_jsx_runtime27.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)(import_jsx_runtime28.Fragment, { children: [
+    /* @__PURE__ */ (0, import_jsx_runtime28.jsx)(
       import_dsh_client_ui_primitives3.Menu,
       {
         open,
@@ -19277,7 +20413,7 @@ function PermissionMenu({ face: face2, disabled }) {
           setOpen(false);
         },
         side: "top",
-        anchor: /* @__PURE__ */ (0, import_jsx_runtime27.jsxs)(
+        anchor: /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)(
           "button",
           {
             type: "button",
@@ -19289,15 +20425,15 @@ function PermissionMenu({ face: face2, disabled }) {
               setOpen(!open);
             },
             children: [
-              permissionGlyphs[currentValue] !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("span", { className: "femo-comp-perm-icon", "aria-hidden": true, children: permissionGlyphs[currentValue] }),
-              /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("span", { className: "femo-comp-perm-label", children: current === void 0 ? displayName(currentValue) : optionLabel(current) }),
-              /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("span", { className: "femo-comp-perm-chevron", "data-open": open, "aria-hidden": true, children: /* @__PURE__ */ (0, import_jsx_runtime27.jsx)(IconChevronDown, {}) })
+              permissionGlyphs[currentValue] !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("span", { className: "femo-comp-perm-icon", "aria-hidden": true, children: permissionGlyphs[currentValue] }),
+              /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("span", { className: "femo-comp-perm-label", children: current === void 0 ? displayName(currentValue) : optionLabel(current) }),
+              /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("span", { className: "femo-comp-perm-chevron", "data-open": open, "aria-hidden": true, children: /* @__PURE__ */ (0, import_jsx_runtime28.jsx)(IconChevronDown, {}) })
             ]
           }
         )
       }
     ),
-    /* @__PURE__ */ (0, import_jsx_runtime27.jsx)(
+    /* @__PURE__ */ (0, import_jsx_runtime28.jsx)(
       import_dsh_client_ui_primitives3.RiskConfirmation,
       {
         open: confirmation !== null,
@@ -19373,7 +20509,7 @@ function itemOutput(it) {
 }
 
 // client/client-ui/composer-run-state.tsx
-var import_react28 = require("react");
+var import_react29 = require("react");
 var IDLE_RUN_STATE = { running: false, waiting: false, waitScope: [], outVars: [] };
 function composerButtonState(args) {
   const { winKind, actor, run, mainRunning } = args;
@@ -19391,9 +20527,9 @@ function composerButtonState(args) {
   return "disabled";
 }
 function useFemoRunState(sessionId, mainSid) {
-  const [run, setRun] = (0, import_react28.useState)(IDLE_RUN_STATE);
-  const [winInfo, setWinInfo] = (0, import_react28.useState)({ winKind: "none" });
-  const applyState = (0, import_react28.useCallback)((data) => {
+  const [run, setRun] = (0, import_react29.useState)(IDLE_RUN_STATE);
+  const [winInfo, setWinInfo] = (0, import_react29.useState)({ winKind: "none" });
+  const applyState = (0, import_react29.useCallback)((data) => {
     setWinInfo({ winKind: data.winKind ?? "none", actor: data.actor });
     if (data.ok === true) {
       setRun({
@@ -19405,13 +20541,13 @@ function useFemoRunState(sessionId, mainSid) {
       });
     }
   }, []);
-  const refreshRunState = (0, import_react28.useCallback)((sessionIdValue) => {
+  const refreshRunState = (0, import_react29.useCallback)((sessionIdValue) => {
     void fetch(`/femo-plugin/projection-state?sessionId=${encodeURIComponent(sessionIdValue)}`).then((r) => r.json()).then((data) => {
       applyState(data);
     }).catch(() => {
     });
   }, [applyState]);
-  (0, import_react28.useEffect)(() => {
+  (0, import_react29.useEffect)(() => {
     if (sessionId === void 0 || !sessionId.startsWith("femo-proj-")) {
       setWinInfo({ winKind: "none" });
       return;
@@ -19431,11 +20567,11 @@ function useFemoRunState(sessionId, mainSid) {
       window.removeEventListener("focus", onVisible);
     };
   }, [sessionId, refreshRunState]);
-  (0, import_react28.useEffect)(() => {
+  (0, import_react29.useEffect)(() => {
     if (mainSid === void 0) return;
     return femoStreamAcquire({ background: true });
   }, [sessionId, mainSid]);
-  (0, import_react28.useEffect)(() => {
+  (0, import_react29.useEffect)(() => {
     if (mainSid === void 0) return;
     return subscribeControlEvents((msg) => {
       if (msg.type !== "projection_state") return;
@@ -19454,7 +20590,7 @@ function useFemoRunState(sessionId, mainSid) {
 }
 
 // client/client-ui/composer.tsx
-var import_jsx_runtime28 = require("react/jsx-runtime");
+var import_jsx_runtime29 = require("react/jsx-runtime");
 var DRAFT_STORE_KEY = "femo-plugin.composer.drafts";
 function readDrafts() {
   try {
@@ -19477,13 +20613,13 @@ function writeDraft(sid, text) {
 }
 function ProjectionComposer({ useSession, useSessions, getSessionFace }) {
   const sessionId = useSession((s) => s.sessionId);
-  const [text, setText] = (0, import_react29.useState)("");
-  const [busy, setBusy] = (0, import_react29.useState)(false);
-  const [error, setError] = (0, import_react29.useState)(null);
-  const composingRef = (0, import_react29.useRef)(false);
-  const inputRef = (0, import_react29.useRef)(null);
-  const errorSeqRef = (0, import_react29.useRef)(0);
-  (0, import_react29.useEffect)(() => {
+  const [text, setText] = (0, import_react30.useState)("");
+  const [busy, setBusy] = (0, import_react30.useState)(false);
+  const [error, setError] = (0, import_react30.useState)(null);
+  const composingRef = (0, import_react30.useRef)(false);
+  const inputRef = (0, import_react30.useRef)(null);
+  const errorSeqRef = (0, import_react30.useRef)(0);
+  (0, import_react30.useEffect)(() => {
     if (sessionId === void 0) return;
     setText(readDrafts()[sessionId] ?? "");
   }, [sessionId]);
@@ -19497,7 +20633,7 @@ function ProjectionComposer({ useSession, useSessions, getSessionFace }) {
     return typeof pid === "string" && pid.length > 0 ? pid : void 0;
   });
   const mainListed = useSessions((state) => typeof mainSid === "string" && Array.isArray(state?.ids) && state.ids.includes(mainSid));
-  const mainFace = (0, import_react29.useMemo)(
+  const mainFace = (0, import_react30.useMemo)(
     () => mainSid === void 0 || !mainListed ? void 0 : getSessionFace?.(mainSid),
     [mainSid, mainListed, getSessionFace]
   );
@@ -19505,15 +20641,15 @@ function ProjectionComposer({ useSession, useSessions, getSessionFace }) {
   const mainRunning = mainSnapshot?.running === true;
   const { run, winInfo } = useFemoRunState(sessionId, mainSid);
   const buttonState = composerButtonState({ winKind: winInfo.winKind, actor: winInfo.actor, run, mainRunning });
-  const [varsOpen, setVarsOpen] = (0, import_react29.useState)(false);
-  const [varValues, setVarValues] = (0, import_react29.useState)({});
-  const varsPanelRef = (0, import_react29.useRef)(null);
+  const [varsOpen, setVarsOpen] = (0, import_react30.useState)(false);
+  const [varValues, setVarValues] = (0, import_react30.useState)({});
+  const varsPanelRef = (0, import_react30.useRef)(null);
   const outVarsKey = run.outVars.join("\0");
-  (0, import_react29.useEffect)(() => {
+  (0, import_react30.useEffect)(() => {
     setVarsOpen(false);
     setVarValues({});
   }, [outVarsKey]);
-  (0, import_react29.useEffect)(() => {
+  (0, import_react30.useEffect)(() => {
     if (!varsOpen) return;
     const onPointerDown = (e) => {
       if (e.target instanceof Node && varsPanelRef.current?.contains(e.target) === true) return;
@@ -19584,7 +20720,7 @@ function ProjectionComposer({ useSession, useSessions, getSessionFace }) {
       }
     })();
   };
-  (0, import_react29.useEffect)(() => {
+  (0, import_react30.useEffect)(() => {
     if (error === null) return;
     const timer = setTimeout(() => {
       setError(null);
@@ -19593,7 +20729,7 @@ function ProjectionComposer({ useSession, useSessions, getSessionFace }) {
       clearTimeout(timer);
     };
   }, [error]);
-  (0, import_react29.useEffect)(() => {
+  (0, import_react30.useEffect)(() => {
     if (busy) return;
     inputRef.current?.focus({ preventScroll: true });
   }, [sessionId]);
@@ -19610,8 +20746,8 @@ function ProjectionComposer({ useSession, useSessions, getSessionFace }) {
     e.preventDefault();
     inputRef.current?.focus({ preventScroll: true });
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { className: "femo-comp-root", children: [
-    run.waiting && run.prompt !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("div", { role: "status", style: {
+  return /* @__PURE__ */ (0, import_jsx_runtime29.jsxs)("div", { className: "femo-comp-root", children: [
+    run.waiting && run.prompt !== void 0 && /* @__PURE__ */ (0, import_jsx_runtime29.jsx)("div", { role: "status", style: {
       margin: "0 0 6px",
       padding: "8px 12px",
       borderRadius: "8px",
@@ -19621,14 +20757,14 @@ function ProjectionComposer({ useSession, useSessions, getSessionFace }) {
       fontSize: "13px",
       whiteSpace: "pre-wrap",
       wordBreak: "break-word"
-    }, children: /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 }, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime28.jsx)(FemoLogo, { size: 12, style: { flexShrink: 0 } }),
+    }, children: /* @__PURE__ */ (0, import_jsx_runtime29.jsxs)("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime29.jsx)(FemoLogo, { size: 12, style: { flexShrink: 0 } }),
       run.prompt
     ] }) }),
-    error !== null && /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("div", { className: "femo-comp-notice", role: "status", children: error.text }),
-    /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { className: "femo-comp-card", "data-composer-card": "", children: [
-      showVarUi && /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { className: "femo-comp-var-bar", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)(
+    error !== null && /* @__PURE__ */ (0, import_jsx_runtime29.jsx)("div", { className: "femo-comp-notice", role: "status", children: error.text }),
+    /* @__PURE__ */ (0, import_jsx_runtime29.jsxs)("div", { className: "femo-comp-card", "data-composer-card": "", children: [
+      showVarUi && /* @__PURE__ */ (0, import_jsx_runtime29.jsxs)("div", { className: "femo-comp-var-bar", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime29.jsxs)(
           "button",
           {
             type: "button",
@@ -19642,17 +20778,17 @@ function ProjectionComposer({ useSession, useSessions, getSessionFace }) {
               setVarsOpen(!varsOpen);
             },
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime28.jsx)(FaCode, { size: 12 }),
-              /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("span", { children: "\u53D8\u91CF\u8D4B\u503C" })
+              /* @__PURE__ */ (0, import_jsx_runtime29.jsx)(FaCode, { size: 12 }),
+              /* @__PURE__ */ (0, import_jsx_runtime29.jsx)("span", { children: "\u53D8\u91CF\u8D4B\u503C" })
             ]
           }
         ),
-        varsOpen && /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { ref: varsPanelRef, className: "femo-comp-var-panel", role: "dialog", "aria-label": "\u53D8\u91CF\u8D4B\u503C", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("div", { className: "femo-comp-var-head", children: "\u672C\u8282\u70B9\u53D8\u91CF\u8D4B\u503C\uFF08\u53EF\u53EA\u586B\u5176\u4E2D\u51E0\u9879\uFF09" }),
-          run.outVars.map((name) => /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { className: "femo-comp-var-row", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("span", { className: "femo-comp-var-name", title: name, children: name }),
-            /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("span", { className: "femo-comp-var-eq", "aria-hidden": true, children: "=" }),
-            /* @__PURE__ */ (0, import_jsx_runtime28.jsx)(
+        varsOpen && /* @__PURE__ */ (0, import_jsx_runtime29.jsxs)("div", { ref: varsPanelRef, className: "femo-comp-var-panel", role: "dialog", "aria-label": "\u53D8\u91CF\u8D4B\u503C", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime29.jsx)("div", { className: "femo-comp-var-head", children: "\u672C\u8282\u70B9\u53D8\u91CF\u8D4B\u503C\uFF08\u53EF\u53EA\u586B\u5176\u4E2D\u51E0\u9879\uFF09" }),
+          run.outVars.map((name) => /* @__PURE__ */ (0, import_jsx_runtime29.jsxs)("div", { className: "femo-comp-var-row", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime29.jsx)("span", { className: "femo-comp-var-name", title: name, children: name }),
+            /* @__PURE__ */ (0, import_jsx_runtime29.jsx)("span", { className: "femo-comp-var-eq", "aria-hidden": true, children: "=" }),
+            /* @__PURE__ */ (0, import_jsx_runtime29.jsx)(
               "input",
               {
                 className: "femo-comp-var-input",
@@ -19665,7 +20801,7 @@ function ProjectionComposer({ useSession, useSessions, getSessionFace }) {
               }
             )
           ] }, name)),
-          /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)(
+          /* @__PURE__ */ (0, import_jsx_runtime29.jsxs)(
             "button",
             {
               type: "button",
@@ -19674,17 +20810,17 @@ function ProjectionComposer({ useSession, useSessions, getSessionFace }) {
               onMouseDown: keepFocus,
               onClick: confirmVars,
               children: [
-                /* @__PURE__ */ (0, import_jsx_runtime28.jsx)(FaCircleCheck, { size: 13 }),
-                /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("span", { children: busy ? "\u53D1\u9001\u4E2D" : "\u786E\u8BA4\u8D4B\u503C\u5E76\u53D1\u9001" })
+                /* @__PURE__ */ (0, import_jsx_runtime29.jsx)(FaCircleCheck, { size: 13 }),
+                /* @__PURE__ */ (0, import_jsx_runtime29.jsx)("span", { children: busy ? "\u53D1\u9001\u4E2D" : "\u786E\u8BA4\u8D4B\u503C\u5E76\u53D1\u9001" })
               ]
             }
           )
         ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("div", { className: "femo-comp-scroll", "data-input-scroll": "", children: /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { className: "femo-comp-grow", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("div", { "aria-hidden": true, className: "femo-comp-mirror", "data-input-mirror": "", children: `${text}
+      /* @__PURE__ */ (0, import_jsx_runtime29.jsx)("div", { className: "femo-comp-scroll", "data-input-scroll": "", children: /* @__PURE__ */ (0, import_jsx_runtime29.jsxs)("div", { className: "femo-comp-grow", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime29.jsx)("div", { "aria-hidden": true, className: "femo-comp-mirror", "data-input-mirror": "", children: `${text}
 ` }),
-        /* @__PURE__ */ (0, import_jsx_runtime28.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime29.jsx)(
           "textarea",
           {
             ref: inputRef,
@@ -19710,16 +20846,16 @@ function ProjectionComposer({ useSession, useSessions, getSessionFace }) {
           }
         )
       ] }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { className: "femo-comp-row", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime28.jsx)(PermissionMenu, { face: mainFace, disabled: busy }),
-        /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { className: "femo-comp-trailing", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime29.jsxs)("div", { className: "femo-comp-row", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime29.jsx)(PermissionMenu, { face: mainFace, disabled: busy }),
+        /* @__PURE__ */ (0, import_jsx_runtime29.jsxs)("div", { className: "femo-comp-trailing", children: [
           sessionId !== void 0 && mainSid !== void 0 && sessionId.startsWith(`femo-proj-${mainSid}-`) && (() => {
             const actorKey = sessionId.slice(`femo-proj-${mainSid}-`.length);
-            if (actorKey === "god") return /* @__PURE__ */ (0, import_jsx_runtime28.jsx)(GodContextRing, { face: mainFace });
-            if (actorKey !== "stage") return /* @__PURE__ */ (0, import_jsx_runtime28.jsx)(ActorContextRing, { mainSid, actorKey });
+            if (actorKey === "god") return /* @__PURE__ */ (0, import_jsx_runtime29.jsx)(GodContextRing, { face: mainFace });
+            if (actorKey !== "stage") return /* @__PURE__ */ (0, import_jsx_runtime29.jsx)(ActorContextRing, { mainSid, actorKey });
             return null;
           })(),
-          /* @__PURE__ */ (0, import_jsx_runtime28.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime29.jsx)(
             "button",
             {
               type: "button",
@@ -19733,34 +20869,34 @@ function ProjectionComposer({ useSession, useSessions, getSessionFace }) {
               } : () => {
                 submit();
               },
-              children: buttonState === "stop" ? /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("svg", { viewBox: "0 0 16 16", width: "16", height: "16", "aria-hidden": true, children: /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("rect", { x: "3", y: "3", width: "10", height: "10", rx: "3", fill: "currentColor" }) }) : /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("svg", { viewBox: "0 0 16 16", width: "16", height: "16", "aria-hidden": true, children: /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("path", { d: "M8.3125 0.980183C8.66767 1.0531 8.97902 1.20418 9.2627 1.43233C9.48724 1.61297 9.73029 1.85793 9.97949 2.10714L14.707 6.83468L13.293 8.24874L9 3.95577V15.0417H7V3.95577L2.70703 8.24874L1.29297 6.83468L6.02051 2.10714C6.26971 1.85793 6.51277 1.61297 6.7373 1.43233C6.97662 1.23986 7.28445 1.04402 7.6875 0.980183C7.8973 0.947006 8.1031 0.95516 8.3125 0.980183Z", fill: "currentColor" }) })
+              children: buttonState === "stop" ? /* @__PURE__ */ (0, import_jsx_runtime29.jsx)("svg", { viewBox: "0 0 16 16", width: "16", height: "16", "aria-hidden": true, children: /* @__PURE__ */ (0, import_jsx_runtime29.jsx)("rect", { x: "3", y: "3", width: "10", height: "10", rx: "3", fill: "currentColor" }) }) : /* @__PURE__ */ (0, import_jsx_runtime29.jsx)("svg", { viewBox: "0 0 16 16", width: "16", height: "16", "aria-hidden": true, children: /* @__PURE__ */ (0, import_jsx_runtime29.jsx)("path", { d: "M8.3125 0.980183C8.66767 1.0531 8.97902 1.20418 9.2627 1.43233C9.48724 1.61297 9.73029 1.85793 9.97949 2.10714L14.707 6.83468L13.293 8.24874L9 3.95577V15.0417H7V3.95577L2.70703 8.24874L1.29297 6.83468L6.02051 2.10714C6.26971 1.85793 6.51277 1.61297 6.7373 1.43233C6.97662 1.23986 7.28445 1.04402 7.6875 0.980183C7.8973 0.947006 8.1031 0.95516 8.3125 0.980183Z", fill: "currentColor" }) })
             }
           )
         ] })
       ] })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime28.jsx)(StatsRow, { face: mainFace })
+    /* @__PURE__ */ (0, import_jsx_runtime29.jsx)(StatsRow, { face: mainFace })
   ] });
 }
 
 // client/client-ui/hub-window.tsx
-var import_react32 = require("react");
+var import_react33 = require("react");
 var import_dsh_client_ui_primitives6 = require("@deepseek-ai/dsh-client-ui-primitives");
 
 // client/femo-reasoning-row.tsx
-var import_react30 = require("react");
+var import_react31 = require("react");
 var import_dsh_client_ui_primitives4 = require("@deepseek-ai/dsh-client-ui-primitives");
-var import_jsx_runtime29 = require("react/jsx-runtime");
+var import_jsx_runtime30 = require("react/jsx-runtime");
 function useThrottledVisualUpdate(update, intervalFrames = 3) {
-  const updateRef = (0, import_react30.useRef)(update);
+  const updateRef = (0, import_react31.useRef)(update);
   updateRef.current = update;
-  const pendingFrameRef = (0, import_react30.useRef)(null);
-  (0, import_react30.useLayoutEffect)(() => () => {
+  const pendingFrameRef = (0, import_react31.useRef)(null);
+  (0, import_react31.useLayoutEffect)(() => () => {
     if (pendingFrameRef.current === null) return;
     cancelAnimationFrame(pendingFrameRef.current);
     pendingFrameRef.current = null;
   }, []);
-  return (0, import_react30.useCallback)(() => {
+  return (0, import_react31.useCallback)(() => {
     if (pendingFrameRef.current !== null) return;
     let remainingFrames = intervalFrames;
     const advance = () => {
@@ -19785,27 +20921,27 @@ function latestLine(text) {
   return newline === -1 ? visible : visible.slice(newline + 1);
 }
 function FemoReasoningRow({ text, running, runningLabel }) {
-  const [expanded, setExpanded] = (0, import_react30.useState)(false);
-  const summaryRef = (0, import_react30.useRef)(null);
+  const [expanded, setExpanded] = (0, import_react31.useState)(false);
+  const summaryRef = (0, import_react31.useRef)(null);
   const summary = running ? latestLine(text) : firstLine(text);
   const scheduleSummaryScroll = useThrottledVisualUpdate(() => {
     const element = summaryRef.current;
     if (element === null) return;
     element.scrollLeft = running ? element.scrollWidth - element.clientWidth : 0;
   });
-  (0, import_react30.useEffect)(() => {
+  (0, import_react31.useEffect)(() => {
     scheduleSummaryScroll();
   }, [running, scheduleSummaryScroll, summary]);
-  return /* @__PURE__ */ (0, import_jsx_runtime29.jsxs)("div", { className: "femo-rr-root", "data-variant": "think", "data-state": running ? "running" : "ok", children: [
-    running && /* @__PURE__ */ (0, import_jsx_runtime29.jsx)("span", { className: "femo-a11y-hidden", children: runningLabel }),
-    /* @__PURE__ */ (0, import_jsx_runtime29.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime30.jsxs)("div", { className: "femo-rr-root", "data-variant": "think", "data-state": running ? "running" : "ok", children: [
+    running && /* @__PURE__ */ (0, import_jsx_runtime30.jsx)("span", { className: "femo-a11y-hidden", children: runningLabel }),
+    /* @__PURE__ */ (0, import_jsx_runtime30.jsx)(
       import_dsh_client_ui_primitives4.DisclosureRow,
       {
         rowClassName: "femo-rr-row",
         leadingClassName: "femo-rr-leading",
         titleClassName: "femo-rr-title",
         chevronClassName: "femo-rr-chevron",
-        icon: /* @__PURE__ */ (0, import_jsx_runtime29.jsx)(IconThink, { size: 14 }),
+        icon: /* @__PURE__ */ (0, import_jsx_runtime30.jsx)(IconThink, { size: 14 }),
         title: "Think",
         open: expanded,
         expandable: true,
@@ -19813,20 +20949,20 @@ function FemoReasoningRow({ text, running, runningLabel }) {
         onToggle: () => {
           setExpanded((value) => !value);
         },
-        collapsedContent: /* @__PURE__ */ (0, import_jsx_runtime29.jsxs)(import_jsx_runtime29.Fragment, { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime29.jsx)("span", { className: "femo-rr-separator", "aria-hidden": true }),
-          /* @__PURE__ */ (0, import_jsx_runtime29.jsx)("span", { ref: summaryRef, className: "femo-rr-summary", "data-follow-end": running || void 0, children: summary })
+        collapsedContent: /* @__PURE__ */ (0, import_jsx_runtime30.jsxs)(import_jsx_runtime30.Fragment, { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime30.jsx)("span", { className: "femo-rr-separator", "aria-hidden": true }),
+          /* @__PURE__ */ (0, import_jsx_runtime30.jsx)("span", { ref: summaryRef, className: "femo-rr-summary", "data-follow-end": running || void 0, children: summary })
         ] }),
-        children: /* @__PURE__ */ (0, import_jsx_runtime29.jsx)("div", { className: "femo-rr-think-body", children: text })
+        children: /* @__PURE__ */ (0, import_jsx_runtime30.jsx)("div", { className: "femo-rr-think-body", children: text })
       }
     )
   ] });
 }
 
 // client/femo-tool-row.tsx
-var import_react31 = require("react");
+var import_react32 = require("react");
 var import_dsh_client_ui_primitives5 = require("@deepseek-ai/dsh-client-ui-primitives");
-var import_jsx_runtime30 = require("react/jsx-runtime");
+var import_jsx_runtime31 = require("react/jsx-runtime");
 var TOOL_VARIANTS = {
   bash: "bash",
   pwsh: "bash",
@@ -19938,32 +21074,32 @@ function formatToolBody(variant, argsRaw) {
   return JSON.stringify(parsed, null, 2);
 }
 var VARIANT_ICONS = {
-  search: /* @__PURE__ */ (0, import_jsx_runtime30.jsx)(import_dsh_client_ui_primitives5.IconSearchOutline16, { size: 14 }),
-  read: /* @__PURE__ */ (0, import_jsx_runtime30.jsx)(import_dsh_client_ui_primitives5.IconBrowseOutline16, { size: 14 }),
-  bash: /* @__PURE__ */ (0, import_jsx_runtime30.jsx)(import_dsh_client_ui_primitives5.IconApiOutline14, { size: 14 }),
-  write: /* @__PURE__ */ (0, import_jsx_runtime30.jsx)(import_dsh_client_ui_primitives5.IconEditOutline16, { size: 14 }),
-  edit: /* @__PURE__ */ (0, import_jsx_runtime30.jsx)(import_dsh_client_ui_primitives5.IconEditOutline16, { size: 14 }),
-  code: /* @__PURE__ */ (0, import_jsx_runtime30.jsx)(import_dsh_client_ui_primitives5.IconCodeOutline16, { size: 14 }),
-  others: /* @__PURE__ */ (0, import_jsx_runtime30.jsx)(import_dsh_client_ui_primitives5.IconSparkle16, { size: 14 })
+  search: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(import_dsh_client_ui_primitives5.IconSearchOutline16, { size: 14 }),
+  read: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(import_dsh_client_ui_primitives5.IconBrowseOutline16, { size: 14 }),
+  bash: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(import_dsh_client_ui_primitives5.IconApiOutline14, { size: 14 }),
+  write: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(import_dsh_client_ui_primitives5.IconEditOutline16, { size: 14 }),
+  edit: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(import_dsh_client_ui_primitives5.IconEditOutline16, { size: 14 }),
+  code: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(import_dsh_client_ui_primitives5.IconCodeOutline16, { size: 14 }),
+  others: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(import_dsh_client_ui_primitives5.IconSparkle16, { size: 14 })
 };
 function FemoToolRow({ name, argsRaw, output, error }) {
-  const [expanded, setExpanded] = (0, import_react31.useState)(false);
+  const [expanded, setExpanded] = (0, import_react32.useState)(false);
   ensureToolStyles();
   const variant = TOOL_VARIANTS[name] ?? "others";
   const done = output !== void 0;
   const state = !done ? "running" : error ? "error" : "ok";
   const title = VARIANT_TITLE[variant] ?? "\u5DE5\u5177\u8C03\u7528";
-  const summary = (0, import_react31.useMemo)(() => argsRaw === "" ? name : deriveSummary(variant, argsRaw), [variant, argsRaw, name]);
+  const summary = (0, import_react32.useMemo)(() => argsRaw === "" ? name : deriveSummary(variant, argsRaw), [variant, argsRaw, name]);
   const expandable = argsRaw !== "" || done && (output ?? "") !== "";
   const open = expanded && expandable;
-  const bodyText = (0, import_react31.useMemo)(
+  const bodyText = (0, import_react32.useMemo)(
     () => open && argsRaw !== "" ? formatToolBody(variant, argsRaw) : null,
     [open, variant, argsRaw]
   );
   const outText = done ? output ?? "" : null;
   const summaryText = state === "error" && outText ? firstLine2(outText) : summary;
-  return /* @__PURE__ */ (0, import_jsx_runtime30.jsxs)("div", { className: "femo-tr-root", "data-state": state, "data-tool": name, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime30.jsxs)(
+  return /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("div", { className: "femo-tr-root", "data-state": state, "data-tool": name, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(
       "div",
       {
         className: "femo-tr-row",
@@ -19979,33 +21115,33 @@ function FemoToolRow({ name, argsRaw, output, error }) {
           }
         },
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime30.jsx)("span", { className: "femo-tr-leading", children: state === "error" ? /* @__PURE__ */ (0, import_jsx_runtime30.jsx)(import_dsh_client_ui_primitives5.StateDot, { state: "error" }) : state === "stopped" ? /* @__PURE__ */ (0, import_jsx_runtime30.jsx)(import_dsh_client_ui_primitives5.StateDot, { state: "warning" }) : VARIANT_ICONS[variant] }),
-          /* @__PURE__ */ (0, import_jsx_runtime30.jsx)("span", { className: "femo-tr-title", children: title }),
-          summaryText !== "" && /* @__PURE__ */ (0, import_jsx_runtime30.jsxs)(import_jsx_runtime30.Fragment, { children: [
-            /* @__PURE__ */ (0, import_jsx_runtime30.jsx)("span", { className: "femo-tr-sep", "aria-hidden": true }),
-            /* @__PURE__ */ (0, import_jsx_runtime30.jsx)("span", { className: "femo-tr-summary", "data-error": state === "error" || void 0, children: summaryText })
+          /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("span", { className: "femo-tr-leading", children: state === "error" ? /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(import_dsh_client_ui_primitives5.StateDot, { state: "error" }) : state === "stopped" ? /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(import_dsh_client_ui_primitives5.StateDot, { state: "warning" }) : VARIANT_ICONS[variant] }),
+          /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("span", { className: "femo-tr-title", children: title }),
+          summaryText !== "" && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(import_jsx_runtime31.Fragment, { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("span", { className: "femo-tr-sep", "aria-hidden": true }),
+            /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("span", { className: "femo-tr-summary", "data-error": state === "error" || void 0, children: summaryText })
           ] }),
-          expandable && /* @__PURE__ */ (0, import_jsx_runtime30.jsx)(
+          expandable && /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(
             "span",
             {
               className: "femo-tr-chevron",
               style: { transform: open ? "rotate(180deg)" : void 0 },
               "aria-hidden": true,
-              children: /* @__PURE__ */ (0, import_jsx_runtime30.jsx)("svg", { width: "14", height: "14", viewBox: "0 0 16 16", fill: "none", xmlns: "http://www.w3.org/2000/svg", children: /* @__PURE__ */ (0, import_jsx_runtime30.jsx)("path", { d: "M4 6L8 10L12 6", stroke: "currentColor", strokeWidth: "1.4", strokeLinecap: "round", strokeLinejoin: "round" }) })
+              children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("svg", { width: "14", height: "14", viewBox: "0 0 16 16", fill: "none", xmlns: "http://www.w3.org/2000/svg", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("path", { d: "M4 6L8 10L12 6", stroke: "currentColor", strokeWidth: "1.4", strokeLinecap: "round", strokeLinejoin: "round" }) })
             }
           )
         ]
       }
     ),
-    open && /* @__PURE__ */ (0, import_jsx_runtime30.jsx)("div", { className: "femo-tr-body", children: (bodyText !== null || outText !== null) && /* @__PURE__ */ (0, import_jsx_runtime30.jsxs)("div", { className: "femo-tr-io", children: [
-      bodyText !== null && /* @__PURE__ */ (0, import_jsx_runtime30.jsxs)("div", { className: "femo-tr-io-section", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime30.jsx)("span", { className: "femo-tr-io-label", children: "\u8F93\u5165" }),
-        /* @__PURE__ */ (0, import_jsx_runtime30.jsx)("span", { className: "femo-tr-io-text", children: bodyText })
+    open && /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("div", { className: "femo-tr-body", children: (bodyText !== null || outText !== null) && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("div", { className: "femo-tr-io", children: [
+      bodyText !== null && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("div", { className: "femo-tr-io-section", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("span", { className: "femo-tr-io-label", children: "\u8F93\u5165" }),
+        /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("span", { className: "femo-tr-io-text", children: bodyText })
       ] }),
-      bodyText !== null && outText !== null && /* @__PURE__ */ (0, import_jsx_runtime30.jsx)("span", { className: "femo-tr-io-divider", "aria-hidden": true }),
-      outText !== null && /* @__PURE__ */ (0, import_jsx_runtime30.jsxs)("div", { className: "femo-tr-io-section", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime30.jsx)("span", { className: "femo-tr-io-label", children: "\u8F93\u51FA" }),
-        /* @__PURE__ */ (0, import_jsx_runtime30.jsx)("span", { className: "femo-tr-io-text", "data-error": state === "error" || void 0, children: outText })
+      bodyText !== null && outText !== null && /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("span", { className: "femo-tr-io-divider", "aria-hidden": true }),
+      outText !== null && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("div", { className: "femo-tr-io-section", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("span", { className: "femo-tr-io-label", children: "\u8F93\u51FA" }),
+        /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("span", { className: "femo-tr-io-text", "data-error": state === "error" || void 0, children: outText })
       ] })
     ] }) })
   ] });
@@ -20018,7 +21154,7 @@ var import_dsh_client_ui_primitives7 = require("@deepseek-ai/dsh-client-ui-primi
 var HUB_ANCHOR_KIND = "hub";
 
 // client/client-ui/hub-window.tsx
-var import_jsx_runtime31 = require("react/jsx-runtime");
+var import_jsx_runtime32 = require("react/jsx-runtime");
 function isHubAnchorEvent(event) {
   if (event.type !== "femo-plugin/chat") return false;
   return event.data?.kind === HUB_ANCHOR_KIND;
@@ -20049,11 +21185,11 @@ var femoHubAnchorDefinition = {
   }
 };
 function useHubFeed(sessionId) {
-  const [rows, setRows] = (0, import_react32.useState)([]);
-  const [error, setError] = (0, import_react32.useState)(false);
-  const [live, setLive] = (0, import_react32.useState)(false);
-  const [job, setJob] = (0, import_react32.useState)(null);
-  (0, import_react32.useEffect)(() => {
+  const [rows, setRows] = (0, import_react33.useState)([]);
+  const [error, setError] = (0, import_react33.useState)(false);
+  const [live, setLive] = (0, import_react33.useState)(false);
+  const [job, setJob] = (0, import_react33.useState)(null);
+  (0, import_react33.useEffect)(() => {
     if (sessionId === void 0 || !sessionId.startsWith("femo-proj-")) return;
     const win = sessionId.slice(sessionId.lastIndexOf("-") + 1);
     let stopped = false;
@@ -20206,33 +21342,33 @@ function ensureHubStyles() {
 function HubDraftRow({ draft }) {
   const kind = draft.kind ?? "say";
   const text = draft.text ?? "";
-  if (kind === "cot") return /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(FemoReasoningRow, { text, running: true, runningLabel: "thinking" });
+  if (kind === "cot") return /* @__PURE__ */ (0, import_jsx_runtime32.jsx)(FemoReasoningRow, { text, running: true, runningLabel: "thinking" });
   if (kind === "tool") {
-    return /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(FemoToolRow, { name: draft.name ?? "tool", argsRaw: text });
+    return /* @__PURE__ */ (0, import_jsx_runtime32.jsx)(FemoToolRow, { name: draft.name ?? "tool", argsRaw: text });
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("div", { className: "femo-hub-say", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(import_dsh_client_ui_primitives6.MarkdownText, { text, streaming: true, codeLabels: { copyLabel: "copy", copiedLabel: "copied" } }) });
+  return /* @__PURE__ */ (0, import_jsx_runtime32.jsx)("div", { className: "femo-hub-say", children: /* @__PURE__ */ (0, import_jsx_runtime32.jsx)(import_dsh_client_ui_primitives6.MarkdownText, { text, streaming: true, codeLabels: { copyLabel: "copy", copiedLabel: "copied" } }) });
 }
 function HubContextInjectionRow({ text, producerLabel }) {
-  const [open, setOpen] = (0, import_react32.useState)(false);
+  const [open, setOpen] = (0, import_react33.useState)(false);
   const summary = firstLineOf(text);
-  return /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("div", { className: "femo-ci-root", "data-open": open || void 0, style: { margin: "16px 0 0" }, children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime32.jsx)("div", { className: "femo-ci-root", "data-open": open || void 0, style: { margin: "16px 0 0" }, children: /* @__PURE__ */ (0, import_jsx_runtime32.jsx)(
     import_dsh_client_ui_primitives7.DisclosureRow,
     {
-      icon: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(IconContextInjection, { size: 14 }),
+      icon: /* @__PURE__ */ (0, import_jsx_runtime32.jsx)(IconContextInjection, { size: 14 }),
       chevronClassName: "femo-ci-chevron",
       title: "\u4E0A\u4E0B\u6587\u6CE8\u5165",
-      collapsedContent: /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(import_jsx_runtime31.Fragment, { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("span", { className: "femo-ci-sep", "aria-hidden": true }),
-        /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("span", { className: "femo-ci-source", "data-context-source": true, children: producerLabel ?? "plugin" }),
-        /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("span", { className: "femo-ci-sep", "aria-hidden": true }),
-        /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("span", { className: "femo-ci-summary", "data-context-summary": true, children: summary })
+      collapsedContent: /* @__PURE__ */ (0, import_jsx_runtime32.jsxs)(import_jsx_runtime32.Fragment, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime32.jsx)("span", { className: "femo-ci-sep", "aria-hidden": true }),
+        /* @__PURE__ */ (0, import_jsx_runtime32.jsx)("span", { className: "femo-ci-source", "data-context-source": true, children: producerLabel ?? "plugin" }),
+        /* @__PURE__ */ (0, import_jsx_runtime32.jsx)("span", { className: "femo-ci-sep", "aria-hidden": true }),
+        /* @__PURE__ */ (0, import_jsx_runtime32.jsx)("span", { className: "femo-ci-summary", "data-context-summary": true, children: summary })
       ] }),
       keepContentWhenOpen: true,
       open,
       expandable: true,
       expandOnRowClick: true,
       onToggle: () => setOpen((v) => !v),
-      children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("div", { className: "femo-ci-body", "data-context-injection-body": true, children: text })
+      children: /* @__PURE__ */ (0, import_jsx_runtime32.jsx)("div", { className: "femo-ci-body", "data-context-injection-body": true, children: text })
     }
   ) });
 }
@@ -20241,60 +21377,60 @@ function firstLineOf(text) {
   return nl === -1 ? text : text.slice(0, nl);
 }
 function HubUserBubble({ text }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("div", { className: "femo-hub-userrow", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("div", { className: "femo-hub-userbubble", children: text }) });
+  return /* @__PURE__ */ (0, import_jsx_runtime32.jsx)("div", { className: "femo-hub-userrow", children: /* @__PURE__ */ (0, import_jsx_runtime32.jsx)("div", { className: "femo-hub-userbubble", children: text }) });
 }
 function HubAlertLine({ kind, text }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("div", { className: kind === "retry" ? "femo-hub-retry" : "femo-hub-fail", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(FaTriangleExclamation, { size: 11, style: { marginRight: 5, verticalAlign: "-1px" } }),
+  return /* @__PURE__ */ (0, import_jsx_runtime32.jsxs)("div", { className: kind === "retry" ? "femo-hub-retry" : "femo-hub-fail", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime32.jsx)(FaTriangleExclamation, { size: 11, style: { marginRight: 5, verticalAlign: "-1px" } }),
     text.replace(/^[⚠❌⛔]\uFE0F?\s*/, "")
   ] });
 }
 function HubNoticeLine({ kind, text }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("div", { className: kind === "prompt" ? "femo-hub-banner prompt" : "femo-hub-banner", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(LeadingIconText, { iconSize: 11, text }) });
+  return /* @__PURE__ */ (0, import_jsx_runtime32.jsx)("div", { className: kind === "prompt" ? "femo-hub-banner prompt" : "femo-hub-banner", children: /* @__PURE__ */ (0, import_jsx_runtime32.jsx)(LeadingIconText, { iconSize: 11, text }) });
 }
 function HubItemRow({ item, row }) {
   const kind = item.kind ?? "say";
   if (kind === "name") {
     const human = row?.role === "human";
-    return /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("div", { className: human ? "femo-hub-actor femo-hub-actor-human" : "femo-hub-actor", style: { color: actorColor(item.text ?? "") }, children: [
-      row?.host !== void 0 && row.host.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("span", { className: "femo-hub-host", children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime32.jsxs)("div", { className: human ? "femo-hub-actor femo-hub-actor-human" : "femo-hub-actor", style: { color: actorColor(item.text ?? "") }, children: [
+      row?.host !== void 0 && row.host.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime32.jsxs)("span", { className: "femo-hub-host", children: [
         "[",
         row.host,
         "]"
       ] }),
       item.text ?? "",
-      row?.open === true && /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("span", { className: "femo-hub-open", children: "\xB7\u6B63\u5728\u2026" })
+      row?.open === true && /* @__PURE__ */ (0, import_jsx_runtime32.jsx)("span", { className: "femo-hub-open", children: "\xB7\u6B63\u5728\u2026" })
     ] });
   }
-  if (kind === "cot") return /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(FemoReasoningRow, { text: item.text ?? "", running: false, runningLabel: "thinking" });
+  if (kind === "cot") return /* @__PURE__ */ (0, import_jsx_runtime32.jsx)(FemoReasoningRow, { text: item.text ?? "", running: false, runningLabel: "thinking" });
   if (isBannerKind(kind)) {
-    return /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(HubNoticeLine, { kind, text: item.text ?? "" });
+    return /* @__PURE__ */ (0, import_jsx_runtime32.jsx)(HubNoticeLine, { kind, text: item.text ?? "" });
   }
   if (kind === "retry" || kind === "fail") {
-    return /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(HubAlertLine, { kind, text: item.text ?? "" });
+    return /* @__PURE__ */ (0, import_jsx_runtime32.jsx)(HubAlertLine, { kind, text: item.text ?? "" });
   }
   if (kind === "tool_result") {
     const res = item.toolResult;
     const out = res?.output !== void 0 ? res.output : item.text ?? "";
-    return /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("div", { className: "femo-hub-toolresult", children: out });
+    return /* @__PURE__ */ (0, import_jsx_runtime32.jsx)("div", { className: "femo-hub-toolresult", children: out });
   }
   if (row?.role === "human") {
-    return /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(HubUserBubble, { text: item.text ?? "" });
+    return /* @__PURE__ */ (0, import_jsx_runtime32.jsx)(HubUserBubble, { text: item.text ?? "" });
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("div", { className: "femo-hub-say", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(import_dsh_client_ui_primitives6.MarkdownText, { text: item.text ?? "", codeLabels: { copyLabel: "copy", copiedLabel: "copied" } }) });
+  return /* @__PURE__ */ (0, import_jsx_runtime32.jsx)("div", { className: "femo-hub-say", children: /* @__PURE__ */ (0, import_jsx_runtime32.jsx)(import_dsh_client_ui_primitives6.MarkdownText, { text: item.text ?? "", codeLabels: { copyLabel: "copy", copiedLabel: "copied" } }) });
 }
 function HubLine({ row }) {
   const kind = row.kind ?? "say";
   const meta = metaRowOf(kind);
   if (meta && !meta.plain) {
     const text = row.text ?? "";
-    return /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("div", { className: "femo-hub-meta", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(LeadingIconText, { text: text.length > 0 ? `${meta.label} \xB7 ${text}` : meta.label ?? "" }) });
+    return /* @__PURE__ */ (0, import_jsx_runtime32.jsx)("div", { className: "femo-hub-meta", children: /* @__PURE__ */ (0, import_jsx_runtime32.jsx)(LeadingIconText, { text: text.length > 0 ? `${meta.label} \xB7 ${text}` : meta.label ?? "" }) });
   }
   if (meta?.plain) {
-    return /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("div", { className: meta.error ? "femo-hub-meta femo-hub-meta-err" : "femo-hub-meta", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(LeadingIconText, { text: row.text ?? "" }) });
+    return /* @__PURE__ */ (0, import_jsx_runtime32.jsx)("div", { className: meta.error ? "femo-hub-meta femo-hub-meta-err" : "femo-hub-meta", children: /* @__PURE__ */ (0, import_jsx_runtime32.jsx)(LeadingIconText, { text: row.text ?? "" }) });
   }
   if (isBannerKind(kind)) {
-    return /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("div", { className: "femo-hub-line", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(HubNoticeLine, { kind, text: row.text ?? "" }) });
+    return /* @__PURE__ */ (0, import_jsx_runtime32.jsx)("div", { className: "femo-hub-line", children: /* @__PURE__ */ (0, import_jsx_runtime32.jsx)(HubNoticeLine, { kind, text: row.text ?? "" }) });
   }
   const isSection = kind === "section";
   const items = row.items ?? [];
@@ -20321,32 +21457,32 @@ function HubLine({ row }) {
     }
     slots.push(s);
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("div", { className: "femo-hub-line", children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime32.jsxs)("div", { className: "femo-hub-line", children: [
     !isSection && row.actor !== void 0 && row.actor.length > 0 && !// FEMO外用户发言的气泡行不画名字行（dsh 原生用户气泡无名字；名字恒为
     // 「用户」也不带信息量，2026-09-20）；插件注入行同理——「上下文注入
     // · 来源」行头自带身份（2026-09-21）。
-    (kind === "whisper" && (row.role === "human" || row.zone === "outside" && row.actor === "\u7528\u6237" || row.actor === "\u63D2\u4EF6")) && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("div", { className: "femo-hub-actor", style: { color: actorColor(row.actor ?? "") }, children: [
-      row.host !== void 0 && row.host.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("span", { className: "femo-hub-host", children: [
+    (kind === "whisper" && (row.role === "human" || row.zone === "outside" && row.actor === "\u7528\u6237" || row.actor === "\u63D2\u4EF6")) && /* @__PURE__ */ (0, import_jsx_runtime32.jsxs)("div", { className: "femo-hub-actor", style: { color: actorColor(row.actor ?? "") }, children: [
+      row.host !== void 0 && row.host.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime32.jsxs)("span", { className: "femo-hub-host", children: [
         "[",
         row.host,
         "]"
       ] }),
       row.actor
     ] }),
-    kind === "whisper" && row.text !== void 0 && row.text.length > 0 && (row.role === "human" || row.zone === "outside" && row.actor === "\u7528\u6237" ? /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(HubUserBubble, { text: row.text }) : row.actor === "\u63D2\u4EF6" ? /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(HubContextInjectionRow, { text: row.text, producerLabel: "femo-plugin" }) : /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("div", { className: "femo-hub-whisper", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(LeadingIconText, { text: row.text }) })),
-    kind === "narrate" && row.text !== void 0 && row.text.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("div", { className: "femo-hub-narrate", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(LeadingIconText, { text: row.text }) }),
-    (kind === "retry" || kind === "fail") && row.text !== void 0 && row.text.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(HubAlertLine, { kind, text: row.text }),
-    isSection && /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)(import_jsx_runtime31.Fragment, { children: [
+    kind === "whisper" && row.text !== void 0 && row.text.length > 0 && (row.role === "human" || row.zone === "outside" && row.actor === "\u7528\u6237" ? /* @__PURE__ */ (0, import_jsx_runtime32.jsx)(HubUserBubble, { text: row.text }) : row.actor === "\u63D2\u4EF6" ? /* @__PURE__ */ (0, import_jsx_runtime32.jsx)(HubContextInjectionRow, { text: row.text, producerLabel: "femo-plugin" }) : /* @__PURE__ */ (0, import_jsx_runtime32.jsx)("div", { className: "femo-hub-whisper", children: /* @__PURE__ */ (0, import_jsx_runtime32.jsx)(LeadingIconText, { text: row.text }) })),
+    kind === "narrate" && row.text !== void 0 && row.text.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime32.jsx)("div", { className: "femo-hub-narrate", children: /* @__PURE__ */ (0, import_jsx_runtime32.jsx)(LeadingIconText, { text: row.text }) }),
+    (kind === "retry" || kind === "fail") && row.text !== void 0 && row.text.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime32.jsx)(HubAlertLine, { kind, text: row.text }),
+    isSection && /* @__PURE__ */ (0, import_jsx_runtime32.jsxs)(import_jsx_runtime32.Fragment, { children: [
       slots.map((slot, i) => {
         if (slot.type === "tool") {
           const tool = slot;
-          return /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(FemoToolRow, { name: tool.name, argsRaw: tool.args, output: tool.output, error: tool.error }, i);
+          return /* @__PURE__ */ (0, import_jsx_runtime32.jsx)(FemoToolRow, { name: tool.name, argsRaw: tool.args, output: tool.output, error: tool.error }, i);
         }
-        return /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(HubItemRow, { item: slot, row }, i);
+        return /* @__PURE__ */ (0, import_jsx_runtime32.jsx)(HubItemRow, { item: slot, row }, i);
       }),
-      drafts.map((draft, i) => /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(HubDraftRow, { draft }, "d" + String(i)))
+      drafts.map((draft, i) => /* @__PURE__ */ (0, import_jsx_runtime32.jsx)(HubDraftRow, { draft }, "d" + String(i)))
     ] }),
-    kind === "say" && row.text !== void 0 && row.text.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("div", { className: "femo-hub-say", children: /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(import_dsh_client_ui_primitives6.MarkdownText, { text: row.text, codeLabels: { copyLabel: "copy", copiedLabel: "copied" } }) })
+    kind === "say" && row.text !== void 0 && row.text.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime32.jsx)("div", { className: "femo-hub-say", children: /* @__PURE__ */ (0, import_jsx_runtime32.jsx)(import_dsh_client_ui_primitives6.MarkdownText, { text: row.text, codeLabels: { copyLabel: "copy", copiedLabel: "copied" } }) })
   ] });
 }
 console.log("[femo-hub] bundle marker v3 (official ToolRow disclosure)");
@@ -20355,7 +21491,7 @@ function FemoHubAnchorView({ useSession }) {
   const view = useView(sessionId);
   const { rows, error, live, job } = useHubFeed(sessionId);
   ensureHubStyles();
-  (0, import_react32.useEffect)(() => {
+  (0, import_react33.useEffect)(() => {
     console.log(`[femo-hub] anchor view mounted sid=${sessionId ?? "none"}`);
     void fetch("/femo-plugin/client-probe", {
       method: "POST",
@@ -20365,11 +21501,11 @@ function FemoHubAnchorView({ useSession }) {
     });
   }, [sessionId]);
   if (view === "offstage") return null;
-  return /* @__PURE__ */ (0, import_jsx_runtime31.jsxs)("div", { className: "femo-hub-root", children: [
-    error && /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("div", { className: "femo-hub-status", children: "\u6295\u5F71\u4E2D\u5FC3\u4E0D\u5728\u7EBF\uFF0C\u5185\u5BB9\u6682\u65F6\u505C\u66F4\u2026" }),
-    !error && !live && rows.length === 0 && job !== null && /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("div", { className: "femo-hub-status", children: "\u8FDE\u63A5\u6295\u5F71\u4E2D\u5FC3\u2026" }),
-    !error && !live && rows.length === 0 && job === null && /* @__PURE__ */ (0, import_jsx_runtime31.jsx)("div", { className: "femo-hub-status", children: "\u672C\u6B21\u8FD8\u6CA1\u6709\u6295\u5F71\u6570\u636E\uFF08\u8FD0\u884CFEMO\u811A\u672C\u540E\u8FD9\u91CC\u663E\u793A\u5B9E\u51B5\uFF09" }),
-    rows.map((row) => /* @__PURE__ */ (0, import_jsx_runtime31.jsx)(HubLine, { row }, row.n))
+  return /* @__PURE__ */ (0, import_jsx_runtime32.jsxs)("div", { className: "femo-hub-root", children: [
+    error && /* @__PURE__ */ (0, import_jsx_runtime32.jsx)("div", { className: "femo-hub-status", children: "\u6295\u5F71\u4E2D\u5FC3\u4E0D\u5728\u7EBF\uFF0C\u5185\u5BB9\u6682\u65F6\u505C\u66F4\u2026" }),
+    !error && !live && rows.length === 0 && job !== null && /* @__PURE__ */ (0, import_jsx_runtime32.jsx)("div", { className: "femo-hub-status", children: "\u8FDE\u63A5\u6295\u5F71\u4E2D\u5FC3\u2026" }),
+    !error && !live && rows.length === 0 && job === null && /* @__PURE__ */ (0, import_jsx_runtime32.jsx)("div", { className: "femo-hub-status", children: "\u672C\u6B21\u8FD8\u6CA1\u6709\u6295\u5F71\u6570\u636E\uFF08\u8FD0\u884CFEMO\u811A\u672C\u540E\u8FD9\u91CC\u663E\u793A\u5B9E\u51B5\uFF09" }),
+    rows.map((row) => /* @__PURE__ */ (0, import_jsx_runtime32.jsx)(HubLine, { row }, row.n))
   ] });
 }
 

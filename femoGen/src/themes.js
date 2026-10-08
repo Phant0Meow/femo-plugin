@@ -28,6 +28,20 @@ export const FEMO_THEMES = [
   { id: 'web', name: '翡翠', desc: '深色玻璃 + 翡翠绿主紫辅 + 系统字体 + 按压缩放（源自 webAdapter 操作台设计语言）' },
 ];
 
+// ── 生僻字补字字体（character_need）──
+// 字体数据内嵌（base64 data URI，随包发布）：dsh 插件模式没有 HTTP 面伺服
+// ttf 文件，链接 /character_need.ttf 会 404，内嵌让三种形态（独立/托管/插件）通吃。
+// 字形源 = femoGen/public/character_need.ttf（4.2KB，只映射 5 个生僻码位：
+// 愱 U+6131、𢗼 U+225FC、𧉉 U+27249、𭛊 U+2D6CA、U+32C3C——除此外不映射任何字符，
+// 所以放进字体链首位逐字回退、不截胡普通字）。重生成 fontFace 数据：
+// python -c "import base64;textwrap;print(textwrap.fill(base64.b64encode(open(r'femoGen/public/character_need.ttf','rb').read()).decode(),76))"
+// 再把输出粘进下面的 FONT_FACE_CSS。字体链接线裁决见 femoGen/AGENTS.md §八。
+export const FONT_FACE_CSS = `@font-face {
+  font-family: 'MyCustomFont';
+  src: url('data:font/truetype;charset=utf-8;base64,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') format('truetype');
+  font-display: swap;
+}`;
+
 // ── 主题 CSS（由 common.jsx 的 FontStyle 注入，两种模式都生效）──
 // :root 兜底独立模式；[data-femo-theme] 限定编辑器容器作用域（插件模式不污染宿主）。
 export const THEME_CSS = `
@@ -178,10 +192,13 @@ export const THEME_CSS = `
   --femo-border-w-accent: 3px;       /* 左侧强调边（列表选中/错误条） */
   --femo-border-w-node: 4px;         /* 节点左侧粗色条 */
 
-  /* ── 字体族（主题可整体换字体）── */
-  --femo-font-sans: 'DM Sans', 'MiSans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --femo-font-mono: 'JetBrains Mono', monospace;
-  --femo-font-body: 'DM Sans', 'MiSans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; /* 独立模式 body 回退字体 */
+  /* ── 字体族（主题可整体换字体）──
+     每条字体链首位放 'MyCustomFont'（生僻字补字字体，定义见 styles/font.css）——
+     CSS 逐字回退只认元素声明清单，不进链=永远用不上；它只映射 5 个生僻码位，
+     链首命中出字形、命不中滑落后面的字体，不截胡（2026-10-08 裁决，见 AGENTS.md §八）。 */
+  --femo-font-sans: 'MyCustomFont', 'DM Sans', 'MiSans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --femo-font-mono: 'MyCustomFont', 'JetBrains Mono', monospace;
+  --femo-font-body: 'MyCustomFont', 'DM Sans', 'MiSans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; /* 独立模式 body 回退字体 */
 
   /* ── 画布背景（主题可换点阵/网格/纯色）── */
   --femo-canvas-dots: radial-gradient(circle, var(--femo-canvas-dot) 1.2px, transparent 1.2px);   /* 桌面画布点阵（颜色嵌套联动） */
@@ -259,10 +276,10 @@ export const THEME_CSS = `
   --femo-border-w-accent: 2px;
   --femo-border-w-node: 3px;
 
-  /* ── 字体：DM Sans（拉丁）+ MiSans（中文，round11 换掉系统雅黑）── */
-  --femo-font-sans: 'DM Sans', 'MiSans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  --femo-font-mono: 'SF Mono', 'JetBrains Mono', 'Fira Code', Consolas, 'Liberation Mono', Menlo, Courier, 'PingFang SC', 'Microsoft YaHei';
-  --femo-font-body: 'DM Sans', 'MiSans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  /* ── 字体：DM Sans（拉丁）+ MiSans（中文，round11 换掉系统雅黑）+ MyCustomFont（生僻字补字，链首逐字回退）── */
+  --femo-font-sans: 'MyCustomFont', 'DM Sans', 'MiSans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --femo-font-mono: 'MyCustomFont', 'SF Mono', 'JetBrains Mono', 'Fira Code', Consolas, 'Liberation Mono', Menlo, Courier, 'PingFang SC', 'Microsoft YaHei';
+  --femo-font-body: 'MyCustomFont', 'DM Sans', 'MiSans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
 
   /* ── 滚动条 8px（dsh 规范）── */
   --femo-scrollbar-w: 8px;
@@ -618,10 +635,10 @@ export const THEME_CSS = `
   --femo-radius-top: 14px 14px 0 0;
   --femo-radius-bubble: 10px 10px 10px 3px;
 
-  /* ── 字体：web 系统栈（控制台不做品牌字体，system-ui 直出）── */
-  --femo-font-sans: system-ui, 'Segoe UI', 'MiSans', 'Microsoft YaHei', sans-serif;
-  --femo-font-mono: ui-monospace, Consolas, 'JetBrains Mono', monospace;
-  --femo-font-body: system-ui, 'Segoe UI', 'MiSans', 'Microsoft YaHei', sans-serif;
+  /* ── 字体：web 系统栈（控制台不做品牌字体，system-ui 直出）+ MyCustomFont（生僻字补字，链首逐字回退）── */
+  --femo-font-sans: 'MyCustomFont', system-ui, 'Segoe UI', 'MiSans', 'Microsoft YaHei', sans-serif;
+  --femo-font-mono: 'MyCustomFont', ui-monospace, Consolas, 'JetBrains Mono', monospace;
+  --femo-font-body: 'MyCustomFont', system-ui, 'Segoe UI', 'MiSans', 'Microsoft YaHei', sans-serif;
 
   /* ── 实心按钮：对齐 webAdapter 侧栏「灵魂席位」运行控制的语言——
      唯一主操作=web 绿实底 + 深绿黑字（绿渐变的实色等价档）；次要动作

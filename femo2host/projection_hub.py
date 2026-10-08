@@ -189,6 +189,7 @@ import struct
 import sys
 import threading
 import time
+import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from collections import deque
 from urllib.parse import urlparse, parse_qs
@@ -209,6 +210,9 @@ HUB_REV = '2026-09-25a-hub-unify'  # 代码修订号（不动协议）：排障�
                                      # 以 /diag 的 rev 为准——桥是 python 进程，改了
                                      # 文件不重启就还是旧码，别拿眼神判断。
 _SUB_Q_MAX = 500      # 单订阅投递队列上限：满即断连（消费端卡死防线，重连有快照）
+_SNAP_WIN_BYTES = 1024 * 1024   # 快照窗口化单侧预算（2026-10-08）：开头/结尾各留
+                                # 这么多字节，中间省略——手机 WAN 链路传 12MB 快照
+                                # 要几十秒的根治；页面 WS 连接带 ?win= 字节定制。
 _LIVE_TTL = 15 * 60   # 打字块静置秒数上限：超时收尸（宿主打字打到一半死掉的尸块）
 _BOOK_TTL = 3600      # 冷账本逐出秒数：没人摸超时即从内存卸下（盘上 journal 是真身）
 _DRAFT_FLUSH_SEC = 0.5  # 草稿旁账节流：流式每秒几十个 chunk，落盘必须被限流
@@ -288,6 +292,41 @@ def _hosts_of_rows(rows) -> list:
         if isinstance(h, str) and h and h not in out:
             out.append(h)
     return out
+
+
+def _row_bytes(r) -> int:
+    """一行的线下真实体积（UTF-8 字节数）——窗口化预算的计数单位。中文正文
+    在 UTF-8 里一字 3 字节，按字符数估会小一半以上，必须按字节。"""
+    return len(json.dumps(r, ensure_ascii=False).encode('utf-8'))
+
+
+def _window_rows(rows, win):
+    """快照窗口化（2026-10-08，手机 Tailscale 链路传 12MB 快照要几十秒的根治）：
+    只保留开头 win 字节 + 结尾 win 字节的行，中间整段省略——elided 元数据把
+    中间还剩多少行、多少字节带回给页面画省略号。行是消息的完整单位：预算压线
+    时把跨线的最后一行**整个带走**（用户拍板「消息不要截断」，可以稍微超过
+    1MB），但不再加新行。总字节 <= 2*win，或首尾区间相接/重叠 → 原样全量
+    不省略（「文本本来就少就从头显示到尾」）。返回 (rows', elided|None)，
+    elided={'head_end','tail_start','rows','bytes'}（中间首尾行号+行数+字节，
+    页面展开按钮按这个对账）。纯函数，不动输入。"""
+    if not win or not isinstance(rows, list) or len(rows) < 3:
+        return rows, None
+    sizes = [_row_bytes(r) for r in rows]
+    if sum(sizes) <= win * 2:
+        return rows, None
+    acc, i = 0, 0
+    while i < len(rows) and acc < win:
+        acc += sizes[i]
+        i += 1
+    acc2, j = 0, len(rows) - 1
+    while j >= 0 and acc2 < win:
+        acc2 += sizes[j]
+        j -= 1
+    if i > j:              # 首尾相接或重叠：全量，不省略
+        return rows, None
+    head, tail = rows[:i], rows[j + 1:]
+    return head + tail, {'head_end': head[-1]['n'], 'tail_start': tail[0]['n'],
+                         'rows': j - i + 1, 'bytes': sum(sizes[i:j + 1])}
 
 
 def _draft_kind(k) -> str:
@@ -894,7 +933,7 @@ class _Sub:
     的具体 (host, sid)（绑定换绑后由 _push_snapshot 重解析跟随）；sess 非空的
     订阅者由 _broadcast_sess 按会话维度投递。"""
     __slots__ = ('job_id', 'view', 'q', 'ws', 'god_host', 'sess', '_via_god',
-                 'echo_view')
+                 'echo_view', 'win')
 
     def __init__(self, job_id, view, ws=None, maxsize=None):
         self.job_id = int(job_id) if job_id is not None else None  # None=跟随最新场
@@ -905,6 +944,8 @@ class _Sub:
         self.sess = None       # 解析出的具体会话 (host, sid)；god:<host> 未解析到=None
         self._via_god = False  # 裸 god 升级订户（2026-09-22）：快照/直播跟会话账走
         self.echo_view = None  # 本订阅当前视角的规范 id（_resolve_god_sub 回填）
+        self.win = None        # 快照窗口化单侧预算字节数（连接 ?win= 带入；None=不窗口化，
+                               # 旧客户端/dsh 投影窗零回归）
 
 
 class ProjectionHub:
@@ -919,6 +960,7 @@ class ProjectionHub:
         self._subs = set()
         self._cast = {}     # job_id → 花名册（flow_start 的剧本 actors）
         self._display = {}  # job_id → {基名: 带括号显示名}（ai_request 登记）
+        self._souls = {}    # job_id → {基名: soul id}（ai_request 登记，2026-10-06：views 宿主标签经它换算本场选角账）
         self._owners = {}   # job_id → {host: {sid,...}} 本场信任来源（戏外行过滤；
                             # host 空串=老宿主/裸跑的全局格，见 set_owner/_owner_for）
         self._hosts = {}    # host 名 → 最近活动时刻（见到即登记；多宿主名册面）
@@ -968,6 +1010,18 @@ class ProjectionHub:
         # 寄人类信的 target_host 用它——与本桥 drain_outgoing 的过滤词同源。
         # 空=回退旧行为（拿等待记录的 host 字段即投影自称；单实例两词本同值）。
         self._mailbox_host = ''
+        # ── 场次清单缓存（2026-10-08 用户拍板：「清单是稳定的，旧数据几乎不变，
+        # 新数据会添加，只有在跑的需要实时更新——既然每次要用，直接存起来」）──
+        # jobs() 不再每拍全城点名几百个目录（旧法攥着全局锁逐行重读有变动的
+        # 账本，撞上机器文件锁一次 20s+，投影页 15s 一次的心跳就把交互帧全堵
+        # 死）。现在：①落盘缓存 jobs-index.json（条目带 (mtime,size) 指纹）；
+        # ②启动对账一次——指纹没变的直接信缓存，变了的/新增的才现点名；
+        # ③物化账本（在跑的场）每拍 jobs() 以内存 book.rows 现算覆盖，永远
+        # 新鲜。正确性不押在缓存上：指纹对不上就重读，对账每进程一次兜底。
+        self._jobs_index = {}           # job_id → 条目（含内部指纹 _st）
+        self._jobs_index_ready = False  # 首拍对账已完成（每进程一次）
+        self._jobs_index_dirty = False
+        self._jobs_index_at = 0.0       # 上次落盘时刻（节流写）
 
     # ── 上行 ──────────────────────────────────────────────────────────
 
@@ -1578,14 +1632,16 @@ class ProjectionHub:
 
     def _notify_bind(self, host, focus_job=None) -> None:
         """换绑后的收尾广播（持锁调用）：①ctrl 'sessions' 播给全部订阅者——
-        各页面主会话面板当场刷新；②god:<host> 订阅者当场重解析绑定并推新快照
-        ——面板里一点，上帝窗立刻跟过去（旧语义只有手动 ctrl:view 才重解析）。
-        host 可传单个宿主名或宿主集合（跨宿主联动一次动好几台）。
+        各页面主会话面板当场刷新；②god:<host> 订阅者当场重解析本场开演格并
+        推新快照——面板里一点，上帝窗立刻跟过去（旧语义只有手动 ctrl:view
+        才重解析）。host 可传单个宿主名或宿主集合（跨宿主联动一次动好几台）。
         focus_job=这次换绑围绕的场次（bind/bind_job 传入）：**视角跟随**
-        （2026-09-22 用户拍板）——订阅的宿主与这场无关（绑定被清）时，god 订阅
-        自动跟到这场班底的宿主（选 j2084 独属 standalone → god:dsh 跟成
-        god:standalone），echo 让页面菜单高亮同步。说话即绑不带 focus_job，
-        只动说话那台。取数自取锁（RLock 可重入），put_nowait 不阻塞。"""
+        （2026-09-22 用户拍板；2026-10-06 收紧）——订阅的宿主不是本场开演家
+        时（开演格唯一上帝视角，别家无份），god 订阅自动跟到本场开演家
+        （选 j2084 独属 standalone → god:dsh 跟成 god:standalone），echo 让
+        页面菜单高亮同步；开演家没申报上帝窗（targets 空）→ 没得跟就不跟，
+        内容由 job 账本兜底接住。说话即绑不带 focus_job，只动说话那台。
+        取数自取锁（RLock 可重入），put_nowait 不阻塞。"""
         hosts = {host} if isinstance(host, str) else set(host or ())
         payload = json.dumps(self.sessions_payload(), ensure_ascii=False)
         for sub in list(self._subs):
@@ -1596,22 +1652,20 @@ class ProjectionHub:
         targets = None
         if focus_job is not None:
             self._cast_of(int(focus_job))
-            # 跟随目标读视角规则单源（2026-10-03 收 view_plan）：本场班底 ∩
-            # god_window 申报。跟到一家没申报的，页面会把视角 echo 到清单里不
-            # 存在的 god:<host>，与回落逻辑打架来回横跳；班底里没有一家申报了
-            # 上帝窗 → targets 空=没得跟就不跟，内容由会话账本空的兜底（读那场
-            # job 账本）接住。plan 持锁可调（RLock 可重入）。
+            # 跟随目标读视角规则单源（2026-10-03 收 view_plan）：本场开演格
+            # 单值（2026-10-06 裁决，见 _god_stage_of）。开演家没申报上帝窗
+            # （web 手动开的场）→ targets 空=没得跟就不跟，内容由会话账本空
+            # 的兜底（读那场 job 账本）接住。plan 持锁可调（RLock 可重入）。
             targets = self.view_plan(int(focus_job))['god_hosts']
         for sub in list(self._subs):
             if getattr(sub, 'god_host', None) is None:
                 continue
             if focus_job is not None and targets and sub.god_host not in targets:
-                cur = str((self._load_bindings().get(sub.god_host) or {})
-                          .get('current') or '')
-                if not cur:
-                    # 宿主与这场无关（绑定被联动清空）→ 视角跟到班底宿主
-                    sub.god_host = targets[0]
-                    sub.echo_view = 'god:%s' % targets[0]
+                # 订阅的宿主不是本场开演家（2026-10-06 裁决：开演格唯一上帝
+                # 视角，其他 host 一律无份）→ 视角跟到本场开演家，echo 让
+                # 页面菜单高亮同步。不再看绑定指针（指针已退出视角读法）。
+                sub.god_host = targets[0]
+                sub.echo_view = 'god:%s' % targets[0]
             # 统一走 _push_snapshot（2026-09-22）：旧手写帧固定 job=None、
             # 没有「session 账本空 → 兜底读那场 job 账本」——换绑后推的空帧
             # 会把订阅方刚收到的兜底帧覆盖掉（「点哪个显示的不是那场」的
@@ -1984,11 +2038,11 @@ class ProjectionHub:
 
     def _latest_god_host(self):
         """裸 god 升级用（2026-09-22「刷新即假上帝视角」根治）：**读视角规则
-        单源**——「最新场」的 plan.god_hosts 第一家（班底序）。旧实现按「最近
-        活动的会话账本宿主 ∩ roster」启发式（09-22 反残渣拍板），2026-10-03
-        起 god 清单规则统一收 view_plan（见其注释）：残渣账本不是任何真场的
-        班底、天然进不来，比 roster 启发式更硬。计划为空（空世界）→ None。
-        持锁调用。"""
+        单源**——「最新场」的 plan.god_hosts（2026-10-06 起是开演格单值，
+        开演家没申报上帝窗则空）。旧实现按「最近活动的会话账本宿主 ∩ roster」
+        启发式（09-22 反残渣拍板），2026-10-03 起 god 清单规则统一收 view_plan
+        （见其注释）：残渣账本不是任何真场的班底、天然进不来，比 roster 启发式
+        更硬。计划为空（空世界/开演家没申报）→ None。持锁调用。"""
         plan = self.view_plan(None)
         return plan['god_hosts'][0] if plan['god_hosts'] else None
 
@@ -2006,7 +2060,7 @@ class ProjectionHub:
                 vnew = 'god:%s' % gh
         if vnew.startswith('god:'):
             sub.god_host = _norm_host(vnew[4:])
-            sess = self._resolve_god_view(vnew)
+            sess = self._resolve_god_view(vnew, sub.job_id)
             sub.sess = _split_session(sess) if sess else None
             sub.view = 'god'
             sub._via_god = sess is not None   # 升级订户：直播跟会话账走
@@ -2021,11 +2075,14 @@ class ProjectionHub:
             sub._via_god = False
         return vnew
 
-    def snapshot_session(self, session: str, view: str = 'god', after: int = 0) -> dict:
+    def snapshot_session(self, session: str, view: str = 'god', after: int = 0,
+                         win=None) -> dict:
         """会话账本读法（GET /view?session=）：与 snapshot 同三道闸（视角过滤 +
         显示策略 + 草稿合成），**无信任集过滤**——会话账本按 sid 定址，天然隔离。
         织入行保持 zone=inplay，stage/actor 视角在会话账本上同样成立（v1 消费方
-        只用 god）。session='default'/空 → 最近活动会话。"""
+        只用 god）。session='default'/空 → 最近活动会话。win=窗口化单侧预算字节
+        （2026-10-08，见 _window_rows）：只送开头/结尾各 win 字节，中间省略——
+        elided 元数据随快照回给页面画省略号；None=全量（REST 老消费方零回归）。"""
         with self._lock:
             if not session or str(session) == 'default':
                 host, sid = self._default_session()
@@ -2033,7 +2090,7 @@ class ProjectionHub:
                 host, sid = _split_session(session)
             if sid is None:
                 return {'proto': PROTO_VERSION, 'session': None, 'view': view,
-                        'rows': [], 'next': 0}
+                        'rows': [], 'next': 0, 'elided': None}
             book = self._sbook(host, sid)
             rows = []
             for r in book.rows:
@@ -2042,8 +2099,10 @@ class ProjectionHub:
                 prow = self._apply_view_policy(book, view, self._compose(book, r))
                 if prow is not None:
                     rows.append(prow)
+            rows, elided = _window_rows(rows, win)
             return {'proto': PROTO_VERSION, 'session': '%s:%s' % (host, sid),
                     'view': view, 'rows': rows, 'next': book.next_n - 1,
+                    'elided': elided,
                     'hosts': _hosts_of_rows(book.rows)}
 
     def _sweep(self, keep_job=None, keep_sess=None):
@@ -2673,7 +2732,7 @@ class ProjectionHub:
         出），刷新重新升级才跟对新家（⇒永远「刷新之后就好了」）。本场开演登记
         owners（set_owner，桥 job_start 现场喂）且本场=最新时重算：**跟最新模式**
         （job_id=None）的升级订户按 plan.god_default 重对家——换家即 view-echo +
-        重快照（页面菜单高亮/内容一次到位）；web 独演这类班底里没有一家申报上帝
+        重快照（页面菜单高亮/内容一次到位）；web 手动开这类开演家没申报上帝
         窗的场，god_default 落裸 god，订户从会话路径回落 job 路径（读本场账本，
         正确姿势）。钉了场次的订阅不动（用户指哪看哪）。本来就在家的不折腾。
         持锁调用。"""
@@ -2706,12 +2765,15 @@ class ProjectionHub:
             # 快照直接对齐新场（不走出厂 _push_snapshot：其 job 兜底用 latest_job，
             # job_start 先于 flow_start 行时指针还停在旧场——过渡快照会把旧场内容
             # 带给页面）。此刻新场多半只有开局行，后续实时帧从会话路径源源到达。
-            snap = self.snapshot(plan['job'], 'god', 0)
+            # （读法用 stage：过滤矩阵与 god 全同，但不触发裸 god 升级到开演格
+            #   会话读法——这里要的是 job 快照形状，job 键=新场 id 供页面切场。）
+            snap = self.snapshot(plan['job'], 'stage', 0, sub.win)
             try:
                 sub.q.put_nowait(json.dumps(
                     {'ctrl': 'snapshot', 'proto': PROTO_VERSION, 'job': snap['job'],
                      'session': None, 'view': target, 'next': snap['next'],
-                     'rows': snap['rows'], 'hosts': snap.get('hosts') or [],
+                     'rows': snap['rows'], 'elided': snap.get('elided'),
+                     'hosts': snap.get('hosts') or [],
                      'waiting': self.current_waiting_unlocked(), 'live': [],
                      'god_fallback_job': snap['job']}, ensure_ascii=False))
             except queue.Full:
@@ -2773,42 +2835,60 @@ class ProjectionHub:
                 return True
         return False
 
-    def _resolve_god_view(self, view: str):
-        """'god:<host>' → 该宿主当前绑定的会话（'host:sid' 字符串）。未绑定时
-        回落该宿主最近活动的会话账本；什么都没有 → None。持锁调用。"""
+    def _resolve_god_view(self, view: str, job_id=None):
+        """'god:<host>' → 本场上帝视角格（'host:sid' 字符串）。
+        【2026-10-06 用户拍板】一场戏唯一的上帝视角=开演的那个会话——不再读
+        该宿主的 current 主会话指针：指针（跨宿主联动清空、新会话「首见即主」、
+        说话即绑）服务主会话面板，从此退出视角读法——指针怎么漂，视角内容都
+        纹丝不动（2716 实案：god:zcode 读 current，私聊上墙、内容随新会话漂移，
+        全链根因即此）。job_id=None（跟最新）→ 最新场；钉了场 → 那场。
+        开演家不是该 host / 开演家没申报 god_window / 本场无信任集 → None
+        （订阅侧 sess=None，走 job 账本兜底——不回落「最近活动账本」冒充，
+        2026-09-22 老教训沿用）。持锁调用。"""
         host = _norm_host(str(view)[4:])
         if not host:
             return None
-        b = self._load_bindings().get(host) or {}
-        cur = str(b.get('current') or '')
-        if cur:
-            return '%s:%s' % (host, cur)
-        for x in self.sessions_list():
-            if x['session'].split(':', 1)[0] == host:
-                return x['session']
-        return None
+        if job_id is None:
+            job_id = self.latest_job()
+        if job_id is None:
+            return None
+        stage = self._god_stage_of(int(job_id), host)
+        return ('%s:%s' % (host, stage[1])) if stage else None
 
-    def snapshot(self, job_id, view: str = 'god', after: int = 0) -> dict:
-        # god 族视角（2026-09-21 起）：按宿主解析到当前绑定的会话账本——上帝窗
-        # 改绑 (host, 主会话) 后，网页的上帝窗认 host 不认 job。**裸 god 同义**
-        # （2026-09-22「刷新即假上帝视角」根治的 REST 面）：未钉场次时升级到
-        # 最近活动宿主；一个会话账本都没有（纯场记账/冷启动）才落回 job 账本
-        # ——与 WS 订阅（_resolve_god_sub）同一套词汇，REST 与页面不再各说各话。
+    def snapshot(self, job_id, view: str = 'god', after: int = 0, win=None) -> dict:
+        # god 族视角（2026-09-21 起）：解析到本场上帝视角格的会话账本——
+        # 【2026-10-06 用户拍板】一场戏唯一的上帝视角=开演的那个会话，读法
+        # 定格到开演格、不读主会话指针。**裸 god 同义**（2026-09-22「刷新即
+        # 假上帝视角」根治的 REST 面）：没钉场次时升级到最新场的开演家；钉了
+        # 场次（看这场戏）就升到**那场**的开演家；开演家没申报/无信任集才落回
+        # job 账本读法——与 WS 订阅（_resolve_god_sub）同一套词汇，REST 与
+        # 页面不再各说各话。
+        # win=窗口化单侧预算字节（2026-10-08，见 _window_rows）：只对底下这条
+        # job 账本读法生效（god 会话读法走 snapshot_session 的同名参数）；None=
+        # 全量（REST/chronica 等老消费方零回归）。
         if isinstance(view, str) and (view == 'god' or view.startswith('god:')):
-            host = self._latest_god_host() if (view == 'god' and job_id is None)                 else (_norm_host(view[4:]) if view != 'god' else '')
-            sess = self._resolve_god_view('god:%s' % host) if host else None
+            host = ''
+            if view == 'god':
+                if job_id is not None:
+                    stage = self._god_stage_of(int(job_id))
+                    host = stage[0] if stage else ''
+                else:
+                    host = self._latest_god_host() or ''
+            else:
+                host = _norm_host(view[4:])
+            sess = self._resolve_god_view('god:%s' % host, job_id) if host else None
             if sess is not None:
-                return self.snapshot_session(sess, 'god', after)
+                return self.snapshot_session(sess, 'god', after, win)
             if view != 'god':
                 return {'proto': PROTO_VERSION, 'session': None, 'view': 'god',
-                        'rows': [], 'next': 0}
+                        'rows': [], 'next': 0, 'elided': None}
             # 裸 god 无账可升：落到底下 job 账本读法（老语义兜底）
         with self._lock:
             if job_id is None:
                 job_id = self.latest_job()   # 「最新」：内存指针优先，重启后回落盘上最近场
                 if job_id is None:
                     return {'proto': PROTO_VERSION, 'job': None, 'view': view,
-                            'rows': [], 'next': 0}
+                            'rows': [], 'next': 0, 'elided': None}
             book = self._book(int(job_id))
             # 读侧同尺过滤（2026-09-19）：本场 owner 登记后，历史里混进来的
             # 「别的 Session」的行也不再投给页面（journal 原文不动——不删数据，
@@ -2823,8 +2903,9 @@ class ProjectionHub:
                 prow = self._apply_view_policy(book, view, self._compose(book, r))
                 if prow is not None:
                     rows.append(prow)
+            rows, elided = _window_rows(rows, win)
             return {'proto': PROTO_VERSION, 'job': book.job_id, 'view': view,
-                    'rows': rows, 'next': book.next_n - 1,
+                    'rows': rows, 'next': book.next_n - 1, 'elided': elided,
                     'hosts': _hosts_of_rows(book.rows)}
 
     def replay(self, job_id) -> list:
@@ -2832,34 +2913,169 @@ class ProjectionHub:
             book = self._book(int(job_id))
             return [self._compose(book, r) for r in book.rows]
 
+    def range_rows(self, sub, direction: str, lo, hi, job=None) -> dict:
+        """窗口展开读取（2026-10-08 窗口化配套，WS ctrl 'range'）：省略号中间
+        的 (lo, hi) 行号开区间里，按 sub 当前解析路径（god 订阅=会话读法、其余=
+        job 读法，与 _push_snapshot 完全同源）取可见行，从头按 sub.win 预算切块
+        ——跨线行整行带走（「消息不要截断」同尺）。direction 'dn'=从头往后
+        （头段向下展开）、'up'=从尾往前（尾段向上展开）。met=区间已取空（另
+        一侧接上了，页面据此摘掉省略号）。读法直接复用 snapshot/snapshot_session
+        ——展开看到的行与快照给的行必然同源同滤，不造第二套读法。持锁调用。"""
+        direction = 'up' if direction == 'up' else 'dn'
+        empty = {'dir': direction, 'rows': [], 'met': True}
+        try:
+            lo = int(lo) if lo is not None else None
+            hi = int(hi) if hi is not None else None
+        except (TypeError, ValueError):
+            return empty
+        if lo is None or hi is None or lo >= hi:
+            return empty
+        budget = sub.win or _SNAP_WIN_BYTES
+        if sub.god_host is not None:
+            sess = self._resolve_god_view('god:%s' % sub.god_host, sub.job_id)
+            if sess is None:
+                return empty
+            allrows = self.snapshot_session(sess, 'god', 0)['rows']
+        else:
+            jid = sub.job_id if sub.job_id is not None else job
+            if jid is None:
+                return empty
+            allrows = self.snapshot(jid, sub.view, 0)['rows']
+        mid = [r for r in allrows if lo < r['n'] < hi]
+        if direction == 'up':
+            mid.reverse()
+        out, acc = [], 0
+        for r in mid:
+            acc += _row_bytes(r)
+            out.append(r)
+            if acc >= budget:
+                break
+        return {'dir': direction, 'rows': out, 'met': len(out) == len(mid)}
+
     def jobs(self) -> list:
+        """场次清单（2026-10-08 缓存化，出榜内容与旧「全城点名」同尺）：物化
+        账本以内存行现算覆盖（在跑的场，永远新鲜）；其余场从对过账的索引出。
+        不再每拍攥着全局锁扫几百个目录——那会让投影页 15s 一次的心跳问询
+        把同一车道上的交互帧（人类席寄信等）堵死。"""
         with self._lock:
-            ids = set(self._books)
-            if os.path.isdir(self.dir_path):
-                for fn in os.listdir(self.dir_path):   # 布局：<job_id>/journal.jsonl
-                    if fn.isdigit() and os.path.isdir(os.path.join(self.dir_path, fn)):
-                        ids.add(int(fn))
-            out = []
-            for jid in sorted(ids):
-                book = self._books.get(jid)
+            self._jobs_index_ensure_locked()
+            for jid, book in self._books.items():
                 if book is not None:
-                    rows = book.rows
-                    out.append({'job_id': jid, 'rows': len(rows),
-                                'first_t': rows[0]['t'] if rows else None,
-                                'last_t': rows[-1]['t'] if rows else None,
-                                'hosts': _hosts_of_rows(rows)})
-                else:
-                    # 未装载的场只轻量盘点盘上文件——绝不 _book() 物化：清单被
-                    # 页面每次打开拉一遍，懒加载会把全部历史装进内存且永不逐出
-                    st = _stat_journal(os.path.join(self.dir_path, str(jid),
-                                                    'journal.jsonl'))
-                    out.append({'job_id': jid, 'rows': st[0],
-                                'first_t': st[1], 'last_t': st[2],
-                                'hosts': st[3]})
+                    self._jobs_index_book(jid, book)
+            out = [{'job_id': e['job_id'], 'rows': e['rows'],
+                    'first_t': e['first_t'], 'last_t': e['last_t'],
+                    'hosts': list(e['hosts'])}
+                   for e in self._jobs_index.values()]
             # 最近活动降序（场次下拉第一屏就是最新几场；与 /sessions 同尺）。
             # 「最新」伪条目恒在清单顶（页面加的），列表本身再 oldest-first 就反了。
             out.sort(key=lambda x: x['last_t'] or 0, reverse=True)
-            return out
+        self._jobs_index_flush()
+        return out
+
+    # ── 场次清单缓存（2026-10-08）────────────────────────────────────────
+
+    @staticmethod
+    def _jobs_entry_of_rows(jid, rows):
+        return {'job_id': jid, 'rows': len(rows),
+                'first_t': rows[0]['t'] if rows else None,
+                'last_t': rows[-1]['t'] if rows else None,
+                'hosts': _hosts_of_rows(rows)}
+
+    def _jobs_index_book(self, jid, book):
+        """物化账本 → 索引条目（内存行即真相，段改写/搬家/扫除全自动跟上）；
+        变了才置脏。持锁调用。"""
+        e = self._jobs_entry_of_rows(jid, book.rows)
+        old = self._jobs_index.get(jid)
+        if old is None or (old['rows'], old['last_t'], old['hosts']) != \
+                (e['rows'], e['last_t'], e['hosts']):
+            self._jobs_index[jid] = e
+            self._jobs_index_dirty = True
+
+    def _jobs_index_ensure_locked(self):
+        """首拍对账（每进程一次）：落盘缓存先吃，再按指纹对账——没变的场直接
+        信缓存（重启不再整城重读账本），变了的/新增的现点名，没了的撤条目。
+        物化账本随后以内存覆盖（jobs() 每拍都做）。持锁调用。"""
+        if self._jobs_index_ready:
+            return
+        self._jobs_index_ready = True
+        stored = self._jobs_index_load()
+        ids = set(self._books)
+        if os.path.isdir(self.dir_path):
+            for fn in os.listdir(self.dir_path):   # 布局：<job_id>/journal.jsonl
+                if fn.isdigit() and os.path.isdir(os.path.join(self.dir_path, fn)):
+                    ids.add(int(fn))
+        for jid in sorted(ids):
+            jp = os.path.join(self.dir_path, str(jid), 'journal.jsonl')
+            try:
+                st = os.stat(jp)
+                mtime, size = st.st_mtime_ns, st.st_size
+            except OSError:
+                mtime = size = None
+            old = stored.get(jid)
+            if old is not None and mtime is not None and old.get('_st') == [mtime, size]:
+                self._jobs_index[jid] = old        # 指纹没变：原样信缓存
+                continue
+            rows_n, first_t, last_t, hosts = _stat_journal(jp)
+            self._jobs_index[jid] = {'job_id': jid, 'rows': rows_n,
+                                     'first_t': first_t, 'last_t': last_t,
+                                     'hosts': hosts,
+                                     '_st': None if mtime is None else [mtime, size]}
+            self._jobs_index_dirty = True
+        for jid in list(self._jobs_index):
+            if jid not in ids:
+                self._jobs_index.pop(jid, None)    # 场没了（不该发生，对账兜住）
+                self._jobs_index_dirty = True
+
+    def _jobs_index_path(self):
+        return os.path.join(self.dir_path, 'jobs-index.json')
+
+    def _jobs_index_load(self):
+        """上一任的点名结果。读坏了当没有（对账会重建）；条目形状不对的丢弃。"""
+        try:
+            with open(self._jobs_index_path(), 'r', encoding='utf-8') as f:
+                raw = json.load(f)
+        except (OSError, ValueError):
+            return {}
+        if not isinstance(raw, dict):
+            return {}
+        out = {}
+        for k, v in raw.items():
+            if not (isinstance(k, str) and k.isdigit() and isinstance(v, dict)):
+                continue
+            hosts = v.get('hosts')
+            st = v.get('_st')
+            rows = v.get('rows')
+            out[int(k)] = {'job_id': int(k),
+                           'rows': rows if isinstance(rows, int) else 0,
+                           'first_t': v.get('first_t'), 'last_t': v.get('last_t'),
+                           'hosts': hosts if isinstance(hosts, list) else [],
+                           '_st': st if (isinstance(st, list) and len(st) == 2) else None}
+        return out
+
+    def _jobs_index_flush(self):
+        """节流落盘（≥5s 一次）：缓存只是提速，正确性归重启对账兜底——写失败
+        响亮留痕、保持待脏，下一拍 jobs() 再试。锁内取快照（防序列化途中被
+        另一线程改账），磁盘写在锁外。"""
+        if not self._jobs_index_dirty:
+            return
+        now = time.time()
+        if now - self._jobs_index_at < 5.0:
+            return
+        with self._lock:
+            if not self._jobs_index_dirty:
+                return
+            self._jobs_index_at = now
+            self._jobs_index_dirty = False
+            payload = json.dumps(self._jobs_index, ensure_ascii=False)
+        try:
+            path = self._jobs_index_path()
+            tmp = path + '.tmp'
+            with open(tmp, 'w', encoding='utf-8') as f:
+                f.write(payload)
+            os.replace(tmp, path)
+        except OSError as exc:
+            self._jobs_index_dirty = True
+            sys.stderr.write(f"projection_hub: jobs-index persist failed: {exc}\n")
 
     def chronica_sessions(self) -> list:
         """台账场次清单（2026-09-29 整场回放）：按台账号归拢 job——号取自各 job
@@ -2910,24 +3126,47 @@ class ProjectionHub:
             return {'proto': PROTO_VERSION, 'chronica': session_id, 'view': view,
                     'rows': rows, 'next': next_off - 1, 'jobs': jids}
 
+    def _god_stage_of(self, job_id, host=None):
+        """本场上帝视角格（2026-10-06 用户拍板「看这个 job 是哪个 host-session
+        开的，这是这个 job 唯一的上帝视角；其他 host 和本 host 的其他 session
+        都不允许进入上帝视角」）：= 开演方那一个 (host, sid) 格。开演方=信任集
+        （owners）登记序第一格——job_start 现场喂的第一格就是开演家；演员格
+        （possess 出演的宿主）不在信任集，天然无份。开演家没申报 god_window
+        （web 手动开的场）→ None=本场无上帝视角，落裸 god。host 传入时指名
+        核对（解析 god:<host> 用）：不是开演家 → None。sid 取该格登记集的
+        sorted 首个（常态单元素；sorted 保证稳定）。持锁调用。"""
+        self._cast_of(job_id)
+        fam = self._owners.get(job_id) or {}
+        hosts = [h for h in fam.keys() if h]   # 插入序：开演家在先
+        if not hosts:
+            return None
+        opener = hosts[0]
+        if host is not None and opener != host:
+            return None
+        if not self._has_god_window(opener):
+            return None
+        return (opener, sorted(fam[opener])[0])
+
     def view_plan(self, job_id) -> dict:
         """【视角规则单源（2026-10-03 用户拍板「规则应该统一放到一处，写个 def
         专门算每个 job 的视角，其他地方读」）】一场 job 的视角计划：与本场有关
-        的宿主、上帝窗清单、裸 god 升级目标、整场回放条目——视角相关的所有裁决
+        的宿主、上帝窗条目、裸 god 升级目标、整场回放条目——视角相关的所有裁决
         只活在这一个函数里，views()/_latest_god_host()/_notify_bind 全是读壳。
 
-        「与本场有关的宿主」= 班底 ∩（∪）登场，按强度取并集、班底在前：
+        「与本场有关的宿主」= 班底 ∪ 登场，班底在前：
         ①班底：owners 账本（开演 set_owner 登记的本场班底，cast.json 落盘）；
-        ②登场：本场行上实际出现过的宿主（旧账无登记也能接住）。
-        上帝窗清单 = 相关宿主 ∩ god_window 申报（2026-09-28 拍板：申报了没有
-        上帝窗的宿主不列）——相关性判定与展示资格是两件事，不混。相关宿主里
-        没有一家申报了上帝窗 → 不出 god:<host>、god_default 落裸 'god'（读本场
-        job 账本——web 独演的场，这正是「看这场戏」的正确姿势）。
+        ②登场：本场行上实际出现过的宿主（旧账无登记也能接住）——只进相关
+          宿主清单（页面视角切换器的宿主语汇），**不给上帝视角资格**。
 
-        残渣账本（daemon/pytest/dsh-308x 多实例历史名）天然进不来：它不是任何
-        真场的班底、行上也没出现过——旧规则（god 条目按「有会话数据的宿主」
-        三来源并集）被本规则覆盖，_latest_god_host 的 roster 启发式（09-22
-        「只认名册宿主」反残渣拍板）随之退役为读壳。"""
+        上帝视角 = 本场开演格单值（2026-10-06 用户拍板，规则见 _god_stage_of）：
+        开演家申报了 god_window → 出 god:<开演家> 一条（读法定格到开演格，
+        见 _resolve_god_view）；开演家没申报（web 手动开的场——「投影中心不
+        归属任何一个 Host」超然定位）或本场没有信任集 → 不出 god: 条目、
+        god_default 落裸 'god'（读本场 job 账本，投影中心超然看全场）。
+        旧规则「相关宿主 ∪ 登场 ∩ 申报、班底序第一家」随本裁决退役——登场
+        宿主混进 god 清单的实案：2716（web 手动开）zcode 演出，登场兜底把
+        zcode 列进清单、申报过滤又恰好把 web 滤掉，god_default 被算成
+        god:zcode，跟随机制把戏内页面成批拽进一个不该存在的上帝窗。"""
         job_id = int(job_id) if job_id is not None else None
         with self._lock:
             if job_id is None:
@@ -2936,7 +3175,7 @@ class ProjectionHub:
             if job_id is None:
                 return {'job': None, 'hosts': [], 'god_hosts': [],
                         'god_default': 'god', 'chronica': None}
-            # ①班底（owners，冷启动懒恢复）②登场（本场行上的宿主）
+            # ①班底（owners，冷启动懒恢复）②登场（本场行上的宿主，无 god 资格）
             self._cast_of(job_id)
             fam = self._owners.get(job_id) or {}
             rel = [h for h in sorted(fam.keys()) if h]
@@ -2944,9 +3183,9 @@ class ProjectionHub:
                 rh = str(r.get('host') or '') or _seg_host(r.get('seg'))
                 if rh and rh not in rel:
                     rel.append(rh)
-            # god_window 申报过滤（09-28 拍板）+ 升级目标：班底序第一家，没有
-            # 一家申报了 → 落裸 god（读本场 job 账本）
-            god_hosts = [h for h in rel if self._has_god_window(h)]
+            # 上帝条目=开演格单值（申报制；没有 → 落裸 god 读本场 job 账本）
+            stage = self._god_stage_of(job_id)
+            god_hosts = [stage[0]] if stage else []
             god_default = ('god:%s' % god_hosts[0]) if god_hosts else 'god'
             csid = _session_of_job(os.path.join(self.dir_path,
                                                 str(job_id), 'journal.jsonl'))
@@ -2955,23 +3194,24 @@ class ProjectionHub:
 
     def views(self, job_id=None) -> dict:
         """视角清单（角色视角窗的数据管理面，全在 Python——任何宿主据此搭切换器）：
-        god / stage 两个固定视角 + 角色名单。角色两个来源合并（按窗键去重）：
-        ①开演花名册（flow_start 的剧本 actors 定义区，cast.json 落盘——开演即有，
-        不等第一段落地，2026-09-19 用户拍板）；②账本实际出场（actor/targets）。
+        上帝（如有）→ 纯戏内 → 整场回放（如有台账）→ 角色名单。
 
-        【host 维度·2026-09-19 联机改造】角色的身份是 `(host, 基名)`，不是裸基名：
-        多宿主共演时 `[dsh]main` 与 `[zcode]main` 是两个席位，各有各的窗。于是
-        id = 'actor:<host>:<基形>'、key = <host>:<基形>（稳定键；host 由行上取，
-        页面按 host 决定画不画 [dsh] 前缀——**名字本身永远保持裸名**，前缀只在
-        渲染层拼，往数据里塞会破坏 targets/scope 的基名匹配）。
-        宿主自己喂的行若不带 host（老桥/裸跑），退化成全部归 '' 一格，行为同改前。"""
+        【2026-10-06 用户拍板简化】一个角色一行，不再按 (host, 基名) 拆席：
+        旧设计（09-19 联机改造）把「跨宿主同名角色各有各的投递席位」与「视角
+        菜单」混在了一处——同一角色多宿主产行就出多行，菜单里同一个名字出现
+        两遍还带宿主分隔区（2716 实案）。看戏的人只关心角色，不关心哪个宿主
+        演；过滤本就按裸基形相交（view_filter/_view_actor 末节取名，host 从不
+        参与），合并只动清单、过滤与投递零改动（演员收信照旧走选角账）。于是
+        id = 'actor:<基形>'（裸，花名册/出场天然合一），条目带 hosts=[出场宿主…]
+        （去重，供菜单行尾挂 [host] 铭牌；没上过场的角色无标签——花名册开演
+        即列，标签随第一段落地浮现）。旧深链 'actor:<host>:<基形>' 保持可读
+        （_view_actor 按末节取基形，指向同一扇窗）。"""
         with self._lock:
             plan = self.view_plan(job_id)   # 视角规则单源（2026-10-03，见其注释）
             job_id = plan['job']
             all_hosts = self._hosts_sorted()
-            # god 按宿主拆分（2026-09-21 用户拍板：上帝窗带 host 来源，多宿主
-            # 不混）——清单只出「与本场有关的宿主 ∩ god_window 申报」的 god:，
-            # 没有一家就回落裸 'god'（读本场 job 账本）。规则正文见 view_plan。
+            # 上帝条目=本场开演格单值（2026-10-06 裁决，见 view_plan/_god_stage_of）；
+            # 开演家没申报（web 手动开的场）→ 落裸 'god'（读本场 job 账本）。
             god_hosts = plan['god_hosts']
             if god_hosts:
                 base = [{'id': 'god:%s' % h, 'name': '上帝视角', 'host': h}
@@ -2990,49 +3230,49 @@ class ProjectionHub:
                 return {'job': None, 'views': base, 'hosts': all_hosts}
             job_id = int(job_id)
             book = self._book(job_id)
-            # (host, 基名) 去重：显示取长名（带括号更清楚，2026-09-19 用户拍板）。
-            # id/key 里带 host → 显示名再长、同名角色再多也不换 id：前端选中态与
-            # view 参数跨轮有效（过滤本就按基形相交）。
+            # 基形去重：一角色一条。显示名取长名（带括号更清楚，2026-09-19 拍板）；
+            # id/key 里不带 host——显示名再长、跨宿主产行再多也不换 id：前端选中态
+            # 与 view 参数跨轮有效（过滤本就按基形相交）。
             actors, pos = [], {}
 
-            def _add(nm, host=''):
+            def _add(nm):
                 nm = str(nm)
                 bk = min(_name_bases(nm))
-                k = (host, bk)
-                if k not in pos:
-                    pos[k] = len(actors)
-                    actors.append({'id': 'actor:' + (host + ':' if host else '') + bk,
-                                   'name': nm, 'base': bk, 'host': host,
-                                   'key': sanitize_key((host + ':' if host else '') + bk)})
-                elif len(nm) > len(actors[pos[k]]['name']):
-                    actors[pos[k]]['name'] = nm   # 只换显示名；id/key 稳定不换
+                if bk not in pos:
+                    pos[bk] = len(actors)
+                    actors.append({'id': 'actor:' + bk, 'name': nm, 'base': bk,
+                                   'key': sanitize_key(bk)})
+                elif len(nm) > len(actors[pos[bk]]['name']):
+                    actors[pos[bk]]['name'] = nm   # 只换显示名；id/key 稳定不换
 
             for nm in self._cast_of(job_id):
-                _add(nm)         # 花名册未标来源：归 '' 格（老桥/未接线宿主）
+                _add(nm)         # 花名册开演即列
             for r in book.rows:
                 if r.get('zone') != 'inplay':
                     continue
-                # 行归属：旧账本读行 host 章；新账本行不带（刀1），剖段键
-                rh = str(r.get('host') or '') or _seg_host(r.get('seg'))
                 if r.get('actor'):
-                    _add(r['actor'], rh)
+                    _add(r['actor'])
                 for t in (r.get('targets') or []):
-                    _add(t, rh)
+                    _add(t)
             # 显示名合成：ai_request 现场登记的带括号长名优先（用户拍板：菜单带括号）
             disp = self._display_of(job_id)
-            for (h, bk), idx in pos.items():
+            for bk, idx in pos.items():
                 long = disp.get(bk)
                 if long and len(long) > len(actors[idx]['name']):
                     actors[idx]['name'] = long   # 只换显示名；id/key 稳定不换
-            # 花名册（host=''）× 实际出场（带 host）并档：同一基形两边都有时，
-            # 带宿主条目胜出、无宿主条目撤下。view_filter 只按基形相交、host
-            # 不参与匹配，两条目本就是同一个窗；不并档就是视角菜单里「dsh 组」
-            # 与「未标来源组」整列重复（2026-09-20 用户实锤：cast.json 裸名开演
-            # 即入 '' 格，同批角色上场后又带 host 入格，身份键 (host,基名) 拦不住）。
-            # 花名册独有的角色（还没上过场）留在未标来源——「开演即有」不丢。
-            stamped = {bk for (h, bk) in pos if h}
-            if stamped:
-                actors = [a for a in actors if a['host'] or a['base'] not in stamped]
+            # 宿主标签（2026-10-06 用户拍板「这个 soul 实际绑在哪个 host，就显示
+            # 哪个 host」）：本场选角账定格的宿主，经角色↔soul 映射（桥在
+            # ai_request 现场从 actor_info.soul 喂，解析权威在引擎剧本）换算。
+            # 出场行宿主统计退役——群聊剧本每段 scope 全体，按行染标签会把每个
+            # 角色染成所有喂行过的宿主（2716 实案全员双牌）。人类角色没有
+            # ai_request（也就没有映射）→ 天然无标签；一场内选角只补空位不
+            # 覆写 → 恒单值（跨场换绑是别场的账）。
+            cast = (self.cast_job(job_id).get('cast') or {})
+            soulmap = self._souls_of(job_id)
+            for a in actors:
+                ent = cast.get(soulmap.get(a['base'], ''), {})
+                h = str(ent.get('host') or '').strip()
+                a['hosts'] = [h] if h else []
             return {'job': book.job_id, 'views': base + actors,
                     'hosts': self._hosts_sorted()}
 
@@ -3058,6 +3298,9 @@ class ProjectionHub:
                     names = [str(a) for a in data['actors'] if str(a).strip()]
                 if isinstance(data.get('display'), dict):
                     disp = {str(k): str(v) for k, v in data['display'].items()}
+                if isinstance(data.get('souls'), dict):
+                    self._souls[job_id] = {str(k): str(v) for k, v in data['souls'].items()
+                                           if str(k).strip() and str(v).strip()}
                 # 新形状 owners = {host: [sid,...]}（host 空串 = 老宿主/裸跑的全局格）
                 raw_owners = data.get('owners')
                 if isinstance(raw_owners, dict):
@@ -3099,16 +3342,28 @@ class ProjectionHub:
             self._display.setdefault(job_id, {})
             self._persist_meta(job_id)
 
-    def remember_display(self, job_id, name) -> None:
+    def _souls_of(self, job_id: int) -> dict:
+        """角色↔soul 映射（基名 → soul id）：与花名册同文件同加载。"""
+        self._cast_of(job_id)   # 同一文件——顺带确保两侧都已装载
+        return self._souls.get(job_id, {})
+
+    def remember_display(self, job_id, name, soul=None) -> None:
         """登记带括号的显示名（桥在 ai_request 现场喂——派工瞬间菜单即可长出
-        括号，不用等段落落账）。基名相同、更长才更新。"""
+        括号，不用等段落落账）。基名相同、更长才更新。soul 给定时（ai_request
+        的 actor_info.soul，2026-10-06）同拍登记角色↔soul 映射——views 的宿主
+        标签经它换算本场选角账的定格宿主；soul 缺省不碰映射（老调用零回归）。"""
         nm = str(name or '').strip()
         if not nm:
             return
         job_id = int(job_id)
         key = min(_name_bases(nm))
+        soul = str(soul or '').strip() or None
         with self._lock:
             self._cast_of(job_id)                        # 确保已装载（不重读盘）
+            sm = self._souls.setdefault(job_id, {})
+            if soul and sm.get(key) != soul:
+                sm[key] = soul
+                self._persist_meta(job_id)
             disp = self._display.setdefault(job_id, {})
             if len(disp.get(key, '')) >= len(nm):
                 return
@@ -3128,6 +3383,7 @@ class ProjectionHub:
             with open(tmp, 'w', encoding='utf-8') as f:
                 json.dump({'actors': self._cast.get(job_id, []),
                            'display': self._display.get(job_id, {}),
+                           'souls': self._souls.get(job_id, {}),
                            'owners': owners},
                           f, ensure_ascii=False)
             os.replace(tmp, os.path.join(book_dir, 'cast.json'))
@@ -3329,6 +3585,16 @@ class ProjectionHub:
         if self._mailbox is None:
             return 503, {'ok': False, 'wait_key': _wk,
                          'error': 'mailbox unavailable'}
+        # 重发幂等闸（2026-10-08 配合投影页寄出帧重发）：同 wait_key 的信还在
+        # 柜里没被引擎捞走时，回执丢失/迟到的重发不再叠第二封——旧口径第二封
+        # 进引擎也是死信无害，但平白多喂一拍。信柜查询按能力探测：真实驿站在
+        # 场必有此件；测试替身只带 post 的老样子跳过闸，退回旧口径。
+        dup_fn = getattr(self._mailbox, 'pending_out_by_ref', None)
+        if dup_fn is not None:
+            dup = dup_fn(str(wait_key))
+            if dup is not None:
+                return 200, {'ok': True, 'posted': False, 'dedup': True,
+                             'wait_key': _wk, 'letter_id': dup}
         body_payload = {'chat_text': text}
         if clean_vars:
             body_payload['variables'] = clean_vars
@@ -3378,27 +3644,22 @@ class ProjectionHub:
         return self._last_job if self._last_job is not None else self._latest_journal_job()
 
     def _latest_journal_job(self):
-        """目录扫描取最近有行的场次（按末行时刻）。只轻量盘点不物化——
-        「最新」是每条 WS 订阅的缺省落脚点，原来这条路径会把盘上全部历史
-        逐本装进内存（每次页面打开都来一遍）。"""
-        ids = set(self._books)
-        if os.path.isdir(self.dir_path):
-            for fn in os.listdir(self.dir_path):
-                if fn.isdigit() and os.path.isdir(os.path.join(self.dir_path, fn)):
-                    ids.add(int(fn))
-        best, best_t = None, None
-        for jid in sorted(ids):
-            book = self._books.get(jid)
-            if book is not None:
-                t = book.rows[-1]['t'] if book.rows else None
-            else:
-                t = _stat_journal(os.path.join(self.dir_path, str(jid),
-                                               'journal.jsonl'))[2]
-            if t is None:
-                continue
-            if best is None or t > best_t:
-                best, best_t = jid, t
-        return best
+        """最近有行的场次（按末行时刻）——2026-10-08 起从缓存索引出（首拍对账
+        一次 + 物化账本内存覆盖，jobs() 同尺），不再每条 WS 订阅都全城点名。
+        平局取小号（与旧目录升序首中一致）。"""
+        with self._lock:
+            self._jobs_index_ensure_locked()
+            for jid, book in self._books.items():
+                if book is not None:
+                    self._jobs_index_book(jid, book)
+            best, best_t = None, None
+            for jid in sorted(self._jobs_index):
+                t = self._jobs_index[jid]['last_t']
+                if t is None:
+                    continue
+                if best is None or t > best_t:
+                    best, best_t = jid, t
+            return best
 
     # ── 广播 ──────────────────────────────────────────────────────────
 
@@ -3829,7 +4090,8 @@ class _HubHandler(BaseHTTPRequestHandler):
                     hub.set_cast(req.get('job_id'), req.get('actors'))
                     self._json(200, {'ok': True})
                 elif kind == 'display':
-                    hub.remember_display(req.get('job_id'), req.get('name'))
+                    hub.remember_display(req.get('job_id'), req.get('name'),
+                                         soul=req.get('soul') or None)
                     self._json(200, {'ok': True})
                 elif kind == 'owner':
                     hub.set_owner(req.get('job_id'), req.get('sid'),
@@ -4102,6 +4364,11 @@ class _HubHandler(BaseHTTPRequestHandler):
         q = parse_qs(url.query)
         vparam = (q.get('view') or ['god'])[0]
         sub = _Sub(self._qjob(q), vparam, ws=ws)
+        # 快照窗口化预算（2026-10-08）：页面连接时 ?win= 字节带入，本连接的
+        # 所有快照（升级首帧/换视角/换绑重推）一律窗口化；不带=全量（旧页零回归）。
+        wparam = (q.get('win') or [''])[0]
+        if str(wparam).isdigit():
+            sub.win = max(64 * 1024, int(wparam))
         # god 族统一解析（2026-09-22「刷新即假上帝视角」根治）：**裸 god 也升级**
         # ——有会话账本时刷新首帧直接读到「戏外+织入」的真上帝视角；升级返回
         # 规范 id（god:<host>）记在 echo_view，快照后回显给页面校正。
@@ -4129,107 +4396,23 @@ class _HubHandler(BaseHTTPRequestHandler):
                     msg = json.loads(payload.decode('utf-8'))
                 except (ValueError, UnicodeDecodeError):
                     continue
-                if isinstance(msg, dict) and msg.get('ctrl') == 'view':
-                    with hub._lock:
-                        # 换视角与取快照同锁：旧视角残帧只可能排在快照之前
-                        # （客户端快照=整屏替换），绝不排在新快照之后
-                        sub.job_id = int(msg['job']) if msg.get('job') is not None else None
-                        vnew = str(msg.get('view') or sub.view)
-                        # god 族统一解析口（2026-09-22）：裸 god 与 god:<host>
-                        # 同路——刷新（upgrade）与切回（ctrl:view）自此同源，
-                        # 「切走再切回才变好」的相位差拔根。
-                        sub.echo_view = hub._resolve_god_sub(vnew, sub)
-                        self._push_snapshot(hub, sub, 0, via_god=True)
-                elif isinstance(msg, dict) and msg.get('ctrl') == 'jobs':
-                    # 清单也走 WS（2026-09-19）：file:// 直开的页面 fetch 全废，
-                    # 一条通道全搞定——页面从任何地方打开都完整可用。
-                    try:
-                        sub.q.put_nowait(json.dumps(
-                            {'ctrl': 'jobs', 'jobs': hub.jobs(),
-                             'hosts': hub._hosts_sorted(),
-                             'latest': hub.latest_job()}, ensure_ascii=False))
-                    except queue.Full:
-                        pass
-                elif isinstance(msg, dict) and msg.get('ctrl') == 'views':
-                    vs = hub.views(msg.get('job'))
-                    try:
-                        sub.q.put_nowait(json.dumps(
-                            {'ctrl': 'views', 'job': vs['job'],
-                             'hosts': vs.get('hosts') or [],
-                             'views': vs['views']}, ensure_ascii=False))
-                    except queue.Full:
-                        pass
-                elif isinstance(msg, dict) and msg.get('ctrl') == 'chronica':
-                    # 台账场次清单（2026-09-29 整场回放）：与 /jobs 同理走 WS 单通道
-                    # （file:// 直开页面 fetch 全废的老教训）。快照本身走 REST
-                    # （/chronica/view，一次性拼拼读，无订阅语义）。
-                    try:
-                        sub.q.put_nowait(json.dumps(
-                            {'ctrl': 'chronica',
-                             'chronica': hub.chronica_sessions()},
-                            ensure_ascii=False))
-                    except queue.Full:
-                        pass
-                elif isinstance(msg, dict) and msg.get('ctrl') == 'sessions':
-                    # 主会话面板清单（2026-09-21）：file:// 直开 fetch 全废的老教训
-                    # ——清单一律走 WS 单通道；announce/bind 变化时 hub 也主动广播
-                    # 同款载荷（_notify_bind），页面零轮询跟着刷新。
-                    try:
-                        sub.q.put_nowait(json.dumps(
-                            hub.sessions_payload(), ensure_ascii=False))
-                    except queue.Full:
-                        pass
-                elif isinstance(msg, dict) and msg.get('ctrl') == 'bind':
-                    # 面板选中主 session：hub.bind 落账（含跨宿主联动）后
-                    # _notify_bind 已广播 ctrl 'sessions'（含本页）+ god:<host>
-                    # 订阅者推新快照。
-                    out = hub.bind(str(msg.get('session') or ''))
-                    try:
-                        sub.q.put_nowait(json.dumps(
-                            {'ctrl': 'bind-result', **out}, ensure_ascii=False))
-                    except queue.Full:
-                        pass
-                elif isinstance(msg, dict) and msg.get('ctrl') == 'bind-job':
-                    # 面板改场次（2026-09-22 联动）：按 owners 账本给每个已知
-                    # 宿主设它那格的主 session，落账后 _notify_bind 广播同款
-                    # 载荷——页面零轮询跟着刷新。
-                    out = hub.bind_job(msg.get('job'))
-                    try:
-                        sub.q.put_nowait(json.dumps(
-                            {'ctrl': 'bind-job-result', **out}, ensure_ascii=False))
-                    except queue.Full:
-                        pass
-                elif isinstance(msg, dict) and msg.get('ctrl') == 'human-input':
-                    # 投影页人类席交卷（WS 单通道：file:// 直开的页面 fetch 全废，
-                    # 与 jobs/views 同理——页面从任何地方打开都完整可用）。
-                    code, out = hub.human_input(msg.get('wait_key'), msg.get('text'),
-                                                msg.get('variables'))
-                    try:
-                        sub.q.put_nowait(json.dumps(
-                            {'ctrl': 'human-input-result', 'code': code, **out},
-                            ensure_ascii=False))
-                    except queue.Full:
-                        pass
-                elif isinstance(msg, dict) and msg.get('ctrl') == 'prints':
-                    # print 旁路回放（2026-09-19）：{'ctrl':'prints','limit':n} → 历史
-                    try:
-                        sub.q.put_nowait(json.dumps(
-                            {'ctrl': 'prints', 'items': hub.prints_tail(msg.get('limit'))},
-                            ensure_ascii=False))
-                    except queue.Full:
-                        pass
-                elif isinstance(msg, dict) and msg.get('ctrl') == 'prints-clear':
-                    # 清空镜像环；广播 prints-cleared 让所有开着的浮层同步清屏
-                    hub.clear_prints()
-                    with hub._lock:
-                        cleared = json.dumps({'ctrl': 'prints-cleared'},
-                                             ensure_ascii=False)
-                        for s in list(hub._subs):
-                            try:
-                                s.q.put_nowait(cleared)
-                            except queue.Full:
-                                if s.ws is not None:
-                                    s.ws.close()
+                try:
+                    # 【逐帧护栏（2026-10-08）】一帧的差事撞上机器级文件锁等
+                    # 环境性 OSError（甚至真 bug），只该这一帧哑火——旧法
+                    # except 罩到 recv 整个循环，任何一帧撞锁就把整条页面
+                    # 连接静默拆掉，寄出帧/回执/直播全陪葬（j2719 延误事故
+                    # 的结构性弱点之三，用户拍板「响亮留痕并保住连接」）。
+                    self._ws_dispatch(hub, sub, msg)
+                except OSError as exc:
+                    _kind = msg.get('ctrl') if isinstance(msg, dict) else type(msg).__name__
+                    sys.stderr.write('[ws] 帧处理撞上 IO/锁异常（连接保住）ctrl=' + _kind +
+                                     ' job=' + str(sub.job_id) + ' view=' + str(sub.view) +
+                                     ': ' + repr(exc) + '\n')
+                except Exception as exc:
+                    _kind = msg.get('ctrl') if isinstance(msg, dict) else type(msg).__name__
+                    sys.stderr.write('[ws] 帧处理异常（连接保住，响亮待修）ctrl=' + _kind +
+                                     ' job=' + str(sub.job_id) + ' view=' + str(sub.view) +
+                                     ': ' + repr(exc) + '\n' + traceback.format_exc())
         except (ConnectionError, OSError):
             pass
         finally:
@@ -4241,6 +4424,126 @@ class _HubHandler(BaseHTTPRequestHandler):
             except queue.Full:
                 pass   # 队列满：ws 已关，写线程自行退场
             ws.close()
+
+    def _ws_dispatch(self, hub, sub, msg):
+        """一帧的差事（ctrl 分派，2026-10-08 自读循环搬出）：各支自取所需
+        之锁（RLock 可重入），由读循环的逐帧护栏包裹——撞锁/真 bug 只该
+        这一帧哑火、连接保住，不再一帧陪葬整条线。"""
+        if isinstance(msg, dict) and msg.get('ctrl') == 'view':
+            with hub._lock:
+                # 换视角与取快照同锁：旧视角残帧只可能排在快照之前
+                # （客户端快照=整屏替换），绝不排在新快照之后
+                sub.job_id = int(msg['job']) if msg.get('job') is not None else None
+                vnew = str(msg.get('view') or sub.view)
+                # god 族统一解析口（2026-09-22）：裸 god 与 god:<host>
+                # 同路——刷新（upgrade）与切回（ctrl:view）自此同源，
+                # 「切走再切回才变好」的相位差拔根。
+                sub.echo_view = hub._resolve_god_sub(vnew, sub)
+                self._push_snapshot(hub, sub, 0, via_god=True)
+        elif isinstance(msg, dict) and msg.get('ctrl') == 'jobs':
+            # 清单也走 WS（2026-09-19）：file:// 直开的页面 fetch 全废，
+            # 一条通道全搞定——页面从任何地方打开都完整可用。
+            try:
+                sub.q.put_nowait(json.dumps(
+                    {'ctrl': 'jobs', 'jobs': hub.jobs(),
+                     'hosts': hub._hosts_sorted(),
+                     'latest': hub.latest_job()}, ensure_ascii=False))
+            except queue.Full:
+                pass
+        elif isinstance(msg, dict) and msg.get('ctrl') == 'views':
+            vs = hub.views(msg.get('job'))
+            try:
+                sub.q.put_nowait(json.dumps(
+                    {'ctrl': 'views', 'job': vs['job'],
+                     'hosts': vs.get('hosts') or [],
+                     'views': vs['views']}, ensure_ascii=False))
+            except queue.Full:
+                pass
+        elif isinstance(msg, dict) and msg.get('ctrl') == 'chronica':
+            # 台账场次清单（2026-09-29 整场回放）：与 /jobs 同理走 WS 单通道
+            # （file:// 直开页面 fetch 全废的老教训）。快照本身走 REST
+            # （/chronica/view，一次性拼拼读，无订阅语义）。
+            try:
+                sub.q.put_nowait(json.dumps(
+                    {'ctrl': 'chronica',
+                     'chronica': hub.chronica_sessions()},
+                    ensure_ascii=False))
+            except queue.Full:
+                pass
+        elif isinstance(msg, dict) and msg.get('ctrl') == 'sessions':
+            # 主会话面板清单（2026-09-21）：file:// 直开 fetch 全废的老教训
+            # ——清单一律走 WS 单通道；announce/bind 变化时 hub 也主动广播
+            # 同款载荷（_notify_bind），页面零轮询跟着刷新。
+            try:
+                sub.q.put_nowait(json.dumps(
+                    hub.sessions_payload(), ensure_ascii=False))
+            except queue.Full:
+                pass
+        elif isinstance(msg, dict) and msg.get('ctrl') == 'bind':
+            # 面板选中主 session：hub.bind 落账（含跨宿主联动）后
+            # _notify_bind 已广播 ctrl 'sessions'（含本页）+ god:<host>
+            # 订阅者推新快照。
+            out = hub.bind(str(msg.get('session') or ''))
+            try:
+                sub.q.put_nowait(json.dumps(
+                    {'ctrl': 'bind-result', **out}, ensure_ascii=False))
+            except queue.Full:
+                pass
+        elif isinstance(msg, dict) and msg.get('ctrl') == 'bind-job':
+            # 面板改场次（2026-09-22 联动）：按 owners 账本给每个已知
+            # 宿主设它那格的主 session，落账后 _notify_bind 广播同款
+            # 载荷——页面零轮询跟着刷新。
+            out = hub.bind_job(msg.get('job'))
+            try:
+                sub.q.put_nowait(json.dumps(
+                    {'ctrl': 'bind-job-result', **out}, ensure_ascii=False))
+            except queue.Full:
+                pass
+        elif isinstance(msg, dict) and msg.get('ctrl') == 'range':
+            # 窗口展开读取（2026-10-08 窗口化配套）：页面按省略号两侧
+            # 行号要中间的一段，头/尾各按本连接预算切块（跨线行整行带
+            # 走），met=中间已取空（页面据此摘省略号）。tok 原样回显：
+            # 页面按快照序号对号入座，换场后的迟到处帧对不上号就安静作废。
+            out = hub.range_rows(sub, str(msg.get('dir') or 'dn'),
+                                 msg.get('head_end'), msg.get('tail_start'),
+                                 job=msg.get('job'))
+            try:
+                sub.q.put_nowait(json.dumps(
+                    {'ctrl': 'rows-range', 'tok': msg.get('tok'), **out},
+                    ensure_ascii=False))
+            except queue.Full:
+                pass
+        elif isinstance(msg, dict) and msg.get('ctrl') == 'human-input':
+            # 投影页人类席交卷（WS 单通道：file:// 直开的页面 fetch 全废，
+            # 与 jobs/views 同理——页面从任何地方打开都完整可用）。
+            code, out = hub.human_input(msg.get('wait_key'), msg.get('text'),
+                                        msg.get('variables'))
+            try:
+                sub.q.put_nowait(json.dumps(
+                    {'ctrl': 'human-input-result', 'code': code, **out},
+                    ensure_ascii=False))
+            except queue.Full:
+                pass
+        elif isinstance(msg, dict) and msg.get('ctrl') == 'prints':
+            # print 旁路回放（2026-09-19）：{'ctrl':'prints','limit':n} → 历史
+            try:
+                sub.q.put_nowait(json.dumps(
+                    {'ctrl': 'prints', 'items': hub.prints_tail(msg.get('limit'))},
+                    ensure_ascii=False))
+            except queue.Full:
+                pass
+        elif isinstance(msg, dict) and msg.get('ctrl') == 'prints-clear':
+            # 清空镜像环；广播 prints-cleared 让所有开着的浮层同步清屏
+            hub.clear_prints()
+            with hub._lock:
+                cleared = json.dumps({'ctrl': 'prints-cleared'},
+                                     ensure_ascii=False)
+                for s in list(hub._subs):
+                    try:
+                        s.q.put_nowait(cleared)
+                    except queue.Full:
+                        if s.ws is not None:
+                            s.ws.close()
 
     @staticmethod
     def _push_snapshot(hub: ProjectionHub, sub: _Sub, after: int,
@@ -4259,18 +4562,20 @@ class _HubHandler(BaseHTTPRequestHandler):
             except queue.Full:
                 pass
         if sub.god_host is not None:
-            # god:<host> 订阅（2026-09-21）：每次快照重解析绑定（换绑即跟随）。
-            # **不用 _resolve_god_view**（2026-09-22 用户报「显示的根本不是这个
-            # job」）：它对空 current 会回落该宿主最近活动的账本——绑定被联动
-            # 清空=「这个宿主与你点的这场无关」，回落等于拿一本不相干的账冒充
-            # 内容。订阅侧绑定空就当没账本（sess=None），往下走场次兜底。
+            # god:<host> 订阅（2026-09-21）：每次快照重解析本场上帝视角格。
+            # 【2026-10-06 用户拍板】一场戏唯一的上帝视角=开演的那个会话，
+            # 统一走 _resolve_god_view（读开演格）——不再读 current 指针：
+            # 指针漂移（联动清空/首见即主/说话即绑）与视角内容彻底绝缘，
+            # 换场跟随也自然成立（跟最新每次重解析到最新场开演格）。解析不到
+            # （开演家没申报 / 不是该宿主 / 无信任集）→ sess=None 往下走场次
+            # 兜底（2026-09-22 老教训沿用：绝不拿「最近活动账本」冒充内容）。
             with hub._lock:
-                b = hub._load_bindings().get(sub.god_host) or {}
-                cur = str(b.get('current') or '')
-                sess = ('%s:%s' % (sub.god_host, cur)) if cur else None
+                sess = hub._resolve_god_view('god:%s' % sub.god_host,
+                                             sub.job_id)
                 sub.sess = _split_session(sess) if sess else None
-                snap = hub.snapshot_session(sess, 'god', after) if sess else \
-                    {'session': None, 'rows': [], 'next': 0, 'hosts': []}
+                # win（2026-10-08 窗口化）：订阅带了预算就窗口化，只送头尾
+                snap = hub.snapshot_session(sess, 'god', after, sub.win) if sess else \
+                    {'session': None, 'rows': [], 'next': 0, 'hosts': [], 'elided': None}
             # 兜底（2026-09-22 用户报「点哪个显示的根本不是那场」+「狼人杀明明
             # 有内容」）：会话账本没内容（织入上线前的旧场，session 账本根本没
             # 建）时，直接读**那场的 job 账本**——场次优先取订阅带的（用户点了
@@ -4295,13 +4600,18 @@ class _HubHandler(BaseHTTPRequestHandler):
                               % (sub.god_host, fb_job))
                     except Exception:
                         pass
-                    fb = hub.snapshot(fb_job, 'god', after)
+                    # 兜底读「那场 job 账本」纯戏内读法：view 用 stage——
+                    # 过滤矩阵与 god 全同（human_prompt 两视角都放行），但
+                    # 不会触发 snapshot 的裸 god 升级（2026-10-06 起钉场裸
+                    # god 会升到开演格会话读法，兜底要的是 job 账本本体）。
+                    fb = hub.snapshot(fb_job, 'stage', after, sub.win)
                     try:
                         sub.q.put_nowait(json.dumps(
                             {'ctrl': 'snapshot', 'proto': PROTO_VERSION,
                              'job': fb['job'], 'session': None,
                              'view': 'god:%s' % sub.god_host,
                              'next': fb['next'], 'rows': fb['rows'],
+                             'elided': fb.get('elided'),
                              'hosts': fb.get('hosts') or [],
                              'waiting': hub.current_waiting(),
                              'live': [], 'god_fallback_job': fb['job']},
@@ -4315,13 +4625,14 @@ class _HubHandler(BaseHTTPRequestHandler):
                      'session': snap.get('session'),
                      'view': 'god:%s' % sub.god_host,
                      'next': snap['next'], 'rows': snap['rows'],
+                     'elided': snap.get('elided'),
                      'hosts': snap.get('hosts') or [],
                      'waiting': hub.current_waiting(), 'live': []},
                     ensure_ascii=False))
             except queue.Full:
                 pass   # 满队列=这条连接已在断开流程，快照随重连再来
             return
-        snap = hub.snapshot(sub.job_id, sub.view, after)
+        snap = hub.snapshot(sub.job_id, sub.view, after, sub.win)
         # 快照捎带正在打字的块（按同视角过滤）：换视角/断线重连即刻接上，
         # 不丢半截话（2026-09-19 用户拍板「读现有的记录，流式接上」）。
         live = hub.live_blocks(snap['job'], sub.view) if snap['job'] is not None else []
@@ -4329,6 +4640,7 @@ class _HubHandler(BaseHTTPRequestHandler):
             sub.q.put_nowait(json.dumps(
                 {'ctrl': 'snapshot', 'proto': PROTO_VERSION, 'job': snap['job'],
                  'view': snap['view'], 'next': snap['next'], 'rows': snap['rows'],
+                 'elided': snap.get('elided'),
                  'hosts': snap.get('hosts') or [],
                  'waiting': hub.current_waiting(),
                  'live': live}, ensure_ascii=False))
@@ -4445,14 +4757,15 @@ class EventProjector:
 
     def _waiting_views(self, actor, scope):
         """该亮「人类输入框」的 actor 视角 id 清单（god/stage 两视角页面自判，
-        这里只出角色视角）。基形口径与 views() 同源（min(_name_bases)），host
-        前缀同款——保证与 /views 清单里的 id 逐字可比对。"""
+        这里只出角色视角）。2026-10-06 起与 views() 同口径：裸基形 id——一角色
+        一行，不再按 host 拆席（基形口径同源 min(_name_bases)）。旧深链
+        'actor:<host>:<基形>' 仍指向同一扇窗（_view_actor 末节取基形）。"""
         ids, seen = [], set()
         for nm in ([actor] if actor else []) + list(scope or []):
             bk = min(_name_bases(nm))
             if bk and bk not in seen:
                 seen.add(bk)
-                ids.append('actor:' + (self.host + ':' if self.host else '') + bk)
+                ids.append('actor:' + bk)
         return ids
 
     def _waiting_push(self):
@@ -5029,13 +5342,105 @@ class EventProjector:
         return rows
 
 
+def _try_plain_bind(host: str, port: int) -> bool:
+    s = socket.socket()
+    try:
+        s.bind((host, port))
+        return True
+    except OSError:
+        return False
+    finally:
+        s.close()
+
+
+def _port_live_listener(host: str, port: int, timeout: float = 0.3) -> bool:
+    """这个口上有没有活人在听：connect 得上才算。
+    裸 bind 探测分不清「活口」和「残留」——两种都绑不进去；connect 只认
+    真收连接的口（TIME_WAIT 残留、只绑不听的口都收不进）。"""
+    s = socket.socket()
+    try:
+        s.settimeout(timeout)
+        s.connect((host, port))
+        return True
+    except OSError:
+        return False
+    finally:
+        s.close()
+
+
+_NO_PROXY_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
+def _hub_health_answers(host: str, port: int, timeout: float = 0.8) -> bool:
+    """GET /health 问一声：答得上来（含 404——别人家的服务一样算活口在当家）
+    = True；超时/断线 = False（收得 connect 却不应答健康口，是挂死/垂死的
+    画像）。方言对齐 femo_daemon._probe，不另造第二种探测。
+    回环探测一律直连不走系统代理：回环永远不需要代理，而代理挂掉/重启的
+    几分钟里不该连累引擎的出生裁决。"""
+    try:
+        with _NO_PROXY_OPENER.open('http://%s:%d/health' % (host, port),
+                                   timeout=timeout) as resp:
+            json.load(resp)
+        return True
+    except urllib.error.HTTPError:
+        return True
+    except Exception:
+        return False
+
+
+def _await_home_release(host: str, port: int, settle_sec: float) -> bool:
+    """本家口被垂死前任占着（收得 connect、不应答健康口）：等它交出端口。
+    bind 得进 = 交出来了，True，本进程回家接班；health 缓过来 = 前任没死
+    （False，交给孪生裁决让贤自退）；窗口耗尽 = False，让路向上探。"""
+    deadline = time.monotonic() + settle_sec
+    while True:
+        if _try_plain_bind(host, port):
+            return True
+        if _hub_health_answers(host, port):
+            return False
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.5)
+
+
 def resolve_port(host='127.0.0.1') -> int:
-    """嵌入宿主的缺省端口：env FEMO_PROJECTION_PORT（缺省 8790），占用则向上探 20 个。"""
+    """嵌入宿主的缺省端口：env FEMO_PROJECTION_PORT（缺省 8790）。
+    2026-10-06 手机断线事故的根治——手机 tailscale 那条转发写死了本家口，
+    电脑端读 hub.json 跟着走无感，所以本家口能不漂就不漂。被占分三种，
+    裁决分开：
+      · 活口（connect 得上且答得上 /health）——真有人在当家：让路向上探。
+        自家活 hub 在本家口时，新生儿让路后由孪生裁决（_claim_ledger）探得
+        活、自退，前任照旧当家，不漂；
+      · 垂死前任（connect 得上却不应答 /health）——上一任正在退场路上、
+        还握着监听套接字：等它交出端口再原地接班（实案 17:48 重生即此画像：
+        探测当时立即跳到 8791，前任一死账被抢写，hub 从此漂走、手机 502）；
+        等待窗口同孪生宽限（FEMO_DAEMON_TWIN_SETTLE_SEC，缺省 10s），等不来
+        才让路——出生多花十秒，换常规退场竞速下端口不漂（前任挂死超过窗口
+        的极端场合，本代仍会让路，下一代重生自然归位）；
+      · 没活口但裸 bind 仍被拒——TIME_WAIT 类残留挡门（部分 Windows 构建
+        会，本开发机实测不会）：带真服务同款 SO_REUSEADDR 复用（真服务的
+        ThreadingHTTPServer 自带 allow_reuse_address，这种口本来就绑得住；
+        探测若不放行同样漂移）。
+    顺序不能换：先 connect 探活口再谈 bind——真服务自家就开
+    SO_REUSEADDR（ThreadingHTTPServer 的 allow_reuse_address），Windows 上
+    两个都开 REUSEADDR 的套接字能双绑同一个口，先探活就是防自家人双绑。
+    FEMO_PROJECTION_PORT=0 时首口即 0：
+    bind 必成、返回 0，真服务绑 0 拿临时口——测试沙盒与自检全靠这条。"""
     env = os.environ.get('FEMO_PROJECTION_PORT', '')
     base = int(env) if env.isdigit() else 8790
+    settle = float(os.environ.get('FEMO_DAEMON_TWIN_SETTLE_SEC') or 10)
     for p in range(base, base + 20):
-        try:
+        if _port_live_listener(host, p):
+            if p != base or _hub_health_answers(host, p):
+                continue
+            if _await_home_release(host, p, settle):
+                return p
+            continue
+        if _try_plain_bind(host, p):
+            return p
+        try:                                    # 没活口、bind 不进：残留挡门
             s = socket.socket()
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             s.bind((host, p))
             s.close()
             return p
@@ -5228,8 +5633,16 @@ class HubClient:
             kwargs['start_new_session'] = True
         # PYTHONUNBUFFERED（与 daemon-client 同课）：stdout/stderr 重定向进日志
         # 文件后 python 转块缓冲，引擎 print 不实时落盘——排障取证全靠这份日志。
+        # PYTHONIOENCODING / PYTHONUTF8 是同款对齐的另外两个键（2026-10-06 实锤）：
+        # 日志文件不是终端，python 按系统 locale 编码（本机 cp936）——引擎启动首句
+        # 就带 emoji，GBK 编不出来即 UnicodeEncodeError 当场猝死，代拉的桥等满
+        # 60s 才报错，pytest 里所有走沙盒的桥级测试连坐变红（实锤：test_notice
+        # 全红、沙盒日志 5 处 UnicodeEncodeError）。daemon-client 侧本来就带着
+        # 这两个键，只有 python 侧漏了——两份 spawner 漂移。
         env = dict(os.environ)
         env.setdefault('PYTHONUNBUFFERED', '1')
+        env.setdefault('PYTHONIOENCODING', 'utf-8')
+        env.setdefault('PYTHONUTF8', '1')
         subprocess.Popen([sys.executable, daemon_py, '--data-dir', data_dir],
                          stdin=subprocess.DEVNULL, stdout=logf, stderr=logf,
                          close_fds=True, env=env, **kwargs)
@@ -5287,12 +5700,12 @@ class HubClient:
                 return {'ok': False, 'cast': {}}
         return self._hub.cast_job(job_id)
 
-    def remember_display(self, job_id, name) -> None:
+    def remember_display(self, job_id, name, soul=None) -> None:
         if self._remote:
             self._post('/hub-register', {'kind': 'display', 'job_id': job_id,
-                                         'name': name})
+                                         'name': name, 'soul': soul or ''})
             return
-        self._hub.remember_display(job_id, name)
+        self._hub.remember_display(job_id, name, soul=soul)
 
     def set_waiting(self, state) -> None:
         if self._remote:
@@ -5576,6 +5989,38 @@ def _selftest():
     assert snap3['job'] == 1 and snap3['rows'][-1]['n'] == 7, snap3
     assert hub3.latest_job() == 1
 
+    # ── 快照窗口化（2026-10-08）：大头快照只送头尾、中间省略、range 展开补齐 ──
+    # 造一本 30 行 × ~100KB 的大账（job 9）；win=1.2MB → 头 12 行/尾 12 行/
+    # 中间 6 行进省略号（每行 ~100KB，预算压线跨线行整个带走=消息不截断）。
+    hub2.feed(90, [{'op': 'row', 'zone': 'inplay', 'kind': 'say', 'actor': '甲',
+                   'text': 'x' * 100000} for _ in range(30)], source='selftest')
+    W = 1200 * 1000
+    wsnap = hub2.snapshot(90, 'stage', 0, W)
+    el = wsnap['elided']
+    assert el and el['rows'] == 6 and el['bytes'] > 0, el
+    assert el['head_end'] == 12 and el['tail_start'] == 19, el
+    assert [r['n'] for r in wsnap['rows']] == list(range(1, 13)) + list(range(19, 31))
+    # 总量 <= 2*win：全量不省略（「文本本来就少就从头显示到尾」）
+    full = hub2.snapshot(90, 'stage', 0, 2 * 1000 * 1000)
+    assert full['elided'] is None and len(full['rows']) == 30, full['elided']
+    # 首尾恰好相接/重叠（各吃 15 行）：全量，不出残省略号
+    ov = hub2.snapshot(90, 'stage', 0, 1450 * 1000)
+    assert ov['elided'] is None and len(ov['rows']) == 30, ov['elided']
+    # 不带 win（REST 老消费方/整场回放）：全量零回归
+    assert len(hub2.snapshot(90, 'stage')['rows']) == 30
+    # range 展开读取：中间 6 行（13..18）一次取完 met=True；小预算切块 dn 顺序/
+    # up 倒序、met=False（页面据此保留省略号继续可点）
+    sub9 = _Sub(90, 'stage')
+    sub9.win = W
+    rr = hub2.range_rows(sub9, 'dn', el['head_end'], el['tail_start'])
+    assert [r['n'] for r in rr['rows']] == [13, 14, 15, 16, 17, 18] and rr['met'] is True, rr
+    sub9.win = 250 * 1000
+    rd = hub2.range_rows(sub9, 'dn', el['head_end'], el['tail_start'])
+    assert [r['n'] for r in rd['rows']] == [13, 14, 15] and rd['met'] is False, rd
+    ru = hub2.range_rows(sub9, 'up', el['head_end'], el['tail_start'])
+    assert [r['n'] for r in ru['rows']] == [18, 17, 16] and ru['met'] is False, ru
+    assert hub2.range_rows(sub9, 'dn', 50, 10)['rows'] == []   # 坏区间：空回不炸
+
     # 服务面：HTTP + WS 全链
     port = start_hub_server(hub2, port=0)
     assert os.path.isfile(os.path.join(tmp, 'hub.json'))    # 自发现件已写
@@ -5590,7 +6035,7 @@ def _selftest():
         dg = json.load(resp)
     assert dg['proto'] == 1 and dg['subs'] == 0 and dg['books_loaded'] >= 1, dg
     with urllib.request.urlopen(base + '/jobs', timeout=5) as resp:
-        assert json.load(resp)['latest'] == 1
+        assert json.load(resp)['latest'] == 90   # job 90=窗口化锁刚喂的大账，已是最新场
     with urllib.request.urlopen(base + '/', timeout=5) as resp:
         assert b'Projection' in resp.read()
 
@@ -5788,7 +6233,26 @@ def _selftest():
     assert vmsg['ctrl'] == 'views' and vmsg['views'][0]['id'] == 'god', vmsg
     ws_send({'ctrl': 'jobs'})
     jmsg = ws_read()
-    assert jmsg['ctrl'] == 'jobs' and jmsg['latest'] == 1, jmsg
+    assert jmsg['ctrl'] == 'jobs' and jmsg['latest'] == 1, jmsg   # 最近喂的是 job 1（'ws行'）
+
+    # WS 窗口化端到端（2026-10-08）：连接带 ?win= → 快照窗口化并带 elided；
+    # ctrl 'range' 按本连接预算切中间段，跨线行整行带走。
+    cw, rfw = ws_connect('job=90&view=stage&win=300000')
+    snapw = ws_read(rfw)
+    elw = snapw.get('elided')
+    assert snapw['ctrl'] == 'snapshot' and elw, snapw.get('elided')
+    assert elw['head_end'] == 3 and elw['tail_start'] == 28 and elw['rows'] == 24, elw
+    ns_w = [r['n'] for r in snapw['rows']]
+    assert ns_w == [1, 2, 3] + list(range(28, 31)), ns_w
+    ws_send({'ctrl': 'range', 'dir': 'dn', 'head_end': 3, 'tail_start': 28,
+             'tok': 't-echo'}, cw)
+    rg = ws_read(rfw)
+    assert rg['ctrl'] == 'rows-range' and rg['dir'] == 'dn' and rg['tok'] == 't-echo' \
+        and [r['n'] for r in rg['rows']] == [4, 5, 6] and rg['met'] is False, rg
+    ws_send({'ctrl': 'range', 'dir': 'up', 'head_end': 3, 'tail_start': 28}, cw)
+    rg = ws_read(rfw)
+    assert rg['dir'] == 'up' and [r['n'] for r in rg['rows']] == [27, 26, 25], rg
+    cw.close()
 
     # 草稿层走 WS（页面就是靠这条 row-update 接住「正在写的字」）：开段=行本体，
     # 草稿增量=同 n 原位 row-update（帧里带 drafts），收口=草稿消失、定稿上位。
@@ -6042,9 +6506,17 @@ def _selftest():
                    # 【刀1】行不带 host 章：出场归属剖段键（产线段键由桥带归属）
                    'seg': 'w:dsh:s9'}], source='dsh')
     idsv = [v['id'] for v in hubv.views(9)['views']]
-    assert 'actor:dsh:@Eve' in idsv and 'actor:@Eve' not in idsv, idsv
-    assert 'actor:@小机' in idsv and 'actor:@影子' in idsv, idsv   # 没上过场：留在未标来源
-    assert sum(1 for v in hubv.views(9)['views'] if _view_actor(v['id']) == '@Eve') == 1
+    assert 'actor:@Eve' in idsv and not any(x.startswith('actor:dsh:') for x in idsv), idsv
+    assert 'actor:@小机' in idsv and 'actor:@影子' in idsv, idsv   # 没上过场：开演即列
+    # 宿主标签（2026-10-06 用户拍板「soul 实际绑在哪个 host 就显示哪个」）：
+    # 取本场选角账定格的宿主（经角色↔soul 映射换算），不按出场行染——
+    # 出场染标签在群聊剧本（scope 全体）会把每个角色染成所有宿主。
+    hubv.remember_display(9, '@Eve', soul='e1')     # ai_request 现场同拍登记
+    hubv.cast_entry_put(9, 'e1', 'sid-e', 'dsh')    # 选角账定格：@Eve→dsh
+    _eve9 = [v for v in hubv.views(9)['views'] if v.get('base') == '@Eve']
+    assert len(_eve9) == 1 and _eve9[0]['hosts'] == ['dsh'], _eve9   # 定格宿主上牌
+    _xiaoji = [v for v in hubv.views(9)['views'] if v.get('base') == '@小机']
+    assert _xiaoji[0]['hosts'] == [], _xiaoji                        # 无映射无定格：无标签
 
     # 名字变体归一（2026-09-19 用户实锤下拉重复）：@X（Y） 与 @X 同角色一条
     hub2.set_cast(3, ['@Eve', '@小机'])
@@ -6281,7 +6753,7 @@ def _selftest():
     hub8 = ProjectionHub(data_dir=tmp)
     jl = hub8.jobs()
     jrows = {x['job_id']: x['rows'] for x in jl}
-    assert sorted(jrows) == [1, 2, 3, 4, 9] and jrows[2] == 0 and jrows[3] == 1 \
+    assert sorted(jrows) == [1, 2, 3, 4, 9, 90] and jrows[2] == 0 and jrows[3] == 1 \
         and jrows[4] == 5 and jrows[9] == 1, jrows          # 9=花名册×出场并档测试场
     assert not hub8._books, hub8._books.keys()          # 清单没把账本装进来
     assert hub8.latest_job() == 1 and not hub8._books   # 「最新」同样只盘点
@@ -6754,7 +7226,7 @@ def _selftest():
     assert w['job_id'] == 61 and w['wait_key'] == 'wW1' and w['actor'] == '@猫猫', w
     assert w['host'] == 'dsh' and w['node'] == '[陈述]' and w['prompt'] == '请投票', w
     assert w['out_vars'] == ['票', '理由'], w   # out 变量名随等待态下发（赋值浮层数据源，2026-09-24）
-    assert w['views'] == ['actor:dsh:@猫猫', 'actor:dsh:@Eve'], w   # 与 views() id 逐字可比
+    assert w['views'] == ['actor:@猫猫', 'actor:@Eve'], w   # 与 views() id 逐字可比（2026-10-06 起裸基形）
     # ── 多席并发（2026-10-02 复数化的靶心用例）：par 两条线各自等到人类——
     # 同名节点、同 actor、同时等待，第二席不得覆盖第一席（标量时代的根因）。
     prw.on_event('human_wait', {'job_id': 61, 'node_name': '[陈述]', 'wait_key': 'wW2',
@@ -6928,25 +7400,30 @@ def _selftest():
     hubl.feed(77, [{'op': 'seg-open', 'wait_key': 'SAME', 'actor': '@Eve'},
                    {'op': 'draft-delta', 'wait_key': 'SAME', 'key': 'k',
                     'kind': 'text', 'text': 'B的字'}], source='zcode')
-    segs = [r for r in hubl.snapshot(77, 'god')['rows'] if r.get('seg')]
+    # （77 场的 REST 读法用 stage：2026-10-06 起钉场裸 'god' 升到开演格的
+    #   会话账本——行带宿主章；锁「job 账本行形状」的断言一律走纯戏内读法）
+    segs = [r for r in hubl.snapshot(77, 'stage')['rows'] if r.get('seg')]
     assert sorted(r['seg'] for r in segs) == ['w:dsh:SAME', 'w:zcode:SAME'], segs
     for r in segs:
         got = [d['text'] for d in (r.get('drafts') or [])]
         # 【刀1 归属单源】行不带 host 章，归属剖段键
         assert got == (['A的字'] if _seg_host(r['seg']) == 'dsh' else ['B的字']), (r['seg'], got)
     # 【刀1】job 行本体不带宿主字段；来源剖段键/hosts 集聚合
-    rows77 = hubl.snapshot(77, 'god')['rows']
+    rows77 = hubl.snapshot(77, 'stage')['rows']
     assert all(not r.get('host') for r in rows77), rows77
     assert {_seg_host(r.get('seg')) for r in rows77 if r.get('seg')} == {'dsh', 'zcode'}
-    assert hubl.snapshot(77, 'god')['hosts'] == ['dsh', 'zcode']
+    assert hubl.snapshot(77, 'stage')['hosts'] == ['dsh', 'zcode']
     assert hubl.hosts() and {x['name'] for x in hubl.hosts()} == {'dsh', 'zcode'}, hubl.hosts()
     assert [j for j in hubl.jobs() if j['job_id'] == 77][0]['hosts'] == ['dsh', 'zcode']
-    # 同名角色各归各的窗：id/key 带 host，**显示名保持裸名**（前缀只在渲染层拼），
-    # 过滤仍按裸基名匹配（往数据里塞前缀会让角色窗当场空掉）
+    # 同名角色合并一条（2026-10-06 用户拍板简化）：id 恒裸基形，出场宿主进
+    # hosts 集合（菜单行尾铭牌）；过滤仍按裸基名匹配（往数据里塞前缀会让角色
+    # 窗当场空掉），旧深链 actor:dsh:@Eve 与裸 id 指向同一扇窗
     vs = hubl.views(77)['views']
     eve = [v for v in vs if v.get('base') == '@Eve']
-    assert {v['host'] for v in eve} == {'dsh', 'zcode'}, eve
-    assert {v['id'] for v in eve} == {'actor:dsh:@Eve', 'actor:zcode:@Eve'}, eve
+    assert len(eve) == 1 and eve[0]['id'] == 'actor:@Eve', eve
+    # 77 场 @Eve 双台产行（dsh+zcode）：标签仍只挂**选角账定格**的那家——
+    # 双牌只在「一场内真换绑」时出现（选角账只补空位不覆写，常态恒单值）
+    assert eve[0]['hosts'] == [], eve   # 无映射无定格：出场多台也不染牌
     assert all('[' not in v['name'] for v in eve), eve
     assert view_filter('actor:dsh:@Eve', {'zone': 'inplay', 'targets': ['@Eve']}) is True
     assert view_filter('actor:dsh:@Eve', {'zone': 'inplay', 'targets': ['@猫猫']}) is False
@@ -6964,7 +7441,8 @@ def _selftest():
         hubm.host_book(88)
     # 【2026-09-20 会话账本】inplay 行照进 job 账本（刀1 起行不带 host 章），
     # owner 学会后到达的戏外行改道会话账本（两台各织一份，host 标保持来源宿主）
-    jrows = hubm.snapshot(88, 'god')['rows']
+    # （REST 读 job 账本用 stage：钉场裸 god 自 2026-10-06 起升开演格会话读法）
+    jrows = hubm.snapshot(88, 'stage')['rows']
     assert [r['text'] for r in jrows] == ['一'] and not jrows[-1].get('host'), jrows
     for addr, want in (('dsh:session-A', ['一', '二']), ('zcode:session-B', ['二'])):
         # 共享 tmp：该会话账本里还有上一块（job 77）织入的行——按 job_id 过滤。
@@ -7098,16 +7576,19 @@ def _selftest():
         dg = json.load(resp)
     assert dg['bindings']['dsh']['current'] == 'session-http', dg
     assert 'session_books_loaded' in dg and 'latest_session' in dg
-    # god:<host> 视角（2026-09-21）：views 按宿主拆 god、读路径解析绑定会话
+    # god:<host> 视角（2026-09-21；2026-10-06 起读本场开演格）：views 按宿主
+    # 拆 god、读路径解析**最新场开演格**（601=dsh 开演 → 格 session-wv），不再
+    # 读主会话指针——current 指着 session-http 也不影响。
     with urllib.request.urlopen(base_ + '/views', timeout=5) as resp:
         vs = json.load(resp)
     vids = [v['id'] for v in vs['views']]
-    assert 'god:dsh' in vids and 'god' not in vids, vids   # 有会话数据：god 分家
+    assert 'god:dsh' in vids and 'god' not in vids, vids   # 有班底宿主：god 分家
     assert [v for v in vs['views'] if v['id'] == 'god:dsh'][0]['host'] == 'dsh', vs
     with urllib.request.urlopen(base_ + '/view?view=god:dsh', timeout=5) as resp:
         gv = json.load(resp)
-    assert gv['session'] == 'dsh:session-http' \
-        and [r['text'] for r in gv['rows']] == ['http 直投'], gv
+    assert gv['session'] == 'dsh:session-wv' \
+        and '台词' in [i['text'] for r in gv['rows']
+                       for i in (r.get('items') or [])], gv
     with urllib.request.urlopen(base_ + '/view?view=god:nohost', timeout=5) as resp:
         gv2 = json.load(resp)
     assert gv2['session'] is None and gv2['rows'] == [], gv2   # 无数据宿主=空窗
@@ -7124,12 +7605,12 @@ def _selftest():
     assert b'101' in bb5.split(b'\r\n')[0], bb5[:120]
     rf5 = c5.makefile('rb')
     snap5 = ws_read(rf5)
-    assert snap5['ctrl'] == 'snapshot' and snap5.get('session') == 'dsh:session-http' \
-        and [r['text'] for r in snap5['rows']] == ['http 直投'], snap5
-    hubsn.feed_session('dsh:session-http', [
-        {'kind': 'whisper', 'text': 'ws 实时行', 'src_seq': 'main:session-http:2'}])
+    assert snap5['ctrl'] == 'snapshot' and snap5.get('session') == 'dsh:session-wv' \
+        and any(r.get('kind') == 'play_start' for r in snap5['rows']), snap5
+    hubsn.feed_session('dsh:session-wv', [
+        {'kind': 'whisper', 'text': 'ws 实时行', 'src_seq': 'main:session-wv:2'}])
     live5 = ws_read(rf5)
-    assert live5.get('text') == 'ws 实时行', live5   # 行本体直达会话订阅者
+    assert live5.get('text') == 'ws 实时行', live5   # 行本体直达会话订阅者（开演格）
     c5.close()
     # FEMO 会话名册（2026-09-21 主会话面板）：announce upsert/bind/delist 全语义
     def _post(path, body):
@@ -7257,10 +7738,13 @@ def _selftest():
     snapd = json.loads(sub_d.q.get(timeout=2))
     assert snapd['job'] == 3001 and snapd.get('god_fallback_job') == 3001 \
         and len(snapd['rows']) == 1, snapd
-    # ⑧b 开屏（订阅不带场次）也兜底：session 账本空 → 反查名册里它的最新场
+    # ⑧b 解析不到开演格 → 兜底钉的场（2026-09-22 用户报「点哪个显示的根本
+    #    不是那场」）：god:dsh 钉 3002（zcode 独演），dsh 不是开演家 → 无格
+    #    → sess=None → 兜底读 3002 job 账本；绝不拿「最近活动账本」冒充内容。
+    #    （指针指一本不存在的账也应被无视——2026-10-06 起指针退出视角读法。）
     hublk.announce('dsh', upserts=[{'sid': 'm-fresh', 'name': '新客', 'job': 3002}])
-    hublk._bind_locked('dsh', 'm-fresh')                # 绑到一本不存在的账
-    sub_e = _Sub(None, 'god:dsh')
+    hublk._bind_locked('dsh', 'm-fresh')                # 指针指一本不存在的账
+    sub_e = _Sub(3002, 'god:dsh')
     sub_e.god_host = 'dsh'
     _HubHandler._push_snapshot(hublk, sub_e, 0, via_god=True)
     _ = json.loads(sub_e.q.get(timeout=2))              # view-echo
@@ -7284,26 +7768,35 @@ def _selftest():
         (sub_f.god_host, sub_f.echo_view)
     fb_frames = [sub_f.q.get(timeout=2) for _ in range(2)]   # echo + snapshot（排空防串味）
     hublk._subs.discard(sub_f)
-    # ⑪ 绑定空的宿主不许拿旧账本冒充内容：god:dsh 解析在 current 空时无账本
-    #    （不回落最近活动账本），有场次意图就走兜底。
-    hublk._bind_locked('dsh', 'm-void')                  # 绑一本不存在的账
+    # ⑪ 指针退出视角（2026-10-06 用户拍板「一场戏唯一的上帝视角=开演的那个
+    #    会话」）：god:dsh 钉 3001 → 解析到 3001 开演格 m-dsh、读那本账——
+    #    **哪怕 current 主会话指针指着别处**（m-void，一本不存在的账）。指针
+    #    怎么漂（跨宿主联动清空 / 新会话「首见即主」 / 说话即绑），视角内容
+    #    纹丝不动——2716 实案（god:zcode 读 current：私聊上墙、内容随新会话
+    #    漂移、god_default 被算成 god:zcode 成批拽页）三症状的共同根因锁。
+    hublk._bind_locked('dsh', 'm-void')                  # 指针指向一本不存在的账
     sub_g = _Sub(3001, 'god:dsh')
     sub_g.god_host = 'dsh'
     _HubHandler._push_snapshot(hublk, sub_g, 0, via_god=True)
     _ = json.loads(sub_g.q.get(timeout=2))               # view-echo
     snapg = json.loads(sub_g.q.get(timeout=2))
-    assert snapg['job'] == 3001 and snapg.get('god_fallback_job') == 3001, snapg
+    assert snapg['session'] == 'dsh:m-dsh' and snapg['job'] is None \
+        and len(snapg['rows']) >= 1, snapg
     # ⑪b 兜底链收尾（2026-10-03 用户报「刷新后 job 显示对、下面却空，非得重选
-    #    一次」实案根治）：订阅不带场次（job_id=None——刷新无参 boot 的常态）+
-    #    会话账本存在但空（m-void）+ 会话没链到任何场——fb_job 到此为 None，
-    #    旧码兜底整条断掉、空帧直达页面（升级帧与 ctrl:view 快照双中招）。
-    #    收尾=跟「最新」（latest_job，与场次下拉「最新」同义）：刷新即见最新场。
+    #    一次」实案根治）：订阅不带场次（job_id=None——刷新无参 boot 的常态）
+    #    + 开演格已登记但**账本还没长出任何行**（开演瞬间的常态——outside 行
+    #    在登记前到达只回落 job 账本，格后登记就空着）——fb_job 到此为 None，
+    #    旧码兜底整条断掉、空帧直达页面。收尾=跟「最新」（latest_job，与场次
+    #    下拉「最新」同义）：刷新即见最新场。
+    hublk.feed(3005, [{'kind': 'whisper', 'text': '无主戏外行',
+                       'src_seq': 'main:m-lost:1'}], source='dsh')   # 未登记：回落 job 账本
+    hublk.set_owner(3005, 'm-empty', 'dsh')              # 开演格后登记：格账本空
     sub_k = _Sub(None, 'god:dsh')
     hublk._resolve_god_sub('god:dsh', sub_k)
     _HubHandler._push_snapshot(hublk, sub_k, 0, via_god=True)
     _ = json.loads(sub_k.q.get(timeout=2))               # view-echo
     snapk = json.loads(sub_k.q.get(timeout=2))
-    assert snapk['job'] is not None and snapk.get('god_fallback_job') == snapk['job'] \
+    assert snapk['job'] == 3005 and snapk.get('god_fallback_job') == 3005 \
         and len(snapk['rows']) >= 1, snapk
     # ⑫ 宿主能力申报 god_window（2026-09-28）：申报了「没有上帝窗」的宿主——
     #    ①视角清单不出它的 god:<host> 条目；②裸 god 升级绝不落它头上；
@@ -7354,6 +7847,36 @@ def _selftest():
         and not any(x.startswith('god:') and x != 'god:dsh' for x in ids11), ids11
     assert 'ghost2' not in p11['hosts'] and 'ghost2' not in p11['god_hosts'], p11
     assert not any('ghost2' in v['id'] for v in hublk.views(3011)['views']), ids11
+
+    # ⑬b 登场宿主不给上帝资格（2026-10-06 用户拍板「其他 host 不允许进入
+    #    上帝视角」；2716 实案锁：web 手动开的场、zcode possess 登场演出——
+    #    旧「登场兜底」把 zcode 列进 god 清单，申报过滤又恰好把 web 滤掉，
+    #    god_default 被算成 god:zcode，跟随机制把戏内页面成批拽进一个不该
+    #    存在的上帝窗，窗里只剩 zcode 会话的戏外私聊）：web 开演 + zcode
+    #    登场 → 登场宿主只进相关宿主清单、god 清单必须空、god_default 落
+    #    裸 god；god:zcode 解析不到任何格（zcode 不是开演家）。
+    hublk.set_owner(3015, 'ws-3015', 'web')
+    hublk.feed(3015, [
+        {'kind': 'narrate', 'text': 'web 开演一行',
+         'src_seq': 'human:ws-3015:1', 'seg': 'w:web:j3015a'},
+        {'kind': 'narrate', 'text': 'zcode 登场一行',
+         'src_seq': 'human:ws-3015:2', 'seg': 'w:zcode:j3015b'},
+    ])
+    p15 = hublk.view_plan(3015)
+    assert p15['hosts'] == ['web', 'zcode'], p15         # 登场兜底仍接旧账
+    assert p15['god_hosts'] == [] and p15['god_default'] == 'god', p15
+    ids15 = [v['id'] for v in hublk.views(3015)['views']]
+    assert 'god' in ids15 and not any(x.startswith('god:') for x in ids15), ids15
+    assert hublk._resolve_god_view('god:zcode', 3015) is None, p15
+    sub_m = _Sub(None, 'god:zcode')
+    sub_m.god_host = 'zcode'
+    hublk._subs.add(sub_m)
+    hublk.bind_job(3015)                                 # 换场联动：没得跟就不跟
+    assert sub_m.god_host == 'zcode'                     # 不被拽去别家
+    assert getattr(sub_m, 'echo_view', None) is None     # 也无 echo（targets 空）
+    for _ in range(3):                                   # sessions+echo+snapshot 排空
+        _ = sub_m.q.get(timeout=2)
+    hublk._subs.discard(sub_m)
 
     # ⑭ prompt 槽显示规则（2026-10-03 用户定稿口径）：「prompt 只有人类输入的
     #    时候能看见。输入完就不用了」——等待席在册才放行（以席位镜像为准，不读
@@ -7481,9 +8004,17 @@ def _selftest():
     posted_box = []
 
     class _FakeBox:
+        pending_ref = None   # 测试侧拧的闸：非 None=该 ref 视作「在柜未捞」
+
         def post(self, **kw):
             posted_box.append(kw)
             return dict(kw, id='fake-1')
+
+        def pending_out_by_ref(self, ref):
+            # 喂 human_input 的重发幂等闸（真实驿站的同款查询）
+            if self.pending_ref == ref:
+                return 'fake-1'
+            return None
     hubi.set_mailbox(_FakeBox())
     hubi.set_waiting({'job_id': 99, 'wait_key': 'wI1', 'node': '[陈述]',
                       'actor': '@猫猫', 'scope': ['@猫猫'], 'prompt': '请发言',
@@ -7516,6 +8047,14 @@ def _selftest():
     assert kw['delivery'] == 'urgent', kw
     assert kw['who_move'] == 'customer_hook' and kw['who_require'] == 'system_require', kw
     assert kw['body'] == {'chat_text': '我投 @Eve', 'variables': {'票': '@Eve'}}, kw
+
+    # 重发幂等闸（2026-10-08）：同 wait_key 的第一封还在柜里，重发不叠第二封
+    # ——回执丢失/迟到的重试从此纯安全（真实信柜查询见 mailbox.pending_out_by_ref）
+    hubi._mailbox.pending_ref = 'wI1'
+    b2 = _post_human({'wait_key': 'wI1', 'text': '我投 @Eve（寄出帧重发）'}, 200)
+    assert b2['posted'] is False and b2.get('dedup') is True \
+        and b2.get('wait_key') == 'wI1' and len(posted_box) == 1, (b2, posted_box)
+    hubi._mailbox.pending_ref = None   # 开闸：后面 WS 路的真投递照常落信
 
     # ── hub 唯一化：人类信寄信宿主优先级反转（2026-09-25 设计稿 §三）──────
     # 等待态自带的 host 优先（等待镜像是哪个宿主的桥推来的，信就寄给谁）；
@@ -7596,6 +8135,19 @@ def _selftest():
     _ws_send(ci, {'ctrl': 'human-input', 'wait_key': 'wI1', 'text': '迟到的信'})
     resi = _ws_read_msg(rfi)
     assert resi['ctrl'] == 'human-input-result' and resi['ok'] is False, resi
+    # ── 逐帧护栏（2026-10-08）：一帧的差事撞锁只该这一帧哑火，连接保住 ──
+    # 旧法 except 罩到 recv 整循环，一帧撞机器锁就静默拆线——这里把 jobs
+    # 拧成必炸，哑火一帧后复原，下一帧必须有回音（线还活着）。
+    def _boom_jobs():
+        raise OSError(13, '模拟机器级文件锁')
+    _jobs_real = hubi.jobs
+    hubi.jobs = _boom_jobs
+    _ws_send(ci, {'ctrl': 'jobs'})            # 这一帧哑火（无回执），但不许拆线
+    time.sleep(0.3)
+    hubi.jobs = _jobs_real
+    _ws_send(ci, {'ctrl': 'jobs'})            # 拆了线的话，下面永远等不到回音
+    resg = _ws_read_msg(rfi)
+    assert resg['ctrl'] == 'jobs', resg       # 连接活着，下一帧照常
     ci.close()
 
     # ── 落幕扫除（2026-09-21 用户拍板）：play_end 落账=扳机，「建立了段但没发言」
@@ -7807,6 +8359,41 @@ def _selftest():
     except Exception:
         pass
     assert cb._fails == 0 and cb._dead_announced is False
+
+    # ── 场次清单缓存化（2026-10-08 用户拍板）：落盘→重启接续→增量→外部场
+    #    对账→物化账本内存覆盖→latest 同尺。旧法每拍攥全局锁全城点名，投影页
+    #    15s 一次的心跳把交互帧堵死（j2719 人类信延误 40s+ 的根治）。
+    tmpjx = tempfile.mkdtemp(prefix='femo-hub-jobsidx-')
+    hubA = ProjectionHub(data_dir=tmpjx)
+    hubA.feed(5001, [{'kind': 'narrate', 'text': '甲一', 'src_seq': 'jx:a1'}])
+    hubA.feed(5001, [{'kind': 'narrate', 'text': '甲二', 'src_seq': 'jx:a2'}])
+    hubA.feed(5002, [{'kind': 'narrate', 'text': '乙一', 'src_seq': 'jx:b1'}])
+    ja = hubA.jobs()
+    assert sorted(j['job_id'] for j in ja) == [5001, 5002], ja
+    assert ja[0]['last_t'] >= ja[-1]['last_t'], ja                    # 最近活动降序
+    assert all(set(j) == {'job_id', 'rows', 'first_t', 'last_t', 'hosts'}
+               for j in ja), ja                                       # 外形不变（无内部指纹外漏）
+    assert {j['job_id']: j['rows'] for j in ja} == {5001: 2, 5002: 1}, ja
+    assert os.path.isfile(os.path.join(tmpjx, 'jobs-index.json'))     # 首拍即落盘
+    hubB = ProjectionHub(data_dir=tmpjx)                              # 重启：吃缓存+指纹对账
+    jb = hubB.jobs()
+    assert {(j['job_id'], j['rows']) for j in jb} == \
+           {(5001, 2), (5002, 1)}, (ja, jb)                           # 缓存接得住，数值不漂
+    hubB.feed(5002, [{'kind': 'narrate', 'text': '乙二', 'src_seq': 'jx:b2'}])
+    jb2 = hubB.jobs()
+    assert {j['job_id']: j['rows'] for j in jb2} == {5001: 2, 5002: 2}, jb2  # 增量随写随更
+    assert jb2[0]['job_id'] == 5002, jb2                              # 刚动的场排最前
+    os.makedirs(os.path.join(tmpjx, '5003'), exist_ok=True)           # 外部落进来的场
+    with open(os.path.join(tmpjx, '5003', 'journal.jsonl'), 'w', encoding='utf-8') as fx:
+        fx.write(json.dumps({'n': 1, 't': 1700000000000, 'kind': 'narrate',
+                             'host': 'dsh', 'src_seq': 'jx:c1'}, ensure_ascii=False) + '\n')
+    hubC = ProjectionHub(data_dir=tmpjx)                              # 重启对账：新场入册
+    jc = hubC.jobs()
+    jcmap = {j['job_id']: j for j in jc}
+    assert jcmap[5003]['rows'] == 1 and jcmap[5003]['hosts'] == ['dsh'], jcmap.get(5003)
+    assert jcmap[5001]['rows'] == 2 and jcmap[5002]['rows'] == 2, jc  # 旧缓存原样信，不漂
+    # latest 同尺：5003 的固定旧时间戳（17e12）比 5002 的真实时刻旧——最新仍落 5002
+    assert hubC.latest_job() == 5002, hubC.latest_job()
 
     print('projection_hub selftest ok  (dir=%s)' % tmp)
 

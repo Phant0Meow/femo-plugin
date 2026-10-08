@@ -49,3 +49,48 @@ export function fitTextarea(ta) {
   ta.style.height = 'auto';
   ta.style.height = ta.scrollHeight + 'px';
 }
+
+// ── 人类席草稿的 sessionStorage 镜像（抗刷新，2026-10-08 用户拍板）────────
+// 「刷新了之后，我之前说的话就全没了」的根治。草稿正身仍只活内存（state.mjs
+// S.ihumanDrafts，composer 唯一写口），这里只管把 {wait_key → {text, vars}}
+// 镜像进 sessionStorage：刷新/重连后的新页面对账席位时原样接回。busy（已寄出
+// 锁）刻意不进镜像——刷新即重置，重发是安全的（同 wait_key 第二封信引擎侧
+// 死信无害，hub human_input 注释里的既定裁决）。storage 参数注入（浏览器传
+// sessionStorage，Node 单测传桩），本件保持纯件叶子、node 可直接 import。
+export const DRAFT_STORE_KEY = 'pc-ihuman-drafts';
+
+export function loadDraftStore(storage) {
+  let raw = null;
+  try {
+    raw = storage.getItem(DRAFT_STORE_KEY);
+  } catch (e) {
+    console.warn('draft store read failed:', e);
+    return {};
+  }
+  if (!raw) return {};
+  try {
+    const obj = JSON.parse(raw);
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) throw new Error('not an object');
+    return obj;
+  } catch (e) {
+    console.warn('draft store corrupt, reset:', e);
+    return {};
+  }
+}
+
+export function saveDraftStore(storage, store) {
+  try {
+    storage.setItem(DRAFT_STORE_KEY, JSON.stringify(store));
+  } catch (e) {
+    console.warn('draft store save failed:', e);
+  }
+}
+
+/** 对账：只留还活着的席位键（席位消失=草稿作废，镜像跟着撤，不留僵尸）。 */
+export function pruneDraftStore(store, liveKeys) {
+  const out = {};
+  for (const k of Object.keys(store)) {
+    if (liveKeys.has(k)) out[k] = store[k];
+  }
+  return out;
+}

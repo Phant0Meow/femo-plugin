@@ -1,0 +1,6 @@
+{
+  "$comment": "宿主能力清单：经 femo_bridge.py --host-manifest 指入。host=web 与 bridge.mjs 的 HOST_NAME 必须同词（投影来源标签/驿站 target_host/段键命名空间）。thinking_levels 缺省 = 引擎内置（off/minimal/low/medium/high/xhigh/max）。god_window=上帝视角窗能力申报（投影中心行协议 §6）：web 没有上帝席，投影页默认看戏内席（stage）；缺省=true。",
+  "host": "web",
+  "default_user_id": "u001",
+  "god_window": false
+}

@@ -332,13 +332,27 @@ class JobManager:
 
     def _load(self, job_id: int) -> Optional[JobRecord]:
         """读单份档案。文件缺失 → None；JSON 损坏 → rename 留证（.corrupt-<ts>）
-        + stderr 大声报错 → None（对账判定就靠这文件，坏档不能静默当存在）。"""
+        + stderr 大声报错 → None（对账判定就靠这文件，坏档不能静默当存在）。
+        【读侧共享冲突小重试（2026-10-07，j2717 人类信被咬实案，用户拍板）】
+        写侧 os.replace 自 09-16 就有同款装甲（_os_replace_retry：并发读者/
+        杀毒扫刚写的文件），读侧一直没有——出站轮询投递的第一步就是本方法，
+        撞上「场册刚被检查点重写、正被杀软/索引器扫」的瞬时窗口时
+        PermissionError 直接上抛，用户的话当场蒸发。按写方同款退避
+        （0.05/0.1/0.2s）重试；仍败原样抛出。FileNotFoundError 等非瞬时错误
+        不进重试，语义不变。"""
         path = self._job_path(job_id)
-        try:
-            with open(path, 'r', encoding='utf-8') as f:
-                raw = f.read()
-        except FileNotFoundError:
-            return None
+        raw = None
+        for attempt in range(4):
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    raw = f.read()
+                break
+            except FileNotFoundError:
+                return None
+            except PermissionError:
+                if attempt == 3:
+                    raise
+                time.sleep(0.05 * (2 ** attempt))
         try:
             return JobRecord.from_dict(json.loads(raw))
         except (json.JSONDecodeError, ValueError, TypeError) as exc:

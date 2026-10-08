@@ -9,7 +9,9 @@
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body, #root { width: 100%; height: 100%; overflow: hidden; }
-      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+      /* 首帧兜底链（FontStyle 注入的 FONT_FACE_CSS 落地后由主题 token 接管）；
+         链首放生僻字补字字体，与 themes.js 各链同口径。 */
+      body { font-family: 'MyCustomFont', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
     </style>
   </head>
   <body>

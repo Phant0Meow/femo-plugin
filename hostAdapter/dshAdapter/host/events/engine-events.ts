@@ -25,7 +25,7 @@ import { SessionId, type Session, type SessionEvent } from '@deepseek-ai/dsh-ses
 import type { FemoBridge } from '../bridge'
 import type { ResolvedConfig } from '../config'
 import { broadcastSse } from '../http'
-import { FEMO_PRESET, presetOf, isFemoAgent } from '../persona'
+import { isFemoMainAgent, isFemoSession } from '../femoIdentity'
 import { appendChatProjected, type ProjectionRegistry } from '../projection/projection'
 import { broadcastCompat, projectedCompat } from '../projection/windowing-native'
 import { type GodMirror } from '../hub/god-mirror'
@@ -186,19 +186,23 @@ export function jobMirrorCorrect(runState: RunState, jobId: number, ownerSid: st
 
 /** 终态/校正统一入口：每次 state 真变化伴生 run_state 快照广播（v1 吸收——
  *  前端显示者数据源=快照事件，B7 死于结构：不再有本地兜底覆盖）。变化判定
- *  在核心（run-state-core），本壳只剩广播插座。 */
+ *  在核心（run-state-core），本壳只剩广播插座。
+ *  【已退役-观察期（2026-10-05 画布直连刀3）】run_state SSE 合成广播退役——
+ *  画布改直连引擎后由四个迁移事件（flow_start/flow_paused/flow_done/
+ *  flow_error+bridge_run_ended）直接驱动按钮态，宿主合成成了第二份。镜像
+ *  翻转照旧（/session-state 等 Job 域消费方还在吃饭）。观察无误后连块删。 */
 export function jobMirrorSetState(runState: RunState, jobId: number, state: JobMirror['state']): void {
   if (runStateCore.jobMirrorSetState(runState, jobId, state) === 'changed') {
     const mirror = runState.jobs.get(jobId)
-    if (mirror !== undefined) broadcastSse('run_state', { sid: mirror.ownerSid, job_id: jobId, state })
+    if (mirror !== undefined) console.log(`[femo-plugin] run_state(退役观察): job=${jobId} → ${state} sid=${String(mirror.ownerSid).slice(-12)}`)
   }
 }
 
 /** running→终态：清活跃指针（镜像本身保留供 /session-state 等消费）。 */
 export function jobMirrorClear(runState: RunState, jobId: number): void {
   if (runStateCore.jobMirrorClear(runState, jobId) === 'changed') {
-    const mirror = runState.jobs.get(jobId)
-    if (mirror !== undefined) broadcastSse('run_state', { sid: mirror.ownerSid, job_id: jobId, state: 'suspended' })
+    // 【已退役-观察期（刀3）】run_state SSE 合成广播退役（同 jobMirrorSetState 注）。
+    console.log(`[femo-plugin] run_state(退役观察): job=${jobId} → suspended`)
   }
 }
 
@@ -242,10 +246,11 @@ export function registerEngineEventHandlers(ctx: Context, deps: EngineEventsDeps
   //     （随段落账）与下方 switch 的自绘窗广播——verbs 全体不落行，唯独三个
   //     终局收「真变化」信号点亮 run_state SSE 广播插座（原 jobMirrorSetState
   //     包装的语义原样搬进 verbs：状态翻转在核心、广播是 dsh SSE 物理）。
+  //     【已退役-观察期（刀3）】run_state 合成广播退役（同 jobMirrorSetState 注）
+  //     ——插座保留收「真变化」信号只落一行日志，观察无误后连块删。
   const broadcastRunStateChange = (jobId: number | undefined, changed: boolean, state: JobMirror['state']): void => {
     if (!changed || jobId === undefined) return
-    const mirror = runState.jobs.get(jobId)
-    if (mirror !== undefined) broadcastSse('run_state', { sid: mirror.ownerSid, job_id: jobId, state })
+    console.log(`[femo-plugin] run_state(退役观察): job=${jobId} → ${state}`)
   }
   const triage = createEventCore({
     store: runState,
@@ -272,20 +277,14 @@ export function registerEngineEventHandlers(ctx: Context, deps: EngineEventsDeps
   //    变量世界整包 state 不外发——画布断点/当前节点高亮的活供给（此前断点
   //    显示只靠 /session-state 拉）。信封补 sid（画布按会话过滤）与 job_id
   //    （画布 Job 跟随）；环内重放与旧引擎事件同权（刷新后 In/Out 面板不丢）。
+  //    【已退役-观察期（2026-10-05 画布直连刀3）】画布改直连引擎后直吃三个
+  //    原生事件（checkpoint/func_result/assign_result 字段同名同形，画布侧
+  //    已适配），宿主定向供给成了第二份（双吃禁止）——订阅退役观察。ingest
+  //    照旧（事件分流不回通用代播的裁决不变）。观察无误后连块删。
   if (!variableCanvasWired) {
     variableCanvasWired = true
     variableApi.subscribe('full', (record) => {
-      // checkpoint：按裁参数化取 brief 视图（state 整包不出线）；func/assign
-      // 保持 full（In 面板吃 input）。
-      const out = record.kind === 'checkpoint' ? variableApi.toView(record, 'brief') : record
-      const mirror = typeof out.jobId === 'number' ? runState.jobs.get(out.jobId) : undefined
-      const envelope = {
-        ...out,
-        job_id: out.jobId,
-        ...(mirror !== undefined ? { sid: mirror.ownerSid } : {}),
-      }
-      broadcastSse('variable_record', envelope)
-      rememberEvent('variable_record', envelope)
+      console.log(`[femo-plugin] variable_record(退役观察): kind=${String(record.kind)} job=${String(record.jobId ?? '-')}`)
     })
   }
 
@@ -302,7 +301,8 @@ export function registerEngineEventHandlers(ctx: Context, deps: EngineEventsDeps
     if (decision.kind !== 'enter') return decision
     // 【2026-09-19 取消限制】非 FEMO 会话启动运行期间同样要过门卫（引擎 owns 对话/
     // 用户插话放行/角色噪音过滤/补课），判定依据从 preset 放宽为「有活跃 Job」。
-    if (!isFemoAgent(agent) && !isSessionRunning(runState, String(agent.session.id))) return decision
+    // 【2026-10-07 去预设】另一半（isFemoAgent）也换轴：现在读「有戏有账」的身份轴。
+    if (!isFemoMainAgent(agent) && !isSessionRunning(runState, String(agent.session.id))) return decision
     const sid = String(agent.session.id)
     const gated = gatePreStep({
       messages: decision.messages,
@@ -358,7 +358,7 @@ export function registerEngineEventHandlers(ctx: Context, deps: EngineEventsDeps
   ctx.on('session/event', (session: Session, event: SessionEvent) => {
     // 【2026-09-19 取消限制】非 FEMO 会话启动运行期间主模型交卷捕获也要工作；
     // 无活跃 Job 且无在飞交卷时提前返回，普通会话事件零开销直通。
-    if (presetOf(session) !== FEMO_PRESET
+    if (!isFemoSession(String(session.id))
         && !isSessionRunning(runState, String(session.id))
         && !isMainAnswerPending(String(session.id))) return
     if (session.header.parentSession !== undefined) return // subagent sessions

@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>FEMO · 网页版操作台</title>
+<style>
+  /* ───────── 设计基调：与侧栏同宗 —— 深色 · 玻璃 · 绿主紫辅 ───────── */
+  /* 生僻字补字字体（character_need）：数据内嵌 @font-face + 链首逐字回退——
+     与 femoGen/src/themes.js 的 FONT_FACE_CSS 同源同口径（重生成方法见该处注释）。 */
+  @font-face {
+    font-family: 'MyCustomFont';
+    src: url('data:font/truetype;charset=utf-8;base64,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') format('truetype');
+    font-display: swap;
+  }
+  :root {
+    color-scheme: dark;
+    --bg: #0c0f12;
+    --card: rgba(255, 255, 255, 0.045);
+    --card-hover: rgba(255, 255, 255, 0.075);
+    --line: rgba(255, 255, 255, 0.09);
+    --line-strong: rgba(255, 255, 255, 0.16);
+    --text: #e9eef0;
+    --muted: #8b96a0;
+    --faint: #5d6870;
+    --green: #6fbf3a;
+    --green-bright: #8fdd55;
+    --green-grad: linear-gradient(135deg, #8fdd55 0%, #57b33a 100%);
+    --purple: #a06bff;
+    --ok: #34d399;
+    --busy: #fbbf24;
+    --bad: #f87171;
+    --radius: 16px;
+    --radius-sm: 10px;
+    --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    font-size: 14px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh;
+    background:
+      radial-gradient(1400px 560px at 88% -12%, rgba(111, 191, 58, 0.13), transparent 60%),
+      radial-gradient(1000px 480px at -14% 110%, rgba(160, 107, 255, 0.09), transparent 55%),
+      var(--bg);
+    color: var(--text);
+    font: 14px/1.7 'MyCustomFont', system-ui, "Segoe UI", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding: 0 22px 40px;
+  }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.14); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.24); background-clip: content-box; }
+  ::selection { background: rgba(111, 191, 58, 0.35); }
+  a { color: var(--green-bright); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+
+  /* ── 顶栏 ── */
+  header { display: flex; align-items: center; gap: 14px; padding: 22px 0 6px; }
+  .logo { width: 46px; height: 46px; flex: none; }
+  .logo svg { width: 100%; height: 100%; filter: drop-shadow(0 2px 10px rgba(111, 191, 58, 0.4)); }
+  .brand-name { font-size: 19px; font-weight: 800; letter-spacing: .5px; }
+  .brand-sub { font-size: 11px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
+  .conn {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 7px;
+    font-size: 12px; color: var(--muted);
+    border: 1px solid var(--line); background: var(--card);
+    padding: 5px 13px 5px 10px; border-radius: 999px;
+    white-space: nowrap;
+  }
+  .conn.bad { color: #f3a6a6; border-color: rgba(248,113,113,.35); background: rgba(248,113,113,.08); }
+  .tagline { color: var(--muted); font-size: 12.5px; margin: 2px 0 0 60px; }
+  .tagline b { color: var(--text); font-weight: 600; }
+
+  /* ── 状态点 ── */
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #454f52; flex: none; position: relative; }
+  .dot.on { background: var(--green-bright); }
+  .dot.on::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 1px solid var(--green-bright); opacity: .5; animation: pulse 2s ease-out infinite; }
+  .dot.busy { background: var(--busy); }
+  .dot.busy::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 1px solid var(--busy); opacity: .5; animation: pulse 1.2s ease-out infinite; }
+  @keyframes pulse { from { transform: scale(.6); opacity: .7; } to { transform: scale(1.6); opacity: 0; } }
+
+  /* ── 状态卡 ── */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 18px 0 6px; }
+  .stat {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 13px 16px;
+    display: flex; align-items: center; gap: 12px;
+    transition: border-color .15s ease, background .15s ease;
+  }
+  .stat:hover { background: var(--card-hover); border-color: var(--line-strong); }
+  .stat-ico {
+    width: 38px; height: 38px; flex: none; border-radius: 11px;
+    display: grid; place-items: center;
+    background: rgba(111, 191, 58, 0.1); border: 1px solid rgba(111, 191, 58, 0.25);
+  }
+  .stat-ico svg { width: 19px; height: 19px; color: var(--green-bright); }
+  .stat-ico.purple { background: rgba(160, 107, 255, 0.1); border-color: rgba(160, 107, 255, 0.3); }
+  .stat-ico.purple svg { color: var(--purple); }
+  .stat-ico.amber { background: rgba(251, 191, 36, 0.1); border-color: rgba(251, 191, 36, 0.3); }
+  .stat-ico.amber svg { color: var(--busy); }
+  .stat .k { font-size: 11px; color: var(--faint); letter-spacing: 1px; text-transform: uppercase; }
+  .stat .v { font-size: 13.5px; font-weight: 600; margin-top: 1px; }
+  .stat .v .muted { font-weight: 400; }
+
+  /* ── 主网格 ── */
+  .grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 14px; margin-top: 14px; align-items: start; }
+  @media (max-width: 920px) { .grid { grid-template-columns: 1fr; } .stats { grid-template-columns: repeat(2, 1fr); } }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 16px 18px;
+  }
+  .card-title {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; font-weight: 700; letter-spacing: 1.5px;
+    color: var(--muted); text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .card-title svg { width: 14px; height: 14px; opacity: .85; flex: none; }
+  .card-title .spacer { flex: 1; }
+  .card-note { font-size: 11.5px; color: var(--faint); margin: -8px 0 10px 22px; }
+
+  /* ── 应答席等待卡 ── */
+  .inbox {
+    border: 1px dashed var(--line-strong);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px; margin-bottom: 10px;
+    background: rgba(0, 0, 0, 0.15);
+    font-size: 13px; color: var(--muted);
+    line-height: 1.75;
+    white-space: pre-wrap; word-break: break-word;
+    max-height: 180px; overflow-y: auto;
+  }
+  .inbox.wait { border-style: solid; }
+  .inbox.wait.main { border-color: rgba(251, 191, 36, 0.45); background: rgba(251, 191, 36, 0.05); }
+  .inbox.wait.human { border-color: rgba(111, 191, 58, 0.45); background: rgba(111, 191, 58, 0.05); }
+  .inbox .meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 7px; }
+  .inbox .prompt { color: var(--text); }
+  .chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--line);
+    border-radius: 6px; padding: 1px 8px;
+    font-family: 'MyCustomFont', ui-monospace, Consolas, monospace; font-size: 11px;
+    color: var(--muted);
+  }
+  .chip.amber { color: var(--busy); border-color: rgba(251, 191, 36, 0.4); background: rgba(251, 191, 36, 0.08); }
+  .chip.green { color: var(--green-bright); border-color: rgba(111, 191, 58, 0.4); background: rgba(111, 191, 58, 0.09); }
+  .chip.purple { color: var(--purple); border-color: rgba(160, 107, 255, 0.4); background: rgba(160, 107, 255, 0.08); }
+
+  input[type=text], textarea, select {
+    display: block; width: 100%;
+    background: rgba(0, 0, 0, 0.28);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    color: var(--text); font: inherit;
+    padding: 8px 11px; outline: none;
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  input[type=text]:focus, textarea:focus, select:focus {
+    border-color: var(--green);
+    box-shadow: 0 0 0 3px rgba(111, 191, 58, 0.16);
+  }
+  input::placeholder, textarea::placeholder { color: var(--faint); }
+  select { appearance: none; -webkit-appearance: none; cursor: pointer;
+    background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position: calc(100% - 18px) 55%, calc(100% - 13px) 55%;
+    background-size: 5px 5px; background-repeat: no-repeat;
+  }
+  select option { background: #161b16; }
+  textarea { min-height: 72px; resize: vertical; margin-top: 8px; }
+
+  button {
+    cursor: pointer; font-family: inherit;
+    border: 1px solid var(--line-strong);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text);
+    border-radius: var(--radius-sm);
+    padding: 6px 14px; font-size: 12.5px; font-weight: 600;
+    transition: all .15s ease; flex: none;
+  }
+  button:hover { background: rgba(255, 255, 255, 0.12); }
+  button:active { transform: scale(0.96); }
+  button.primary {
+    background: var(--green-grad); border: none; color: #0d1a08;
+    padding: 8px 20px; font-size: 13px;
+    box-shadow: 0 3px 12px rgba(111, 191, 58, 0.3);
+  }
+  button.primary:hover { filter: brightness(1.08); }
+  button.danger { color: var(--bad); border-color: rgba(248, 113, 113, 0.4); }
+  button.danger:hover { background: rgba(248, 113, 113, 0.12); }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+  .row input[type=text], .row select { display: inline-block; width: auto; flex: 1; min-width: 140px; }
+  .msg { font-size: 12.5px; }
+  .msg.ok { color: var(--ok); } .msg.err { color: var(--bad); }
+  .muted { color: var(--muted); }
+  .faint { color: var(--faint); }
+
+  pre.toolout {
+    white-space: pre-wrap; word-break: break-word;
+    background: rgba(0, 0, 0, 0.3); border: 1px solid var(--line);
+    border-radius: var(--radius-sm); padding: 11px 13px;
+    max-height: 260px; overflow: auto;
+    font: 12px/1.7 ui-monospace, Consolas, monospace;
+    color: var(--muted);
+    margin: 10px 0 0;
+  }
+
+  /* ── 席位表 ── */
+  table { border-collapse: collapse; width: 100%; }
+  th, td { padding: 9px 12px; text-align: left; font-size: 13px; border-bottom: 1px solid var(--line); }
+  th { font-size: 11px; color: var(--faint); letter-spacing: 1px; text-transform: uppercase; font-weight: 700; }
+  tr:last-child td { border-bottom: none; }
+  tbody tr { transition: background .12s ease; }
+  tbody tr:hover { background: rgba(255, 255, 255, 0.03); }
+  tbody tr.running { background: rgba(251, 191, 36, 0.045); }
+  td .soul-in { display: inline-block; width: auto; min-width: 110px; width: 130px; font-family: 'MyCustomFont', ui-monospace, Consolas, monospace; font-size: 12px; padding: 4.5px 9px; }
+  td button { padding: 4px 10px; font-size: 11.5px; }
+  /* 状态字（2026-09-30 用户拍板）：纯色字不带底，与侧栏同款——在线=亮绿字、
+     网页未打开=灰红字、运行中=琥珀字、休眠中=中灰字（2026-10-01 按需唤醒
+     加的第四态：页开着被浏览器冻结，轮到发言自动唤醒；2026-10-02 用户拍板
+     改灰——原与运行中同用琥珀撞色）。label 唯一活在 shared/seats-core.seatState。 */
+  .state-run { color: var(--busy); font-weight: 600; }
+  .state-on { color: var(--green-bright); font-weight: 700; }
+  .state-off { color: #cf8b8b; font-weight: 600; }
+  .state-dormant { color: var(--muted); font-weight: 600; }
+  .badge { font-size: 10px; font-weight: 700; letter-spacing: .5px; border-radius: 6px; padding: 2px 8px; background: var(--green-grad); color: #0d1a08; }
+  .table-note { font-size: 11.5px; color: var(--faint); margin-top: 10px; }
+
+  /* ── 动态时间线 ── */
+  .runlog { display: flex; flex-direction: column; gap: 2px; max-height: 300px; overflow-y: auto; }
+  .runlog .line {
+    display: flex; gap: 10px; align-items: baseline;
+    padding: 5px 8px; border-radius: 8px; font-size: 12.5px;
+  }
+  .runlog .line { white-space: pre-wrap; }   /* 多行报错指引分行显示（缺员名单等）；flex 横排不动 */
+  .runlog .line:hover { background: rgba(255, 255, 255, 0.03); }
+  .runlog .t { font-family: 'MyCustomFont', ui-monospace, Consolas, monospace; font-size: 11px; color: var(--faint); flex: none; }
+  .runlog .kind { color: var(--green-bright); font-weight: 600; flex: none; }
+  .runlog .actor { color: var(--purple); flex: none; }
+  .runlog .laststop { color: var(--busy); }
+  .runlog .start { color: var(--ok); }
+
+  /* ── 空态 / 断连 ── */
+  .empty { text-align: center; padding: 22px 16px; color: var(--faint); font-size: 12.5px; line-height: 1.9; }
+  .empty svg { width: 38px; height: 38px; margin-bottom: 8px; opacity: .45; }
+  #toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(8px);
+    background: #1a201c; border: 1px solid var(--line-strong);
+    color: var(--text); font-size: 13px;
+    border-radius: 10px; padding: 9px 18px;
+    box-shadow: var(--shadow);
+    opacity: 0; pointer-events: none; transition: all .2s ease;
+    max-width: 86%; z-index: 9;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast.err { border-color: rgba(248, 113, 113, 0.4); color: #f3b0b0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo" id="brandLogo"></div>
+    <div>
+      <div class="brand-name">FEMO 操作台</div>
+      <div class="brand-sub">FEMO Web</div>
+    </div>
+    <div class="conn" id="conn"><span class="dot"></span>连接中…</div>
+  </header>
+  <p class="tagline">本宿主没有会话型主Agent AI：FEMO 的运行控制工具由你在这里亲手用；网页会话只承担角色（一个灵魂绑一个会话标签页）。</p>
+
+  <!-- 状态四卡 -->
+  <div class="stats" id="cards"></div>
+
+  <div class="grid">
+    <!-- 左列：应答席 -->
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 2l3 6.5 7 .9-5.2 4.8 1.4 6.8L12 17.6 5.8 21l1.4-6.8L2 9.4l7-.9L12 2z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          主Agent人工席
+        </div>
+        <div class="card-note">没设主Agent席时，主Agent 的回合落在这里等你</div>
+        <div class="inbox" id="mainBrief">暂无等待中的主Agent回合。</div>
+        <textarea id="mainText" placeholder="以主Agent身份给出回复/决策……"></textarea>
+        <div class="row">
+          <button id="answerMain" class="primary">提交（主Agent）</button>
+          <span id="mainMsg" class="msg"></span>
+          <span id="mainRetry" class="faint" style="font-size:12px"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          人类席
+        </div>
+        <div class="card-note">轮到人类节点时在这里作答；也可直接用投影中心的就地输入席</div>
+        <div class="inbox" id="humanWait">暂无等待中的人类节点。</div>
+        <textarea id="humanText" placeholder="以人类角色作答……"></textarea>
+        <div class="row">
+          <button id="answerHuman" class="primary">提交（人类）</button>
+          <button id="humanVarBtn" hidden>变量赋值</button>
+          <span id="humanMsg" class="msg"></span>
+        </div>
+        <div id="humanVarsPanel" hidden></div>
+      </div>
+    </div>
+
+    <!-- 右列：FEMO 运行控制工具 -->
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          FEMO 运行控制
+          <span class="spacer"></span>
+          <span style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--faint)">挂在本地服务的桥上</span>
+        </div>
+
+        <div class="row" style="margin-top:0">
+          <input type="text" id="scriptPath" placeholder="femo 脚本路径，例如 user_data/projects/xxx.femo">
+          <button id="mount">挂载脚本</button>
+        </div>
+
+        <div class="row">
+          <select id="runAction">
+            <option value="fresh_start">fresh_start · 开始运行</option>
+            <option value="pause">pause · 停止</option>
+            <option value="resume">resume · 续跑</option>
+            <option value="list_jobs">list_jobs · 列出 Job</option>
+          </select>
+          <input type="text" id="jobId" placeholder="job_id（续跑必填）" style="max-width:150px">
+          <button id="run" class="primary">执行 femo_run</button>
+        </div>
+
+        <pre class="toolout" id="toolOut">（工具返回值显示在这里）</pre>
+      </div>
+
+      <!-- 最近动态 -->
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M22 12h-4l-3 9L9 3l-3 9H2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          最近动态
+        </div>
+        <div class="runlog" id="runlog"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 席位表 -->
+  <div class="card" style="margin-top:14px">
+    <div class="card-title">
+      <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="2.5" stroke="currentColor" stroke-width="1.7"/><path d="M3 10h18M9 4v16" stroke="currentColor" stroke-width="1.7"/></svg>
+      席位
+      <span class="spacer"></span>
+      <span id="seatCount" style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--faint)"></span>
+    </div>
+    <table id="seatTable">
+      <thead><tr><th>会话</th><th>来源</th><th>标题</th><th>状态</th><th>灵魂</th><th>绑定</th><th>主Agent</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="table-note">一个灵魂绑一个席位；绑定/解绑即时生效。主Agent席至多一个，没设时主Agent的回合落到左上的人工席。</div>
+  </div>
+
+  <!-- 本地服务（2026-09-30 定名并收编侧栏快捷卡三钮）：本页就住在服务上，
+       地址=当前页 origin，不用填；「让扩展连到这里」把地址一键告知扩展（服务
+       挪过窝才需要，平时扩展认默认 127.0.0.1:8796 直连）。这张卡同时管两个
+       服务的开关：webAdapter 本地服务（重启=退场即拉起；关闭=终态动作不拉起，
+       退出前请求引擎散场）与引擎镜窗显隐（设置中心：写本宿主一格愿望，任一
+       在线宿主要显示就显示，缺省隐藏；关窗=杀引擎只归真人点 X）。 -->
+  <div class="card" style="margin-top:14px">
+    <div class="card-title">
+      <svg viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="8" rx="2" stroke="currentColor" stroke-width="1.7"/><rect x="2" y="13" width="20" height="8" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M6 7h.01M6 17h.01" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      本地服务
+      <span class="spacer"></span>
+      <span id="svcAddr" style="font-weight:400;letter-spacing:0;text-transform:none;color:var(--faint)"></span>
+    </div>
+    <div class="table-note">扩展平时认默认地址（127.0.0.1:8796）直连；服务挪过窝（改端口等）才需要点「让扩展连到这里」。</div>
+    <div class="row">
+      <button id="tellExt">让扩展连到这里</button>
+      <span id="tellExtMsg" class="msg"></span>
+    </div>
+    <div class="row">
+      <button id="restartService">重启服务</button>
+      <button id="stopService" class="danger">关闭服务</button>
+      <button id="mirrorToggle" title="引擎日志镜窗（设置中心：任一在线宿主要显示就显示，缺省隐藏；关窗=杀引擎）">引擎镜窗…</button>
+      <span id="svcMsg" class="msg"></span>
+    </div>
+  </div>
+
+</div>
+<div id="toast"></div>
+
+<script type="module">
+// ── 判断层（唯一活在 shared/，本地服务经 /console/shared/ 伺候同一份磁盘文件）──
+// 侧栏面板与操作台共用的判断：重画护栏、席位状态、空灵魂拦截、人类席变量赋值、
+// 运行回执取 job id。画法（这里表格、侧栏卡片）留各页。
+import { $, escapeHtml as esc, createToast } from '/console/shared/dom.mjs';
+import { createRepaintGuard } from '/console/shared/guard.mjs';
+import { seatState, bindRefusal, offlineRollCall, attendanceRefusal } from '/console/shared/seats-core.mjs';
+import { humanWaitKey, composeHumanSubmission, collectNonEmptyVars, answerOutcome } from '/console/shared/human-seat-core.mjs';
+import { jobIdFromRunResult } from '/console/shared/run-core.mjs';
+import { femoLogoSvg } from '/console/shared/femo-logo.mjs';
+
+const toast = createToast($('#toast'));
+$('#brandLogo').innerHTML = femoLogoSvg();   // 品牌图唯一活在 shared/femo-logo.mjs
+
+async function j(url, body) {
+  const res = await fetch(url, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {});
+  return res.json();
+}
+
+const ICO = {
+  bridge: '<svg viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="10" rx="3" stroke="currentColor" stroke-width="1.7"/><path d="M7 12h10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+  run: '<svg viewBox="0 0 24 24" fill="none"><polygon points="7,4 20,12 7,20" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>',
+  seats: '<svg viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9.5 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  hub: '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/><circle cx="4" cy="5" r="2" stroke="currentColor" stroke-width="1.7"/><circle cx="20" cy="5" r="2" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="21" r="2" stroke="currentColor" stroke-width="1.7"/><path d="M5.5 6.5L10 10M18.5 6.5L14 10M12 15v4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>',
+  empty: '<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M8 12h8M12 8v8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'
+};
+
+function fmtBrief(p) {
+  if (!p) return '暂无等待中的主Agent回合。';
+  const prompt = p.prompt ? `\n\n<div class="prompt">${esc(p.prompt)}</div>` : '';
+  return `<div class="meta"><span class="chip amber">job ${esc(p.job_id)}</span><span class="chip">节点 ${esc(p.node)}</span><span class="chip">wait_key ${esc(p.wait_key)}</span></div>${prompt}`;
+}
+
+function renderState(st) {
+  const cards = [
+    ['桥', 'bridge', st.bridgeAlive ? '<span class="state-on">运行中</span>' : '<span class="muted">未启动（首次工具调用时自动拉起）</span>'],
+    ['运行', 'run', st.running
+      ? `<span class="state-on">运行中</span> <span class="muted">${esc(st.playName ?? '')}</span>`
+      : '<span class="muted">未在运行</span>'],
+    ['席位', 'seats', `${st.stats?.online ?? 0}/${st.stats?.seats ?? 0} 在线 · 在飞 ${st.stats?.inflight ?? 0}`],
+    ['投影中心', 'hub purple', st.projection ? `<a href="${st.projection.url}" target="_blank">打开（:${st.projection.port}）</a>` : '<span class="muted">未启动</span>'],
+  ];
+  $('#cards').innerHTML = cards.map(([k, ico, v]) =>
+    `<div class="stat"><div class="stat-ico ${ico.includes('purple') ? 'purple' : ico.includes('run') && !st.running ? 'amber' : ''}">${ICO[ico.split(' ')[0]]}</div><div><div class="k">${k}</div><div class="v">${v}</div></div></div>`
+  ).join('');
+
+  const mb = $('#mainBrief');
+  if (st.pendingMain) { mb.className = 'inbox wait main'; mb.innerHTML = fmtBrief(st.pendingMain); }
+  else { mb.className = 'inbox'; mb.textContent = '暂无等待中的主Agent回合。'; }
+
+  const hw = $('#humanWait');
+  if (st.waitingHuman) {
+    hw.className = 'inbox wait human';
+    hw.innerHTML = `<div class="meta"><span class="chip green">job ${esc(st.waitingHuman.jobId)}</span><span class="chip">节点 ${esc(st.waitingHuman.node)}</span></div><div class="prompt">${esc(st.waitingHuman.prompt)}</div>`;
+  } else { hw.className = 'inbox'; hw.textContent = '暂无等待中的人类节点。'; }
+  updateHumanSeat(st.waitingHuman);
+
+  $('#mainRetry').textContent = st.mainRetry
+    ? `重试牌待办：wait_key=${st.mainRetry.waitKey}（第 ${st.mainRetry.attempt} 次）意见：${st.mainRetry.feedback}` : '';
+
+  const lines = [];
+  if (st.lastStop) lines.push(`<div class="line laststop"><span class="t">结束</span><span>job=${esc(st.lastStop.jobId)} · ${esc(st.lastStop.outcome)}</span></div>`);
+  if (st.playStart) lines.push(`<div class="line start"><span class="t">启动</span><span>job=${esc(st.playStart.jobId)}</span></div>`);
+  for (const r of (st.runlog ?? []).slice().reverse()) {
+    lines.push(`<div class="line"><span class="t">${new Date(r.t).toLocaleTimeString()}</span><span class="kind">${esc(r.kind)}</span>${r.actor ? `<span class="actor">${esc(r.actor)}</span>` : ''}<span>${esc(r.text)}</span></div>`);
+  }
+  $('#runlog').innerHTML = lines.join('') || `<div class="empty">${ICO.empty}<br>还没有动态。挂载脚本并执行 femo_run 后，这里会滚动显示运行流水。</div>`;
+}
+
+/** 席位重画护栏走 shared/guard（比旧版宽一道：只认 INPUT/TEXTAREA 的焦点——
+ *  按钮焦点不再挡重画，「未绑定不刷新」的侧栏实测坑同款修法）。 */
+const seatsGuard = createRepaintGuard();
+function renderSeats(seats) {
+  const tb = $('#seatTable tbody');
+  const sig = JSON.stringify(seats);
+  if (seatsGuard.skip(sig, tb)) return;
+  $('#seatCount').textContent = `${(seats ?? []).length} 个席位`;
+  tb.innerHTML = (seats ?? []).map(s => `
+    <tr class="${s.busy ? 'running' : ''}">
+      <td><span class="chip">${esc(s.sidShort ?? s.sessionId.slice(0, 8))}</span></td>
+      <td>${s.siteLabel ? `<span class="chip" title="${esc(s.site ?? '')}">${esc(s.siteLabel)}</span>` : `<span class="faint">${esc(s.site ?? '—')}</span>`}</td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(s.title || '')}">${esc(s.title || '')}</td>
+      <td><span class="state-${seatState(s).key}">${seatState(s).label}</span>${s.pending ? ` <span class="chip amber">队列 ${s.pending}</span>` : ''}</td>
+      <td>${s.soul ? `<span class="chip green">${esc(s.soul)}</span>` : '<span class="faint">未绑</span>'}</td>
+      <td>
+        <input type="text" value="${esc(s.soul ?? '')}" placeholder="灵魂 id" data-sid="${esc(s.sessionId)}" class="soul-in">
+        <button data-act="bind" data-sid="${esc(s.sessionId)}">绑定</button>
+        <button data-act="unbind" data-sid="${esc(s.sessionId)}">解绑</button>
+      </td>
+      <td>${s.isMain ? '<span class="badge">主Agent</span>' : `<button data-act="main" data-sid="${esc(s.sessionId)}">设主Agent</button>`}</td>
+    </tr>`).join('')
+    || `<tr><td colspan="7"><div class="empty">${ICO.empty}<br>没有在线席位——打开站点会话页并装好扩展。</div></td></tr>`;
+}
+
+$('#seatTable').addEventListener('click', async ev => {
+  const btn = ev.target.closest('button'); if (!btn) return;
+  const sid = btn.dataset.sid, act = btn.dataset.act;
+  if (act === 'bind') {
+    const soul = document.querySelector(`.soul-in[data-sid="${sid}"]`).value.trim();
+    const refuse = bindRefusal(soul);
+    if (refuse) { toast(refuse, true); return; } // 空灵魂拦下（旧版会当解绑误发——shared 判断层）
+    const r = await j('/seats/bind', { sessionId: sid, soul });
+    if (!r.ok) toast(r.error, true); else toast('已绑定');
+  } else if (act === 'unbind') {
+    const r = await j('/seats/bind', { sessionId: sid, soul: '' });
+    if (!r.ok) toast(r.error, true); else toast('已解绑');
+  } else if (act === 'main') {
+    await j('/seats/main', { sessionId: sid });
+    toast('已设为主Agent');
+  }
+  refresh();
+});
+
+async function refresh() {
+  const conn = $('#conn');
+  try {
+    const [st, seats] = await Promise.all([j('/state'), j('/seats')]);
+    conn.className = 'conn';
+    conn.innerHTML = '<span class="dot on"></span>本地服务已连接';
+    renderState(st); renderSeats(seats.seats);
+  } catch (e) {
+    conn.className = 'conn bad';
+    conn.innerHTML = '<span class="dot" style="background:var(--bad)"></span>本地服务不通';
+    $('#cards').innerHTML = `<div class="stat" style="grid-column:1/-1;justify-content:center;color:#f3b0b0">服务不通：${esc(e)} ——先启动 <code>node server/service.mjs</code></div>`;
+  }
+  refreshMirror();   // 镜窗钮随轮询对状态（服务/引擎不通时按钮灰着）
+}
+
+$('#answerMain').addEventListener('click', async () => {
+  try {
+    const r = await j('/answer', { kind: 'main', text: $('#mainText').value });
+    // 成败判据唯一活在 shared/human-seat-core.answerOutcome（与人类席同款）：
+    // posted=true 才算投递成功；拒收稿子留着改（此前拒收也清稿）。
+    const o = answerOutcome(r);
+    $('#mainMsg').textContent = o.message;
+    $('#mainMsg').className = o.ok ? 'msg ok' : 'msg err';
+    if (o.ok) $('#mainText').value = '';
+  }
+  catch (e) { $('#mainMsg').textContent = String(e); $('#mainMsg').className = 'msg err'; }
+  refresh();
+});
+// ── 人类席变量赋值（判断契约=shared/human-seat-core，与侧栏/投影中心同一套）──
+// waitingHuman.out_vars 非空才亮赋值钮；只收非空值；提交时结构化 variables
+// 随信 + 台词末尾按 FEMO脚本语言原样拼 SET VARIABLE 行（显示与文本解析双保险）。
+let humanVarsOpen = false;
+let humanVarsKey = '';   // 回合+变量清单键：变了才重建（打字草稿不被清）
+let humanDraft = {};     // 草稿值
+const humanVarBtn = $('#humanVarBtn');
+const humanVarsPanel = $('#humanVarsPanel');
+
+function renderHumanVarsPanel() {
+  const names = Object.keys(humanDraft);
+  if (!humanVarsOpen || !names.length) { humanVarsPanel.hidden = true; return; }
+  humanVarsPanel.hidden = false;
+  humanVarsPanel.innerHTML = names.map(n =>
+    `<div class="row" style="margin-top:6px"><span class="chip" style="min-width:90px;justify-content:center" title="${esc(n)}">${esc(n)}</span><input type="text" data-varname="${esc(n)}" value="${esc(humanDraft[n] ?? '')}" placeholder="留空=不赋值" style="flex:1"></div>`
+  ).join('') + '<div class="row"><button id="humanVarsConfirm" class="primary">确认赋值并发送</button><button id="humanVarsCancel">收起</button></div>';
+}
+
+/** 轮询喂进来：回合变了作废旧草稿；面板只在变化时重建，打字不被打断。 */
+function updateHumanSeat(hw) {
+  if (!hw) { humanVarBtn.hidden = true; humanVarsPanel.hidden = true; humanVarsOpen = false; return; }
+  const key = humanWaitKey(hw);
+  if (key !== humanVarsKey) {
+    humanVarsKey = key;
+    humanVarsOpen = false;
+    humanDraft = {};
+    for (const n of (hw.out_vars ?? [])) humanDraft[n] = '';
+    $('#humanText').value = '';
+  }
+  humanVarBtn.hidden = !hw.hasOutVars;
+  if (humanVarBtn.hidden) { humanVarsOpen = false; humanVarsPanel.hidden = true; }
+}
+
+humanVarBtn.addEventListener('click', () => { humanVarsOpen = !humanVarsOpen; renderHumanVarsPanel(); });
+humanVarsPanel.addEventListener('click', async ev => {
+  if (ev.target.id === 'humanVarsCancel') { humanVarsOpen = false; renderHumanVarsPanel(); return; }
+  if (ev.target.id !== 'humanVarsConfirm') return;
+  // DOM 只管读值，收拢判据（trim+滤空）唯一活在 shared 的 collectNonEmptyVars。
+  const raw = {};
+  humanVarsPanel.querySelectorAll('input[data-varname]').forEach(inp => {
+    const n = inp.getAttribute('data-varname') || '';
+    if (n) raw[n] = inp.value;
+  });
+  const vals = collectNonEmptyVars(raw);
+  submitHuman($('#humanText').value, vals);
+});
+
+async function submitHuman(textRaw, vars) {
+  const c = composeHumanSubmission(textRaw, vars ?? humanDraft);
+  if (c.error) { $('#humanMsg').textContent = c.error; $('#humanMsg').className = 'msg err'; return; }
+  try {
+    const r = await j('/answer', { kind: 'human', text: c.text, variables: c.variables });
+    // 成败判据唯一活在 shared/human-seat-core.answerOutcome：post_speech 小票
+    // posted=true 才算投递成功；拒收稿子留着改（此前只看 answered，拒收也
+    // 报成功并清稿——丢稿实案）。
+    const o = answerOutcome(r);
+    $('#humanMsg').textContent = o.message;
+    $('#humanMsg').className = o.ok ? 'msg ok' : 'msg err';
+    if (o.ok) { $('#humanText').value = ''; humanDraft = {}; humanVarsOpen = false; renderHumanVarsPanel(); }
+  } catch (e) { $('#humanMsg').textContent = String(e); $('#humanMsg').className = 'msg err'; }
+  refresh();
+}
+
+$('#answerHuman').addEventListener('click', () => submitHuman($('#humanText').value));
+
+$('#mount').addEventListener('click', async () => {
+  $('#toolOut').textContent = '挂载中…';
+  try { const r = await j('/tools/femo_mount', { script_path: $('#scriptPath').value.trim() }); $('#toolOut').textContent = JSON.stringify(r, null, 2); }
+  catch (e) { $('#toolOut').textContent = String(e); }
+});
+$('#run').addEventListener('click', async () => {
+  const action = $('#runAction').value;
+  const body = { action };
+  if ($('#jobId').value.trim()) body.job_id = Number($('#jobId').value.trim());
+  $('#toolOut').textContent = '执行中…';
+  // 运行/续跑前点名（暂停不用）：全在线直接放行；缺席行行自带凑齐指导。
+  // 续跑带 job_id——按该场冻结选角账对账（与派工 resolveSeat 同款优先级）。
+  if (action === 'fresh_start' || action === 'resume') {
+    try {
+      const at = await j('/seats/attendance', action === 'resume' && $('#jobId').value.trim() ? { job_id: Number($('#jobId').value.trim()) } : {});
+      const absent = offlineRollCall(at?.seats, at?.needed);
+      if (absent.length) { $('#toolOut').textContent = attendanceRefusal(absent, '运行'); return; }
+    } catch { /* 点名通道失败不拦运行——femo_run 自己会报 */ }
+  }
+  try { const r = await j('/tools/femo_run', body); $('#toolOut').textContent = JSON.stringify(r, null, 2); const jid = jobIdFromRunResult(r); if (jid) $('#jobId').value = jid; }
+  catch (e) { $('#toolOut').textContent = String(e); }
+  refresh();
+});
+
+// ── 本地服务卡：地址告知（2026-09-28 自侧栏搬入）───────────────────────────
+$('#svcAddr').textContent = location.origin;
+const tellExtBtn = $('#tellExt');
+if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
+  // 非本机地址打开（局域网 IP 等）：扩展清单的发信白名单只锁本机回环，通道
+  // 结构性不存在——如实说明，不装按钮可用。
+  tellExtBtn.disabled = true;
+  tellExtBtn.title = '通道只锁本机回环（127.0.0.1/localhost）';
+  $('#tellExtMsg').textContent = '非本机地址打开，扩展收不到告知。';
+} else {
+  tellExtBtn.addEventListener('click', async () => {
+    let ids = [];
+    try { ids = (await j('/extension/extid')).ids ?? []; } catch { ids = []; }
+    if (!ids.length) { toast('拿不到扩展 ID——manifest.json 的 key 字段读不到（不该发生，去报 bug）', true); return; }
+    // ID 已钉死恒一个；保留挨个敲门（数组）的形状，回错了不用改结构。
+    for (const id of ids) {
+      const r = await new Promise(resolve => {
+        try {
+          chrome.runtime.sendMessage(id, { type: 'web-set-server', url: location.origin }, resp => {
+            resolve(chrome.runtime.lastError ? null : resp);
+          });
+        } catch { resolve(null); }
+      });
+      if (r?.ok) { toast(`已告知扩展：以后连 ${location.origin}`); return; }
+    }
+    toast('告知失败：扩展没应答（扩展没装好或没重载？）', true);
+  });
+}
+
+// ── 本地服务卡：服务开关三钮（2026-09-30 自侧栏快捷卡收编，契约同侧栏旧件）──
+// 重启=退场即拉起（同端口回来，本页轮询自愈）；关闭=终态动作（退场不拉起，
+// ?daemon=1 请求引擎散场——引擎点名门铃簿，别家宿主在线会响亮拒绝）。拉起走
+// 扩展外部信口（web-launch-service：先探活、死才经 Native Messaging 叫醒），
+// 发信资格与「让扩展连到这里」同源：manifest 只放行本机回环。镜窗开关=设置
+// 中心代理（GET/POST /setting，专用头），引擎是唯一权威，不通按钮灰着。
+const svcMsg = $('#svcMsg');
+const restartBtn = $('#restartService');
+const stopBtn = $('#stopService');
+const mirrorBtn = $('#mirrorToggle');
+function svcNote(text, bad) { svcMsg.textContent = text; svcMsg.className = 'msg ' + (bad ? 'err' : 'ok'); }
+
+async function refreshMirror() {
+  try {
+    const r = await fetch('/setting', { signal: AbortSignal.timeout(3000) });
+    const s = await r.json();
+    if (!s?.ok) throw new Error(s?.error || '读不到');
+    if (s.muted) { mirrorBtn.disabled = true; mirrorBtn.textContent = '引擎镜窗（已被静音）'; return; }
+    mirrorBtn.disabled = false;
+    mirrorBtn.textContent = s.console_visible ? '隐藏引擎镜窗（显示中）' : '显示引擎镜窗（已隐藏）';
+    mirrorBtn.dataset.next = s.console_visible ? 'hide' : 'show';
+  } catch {
+    mirrorBtn.disabled = true;
+    mirrorBtn.textContent = '引擎镜窗（引擎不通）';
+  }
+}
+
+mirrorBtn.addEventListener('click', async () => {
+  if (mirrorBtn.disabled) return;
+  const next = mirrorBtn.dataset.next || 'show';
+  mirrorBtn.disabled = true;
+  try {
+    const r = await fetch('/setting', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-femo-setting': '1' },
+      body: JSON.stringify({ value: next }),
+      signal: AbortSignal.timeout(5000),
+    });
+    const s = await r.json();
+    if (!s?.ok) svcNote(`设置失败：${s?.error ?? '?'}`, true);
+    else toast(next === 'show' ? '引擎镜窗已显示' : '引擎镜窗已隐藏');
+  } catch { svcNote('设置失败：引擎不通', true); }
+  refreshMirror();
+});
+
+async function launchViaExt(extIds) {
+  if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage || !extIds.length) {
+    svcNote('拉不起服务：本页发不了扩展消息——请手动跑 start-service.cmd', true);
+    return;
+  }
+  for (const id of extIds) {
+    const r = await new Promise(resolve => {
+      try {
+        chrome.runtime.sendMessage(id, { type: 'web-launch-service' }, resp => {
+          resolve(chrome.runtime.lastError ? null : resp);
+        });
+      } catch { resolve(null); }
+    });
+    if (r?.ok) { svcNote(r.message || '本地服务已启动'); return; }
+  }
+  svcNote('拉起失败：扩展没应答（扩展没装好或没重载？）', true);
+}
+
+restartBtn.addEventListener('click', async () => {
+  if (restartBtn.disabled) return;
+  restartBtn.disabled = true;
+  restartBtn.textContent = '重启中…';
+  svcNote('正在重启本地服务…');
+  // 扩展 ID 先取（服务一关本页就没人应答了）：拉起要靠它敲门。
+  let extIds = [];
+  try { extIds = (await j('/extension/extid')).ids ?? []; } catch { extIds = []; }
+  // 退场半步（侧栏同款）：活着就请它优雅退场（专用头防路过网页误触），盯
+  // /health 到真断再拉，免得拉起侧探到还活着白跑。
+  try {
+    await fetch('/shutdown', { method: 'POST', headers: { 'x-femo-shutdown': '1' }, signal: AbortSignal.timeout(2000) });
+    const deadline = Date.now() + 4000;
+    while (Date.now() < deadline) {
+      try { await fetch('/health', { signal: AbortSignal.timeout(800) }); await new Promise(r => setTimeout(r, 200)); }
+      catch { break; }
+    }
+  } catch { /* 本来就没在跑，直接进拉起 */ }
+  await launchViaExt(extIds);
+  restartBtn.disabled = false;
+  restartBtn.textContent = '重启服务';
+  refresh();
+});
+
+stopBtn.addEventListener('click', async () => {
+  if (!confirm('关闭本地服务？\n· 在跑的演出会被诚实挂起（断点与信柜保留，回来可续跑）\n· 若引擎只服务本宿主，常驻引擎也会一并散场')) return;
+  if (stopBtn.disabled) return;
+  stopBtn.disabled = true;
+  stopBtn.textContent = '正在关闭…';
+  try {
+    await fetch('/shutdown?daemon=1', { method: 'POST', headers: { 'x-femo-shutdown': '1' }, signal: AbortSignal.timeout(2000) });
+  } catch { /* 服务可能已经不通了：目标一致 */ }
+  svcNote('本地服务已关闭（引擎若只服务本宿主也已散场）');
+  stopBtn.disabled = false;
+  stopBtn.textContent = '关闭服务';
+  refresh();
+});
+
+refresh();
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>

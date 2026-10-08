@@ -11,16 +11,22 @@ import { render } from './render.mjs';
 import { applyWaiting, applyInputResult, updateComposer } from './composer.mjs';
 import { dbgLocal, dbgAppend, dbgSetItems, dbgClearAll, dbgReconnectRefresh } from './debug-panel.mjs';
 import { startSessions, applySessionsPayload } from './sessions.mjs';
-import { subscribeCurrent, requestJobs, refreshViewsSoon, applyJobs, applyViews, updateJobMeta, loadChronicaView } from './panels.mjs';
+import { subscribeCurrent, requestJobs, requestRange, refreshViewsSoon, applyJobs, applyViews, updateJobMeta, loadChronicaView } from './panels.mjs';
 
 const elConn = document.getElementById('conn');
 const elConnText = document.getElementById('connText');
 // https 下必须 wss（tailscale serve 等反代场景），否则浏览器拦混合内容；
 // 没有主机名（异常直开）才落本机缺省口。
+// ?win=（2026-10-08 快照窗口化）：告诉 hub 本连接的快照只送头尾各 WIN_BYTES
+// 字节、中间省略（elided 元数据随快照回，render 画省略号+展开按钮）。桌面/
+// 手机一律窗口化（用户拍板「投影中心整个都这样显示」）——电脑只是网快，
+// 形态完全一致；不带参的旧连接 hub 仍回全量（零回归）。
+const WIN_BYTES = 1024 * 1024;
 const WS_URL = location.host
-  ? (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/'
-  : 'ws://127.0.0.1:8790/';
+  ? (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/?win=' + WIN_BYTES
+  : 'ws://127.0.0.1:8790/?win=' + WIN_BYTES;
 let backoff = 500;
+let elideSeq = 0;   // 省略段对账 token：每次快照 +1，rows-range 应答按它对号
 
 // ── 心跳看门狗（2026-10-03）：半死连接的页面侧探活 ─────────────────────────
 // 手机经 tailscale 反代直接看戏时，链路会「无声死掉」（息屏冻结、切网、中继
@@ -110,40 +116,68 @@ function applyTheme(t) {
   document.documentElement.dataset.theme = t;
   try { localStorage.setItem('pc-theme', t); } catch (e) {}
 }
-function initReload() {
-  const elReload = document.getElementById('pageReload');
-  if (elReload) elReload.addEventListener('click', () => location.reload());
-  // 底部刷新（2026-09-29 用户拍板）：同样整页 reload，但刷新后保持贴底跟随——
-  // 先把旗写进 sessionStorage（本标签页私有）再 reload，render 起步读旗置
-  // followBottom=true；旗用完即焚，顶部刷新仍归顶。
-  const elReloadBottom = document.getElementById('pageReloadBottom');
-  if (elReloadBottom) elReloadBottom.addEventListener('click', () => {
-    try { sessionStorage.setItem('pc-bottom-reload', '1'); } catch (e) {}
-    location.reload();
-  });
+// ── 一排按钮、两处出现（2026-10-05 用户拍板「页尾也显示一遍，复用不要重写，
+// 改的时候只改一处」）───────────────────────────────────────────────────
+// 行为只有一份：所有行内按钮带 data-act，下面的委托监听按 act 分发，顶/底
+// 通吃；HTML 只写顶栏一份，boot 时 mirrorRow() 整排深克隆进页尾（#tailbar）。
+// 上下唯一的分叉=刷新（用户点名「上下的刷新不一样，逻辑要加判断」）：按
+// data-pos 判——顶刷归顶；底刷先把贴底旗写进 sessionStorage（本标签页私有，
+// render 起步读旗置 followBottom=true）再 reload，旗用完即焚。
+function mirrorRow() {
+  const tail = document.getElementById('tailbar');
+  const topbar = document.querySelector('.topbar');
+  if (!tail || !topbar) return;
+  const src = topbar.querySelectorAll(
+    ':scope > .runctl, :scope > [data-act="theme"], :scope > [data-act="reload"], :scope > .dbg-wrap');
+  for (const n of src) {
+    const c = n.cloneNode(true);
+    c.removeAttribute('id');
+    c.querySelectorAll('[id]').forEach(x => x.removeAttribute('id'));
+    tail.appendChild(c);
+  }
+  tail.querySelectorAll('[data-act]').forEach(b => { b.dataset.pos = 'btm'; });
+  const rb = tail.querySelector('[data-act="reload"]');
+  if (rb) { rb.dataset.tip = '刷新 · 贴底'; rb.setAttribute('aria-label', '刷新 · 贴底'); }
 }
+function reloadPage(btn) {
+  if (btn.dataset.pos === 'btm') {
+    try { sessionStorage.setItem('pc-bottom-reload', '1'); } catch (e) {}
+  }
+  location.reload();
+}
+// 一份监听管两排（顶/底克隆都吃）：模块级委托，页尾镜像何时入住都不怕。
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.topbtn[data-act]');
+  if (!btn) return;
+  switch (btn.dataset.act) {
+    case 'start': showMountMenu(btn); break;
+    case 'resume': actResume(btn); break;
+    case 'stop': actStop(btn); break;
+    case 'theme': cycleTheme(); break;
+    case 'reload': reloadPage(btn); break;
+  }
+});
 function initTheme() {
   const qp = new URLSearchParams(location.search);
   let t = qp.get('theme') || '';
   if (!t) { try { t = localStorage.getItem('pc-theme') || ''; } catch (e) {} }
   if (!THEMES.some(x => x[0] === t)) t = document.documentElement.dataset.theme || 'porcelain';
   applyTheme(t);
-  // toggle 按钮：纯图标（2026-10-04 用户拍板「主题改成画板那个图标」顶栏全部
-  // 图标化）——主题名文字退场，按钮只留点亮语义：非缺省主题亮青。
-  const elBtn = document.getElementById('themeToggle');
-  const sync = () => {
-    const cur = document.documentElement.dataset.theme;
-    const lit = cur !== 'porcelain';   // 非缺省主题亮青（缺省=素瓷）
-    elBtn.classList.toggle('on', lit);
-    elBtn.setAttribute('aria-pressed', String(lit));
-  };
-  elBtn.addEventListener('click', () => {
-    const cur = document.documentElement.dataset.theme;
-    const i = Math.max(THEMES.findIndex(x => x[0] === cur), 0);
-    applyTheme(THEMES[(i + 1) % THEMES.length][0]);
-    sync();
+  syncThemeBtns();
+}
+// 主题钮点亮语义（2026-10-04 图标化拍板）：非缺省主题亮青——顶/底两颗同刷。
+function syncThemeBtns() {
+  const lit = document.documentElement.dataset.theme !== 'porcelain';   // 缺省=素瓷
+  document.querySelectorAll('[data-act="theme"]').forEach(b => {
+    b.classList.toggle('on', lit);
+    b.setAttribute('aria-pressed', String(lit));
   });
-  sync();
+}
+function cycleTheme() {
+  const cur = document.documentElement.dataset.theme;
+  const i = Math.max(THEMES.findIndex(x => x[0] === cur), 0);
+  applyTheme(THEMES[(i + 1) % THEMES.length][0]);
+  syncThemeBtns();
 }
 
 // ── 运行控制三钮（2026-10-04 用户拍板）：顶栏 开始/继续/停止（纯图标）──────
@@ -152,9 +186,16 @@ function initTheme() {
 //         不是"重开上一场"，而是从各 Host 挂载的剧本里挑一个开跑；清单来自
 //         hub GET /mounts=挂载共同账本 mounts.json 的只读面）→ 选中项走
 //         job_restart {script_path}（引擎读盘上现稿、班底按同名剧本沿袭）；
-//   继续  list_jobs 挑最近挂起的场 → get_job_state 取冻结的 script_text →
-//         job_resume（六关裁决，指纹对上冻结档）；
-//   停止  /engine/health 取 runners → 逐个 job_pause（挂起落断点，幂等可续）。
+//   继续  看「当前投影显示的这场」（快照帧落的 S.currentJobId）：在跑→当没按
+//         （连 flash 都不走）；没在跑（挂起/停过）→ get_job_state 取冻结的
+//         script_text → job_resume（六关裁决，指纹对上冻结档）。
+//         不再「挑最近挂起场」——那会在多场挂起时连环复活别的场（2026-10-04
+//         实案：想推正在看的场一把，连点三下把下午挂着的三场全捞醒，两场并行
+//         抢同一批网页演员）。
+//   停止  看「当前投影显示的这场」（S.currentJobId）：在跑→job_pause（挂起
+//         落断点，幂等可续）；没在跑（本来就挂着）→当没按（连 flash 都不走）。
+//         不再「全停 runners」——那会把显示的场之外的在跑场一起拖下水
+//         （与继续钮同一把尺：都只管你正看着的这一场）。
 // 反馈统一：按钮暂禁 + 结果进 print 浮层；无目标响亮留痕不假装成功。
 async function engineCmd(cmd, args) {
   const r = await fetch('/cmd/' + cmd, {
@@ -164,8 +205,8 @@ async function engineCmd(cmd, args) {
   if (!r || r.ok !== true) throw new Error((r && (r.error || r.detail)) || ('cmd ' + cmd + ' 失败'));
   return r.result;
 }
-async function flashBtn(id, done) {
-  const btn = document.getElementById(id);
+async function flashBtn(btnOrId, done) {
+  const btn = typeof btnOrId === 'string' ? document.getElementById(btnOrId) : btnOrId;
   if (!btn || btn.dataset.busy) return false;
   btn.dataset.busy = '1';
   btn.disabled = true;
@@ -223,7 +264,7 @@ async function showMountMenu(btn) {
     const b = e.target.closest('button.dd-item');
     if (!b) return;
     menu.remove();
-    await flashBtn('startBtn', async () => {
+    await flashBtn(btn, async () => {
       if (b.dataset.sp) {
         const r = await engineCmd('job_restart', { script_path: b.dataset.sp });
         dbgLocal('开始 → 从挂载开跑 j' + (r && r.job_id) + ' ← ' + b.dataset.sp.split(/[\\/]/).pop());
@@ -247,36 +288,41 @@ async function showMountMenu(btn) {
     document.addEventListener('keydown', close);
   }, 0);
 }
-function initRunCtl() {
-  const startBtn = document.getElementById('startBtn');
-  const resumeBtn = document.getElementById('resumeBtn');
-  const stopBtn = document.getElementById('stopBtn');
-  if (startBtn) startBtn.addEventListener('click', () => showMountMenu(startBtn));
-  if (resumeBtn) resumeBtn.addEventListener('click', () => flashBtn('resumeBtn', async () => {
-    const jobs = await engineCmd('list_jobs', {});
-    const suspended = (jobs.jobs || [])
-      .filter(j => j.state === 'suspended')
-      .sort((a, b) => b.job_id - a.job_id);
-    if (!suspended.length) { dbgLocal('继续：没有挂起的场（停止过才有断点）'); return; }
-    const target = suspended[0].job_id;
+// 继续=续「当前显示的这场」（2026-10-04 用户拍板）：当前场在跑→当没按
+// （判断在 flash 之前，按钮连禁用都不走）；没在跑才从断点续跑。
+async function actResume(btn) {
+  const target = S.currentJobId == null ? null : Number(S.currentJobId);
+  if (target == null) { dbgLocal('继续：当前没有对准的场次，不动作'); return; }
+  let runners = [];
+  try {
+    const h = await fetch('/engine/health').then(x => x.json());
+    runners = Array.isArray(h.runners) ? h.runners : [];
+  } catch (e) { dbgLocal('继续：引擎状态拉不到（' + (e && e.message ? e.message : e) + '）'); return; }
+  if (runners.map(Number).includes(target)) return;   // 在跑：当没按
+  await flashBtn(btn, async () => {
     const st = await engineCmd('get_job_state', { job_id: target });
     if (!st || !st.script_text) throw new Error('档案里没有剧本原文（j' + target + '），无法续跑');
     await engineCmd('job_resume', {
       femo: st.script_text, job_id: target, host_ai_backend: true,
     });
-    dbgLocal('继续 → j' + target + ' 从断点续跑');
-  }));
-  if (stopBtn) stopBtn.addEventListener('click', () => flashBtn('stopBtn', async () => {
+    dbgLocal('继续 → j' + target + '（当前显示场）从断点续跑');
+  });
+}
+// 停止=停「当前显示的这场」（2026-10-04 用户拍板）：当前场没在跑（本来就
+// 挂着）→当没按（判断在 flash 之前，按钮连禁用都不走）；在跑才挂起。
+async function actStop(btn) {
+  const target = S.currentJobId == null ? null : Number(S.currentJobId);
+  if (target == null) { dbgLocal('停止：当前没有对准的场次，不动作'); return; }
+  let runners = [];
+  try {
     const h = await fetch('/engine/health').then(x => x.json());
-    const runners = Array.isArray(h.runners) ? h.runners : [];
-    if (!runners.length) { dbgLocal('停止：没有在跑的场'); return; }
-    const out = [];
-    for (const jid of runners) {
-      try { const r = await engineCmd('job_pause', { job_id: jid }); out.push('j' + jid + (r && r.paused ? '✓' : '✗')); }
-      catch (e) { out.push('j' + jid + '✗'); }
-    }
-    dbgLocal('停止 → ' + out.join(' '));
-  }));
+    runners = Array.isArray(h.runners) ? h.runners : [];
+  } catch (e) { dbgLocal('停止：引擎状态拉不到（' + (e && e.message ? e.message : e) + '）'); return; }
+  if (!runners.map(Number).includes(target)) return;   // 本来就挂着：当没按
+  await flashBtn(btn, async () => {
+    const r = await engineCmd('job_pause', { job_id: target });
+    dbgLocal('停止 → j' + target + '（当前显示场）' + (r && r.paused ? '已挂起，断点保留' : '未挂起'));
+  });
 }
 
 function connect() {
@@ -318,6 +364,21 @@ function connect() {
       if (Array.isArray(j.hosts)) S.knownHosts = j.hosts.slice();
       S.waitingSeats = normWaiting(j.waiting);   // 快照捎带：刷新/切视角即刻接上等待席位
       S.rows = j.rows || [];
+      // 窗口化省略段（2026-10-08）：hub 只送了头尾时，把中间的账记下来——
+      // render 在分界画省略号+展开按钮，rows-range 增量按这份账对号入座。
+      S.elide = null;
+      if (j.elided && Array.isArray(j.rows) && j.rows.length) {
+        S.elide = {
+          job: j.job != null ? j.job : null,
+          sess: j.session || null,
+          headEnd: j.elided.head_end, tailStart: j.elided.tail_start,
+          headEnd0: j.elided.head_end, tailStart0: j.elided.tail_start,
+          rows: j.elided.rows || 0, bytes: j.elided.bytes || 0,
+          token: ++elideSeq, _busy: false,
+        };
+        dbgLocal('快照窗口化：中间省略 ' + S.elide.rows + ' 条（约 ' +
+                 Math.max(1, Math.round(S.elide.bytes / 1024)) + 'KB），点省略号两侧可展开');
+      }
       S.liveBlocks.clear();   // 换场/换视角：旧直播块一并清场
       for (const b of (j.live || []))   // 快照捎带的正在打的块：切过来即刻接上
         S.liveBlocks.set(b.key, { actor: b.actor, blockKind: b.blockKind, text: b.text, host: b.host });
@@ -345,6 +406,28 @@ function connect() {
       if (i >= 0) { S.rows.splice(i, 1); render(); }
       return;
     }
+    if (j.ctrl === 'rows-range') {   // 省略段展开到货（2026-10-08）：按 token 对号，头尾各归各位
+      if (!S.elide || j.tok !== S.elide.token || !Array.isArray(j.rows)) return;
+      S.elide._busy = false;
+      const rows = j.rows;
+      if (!rows.length) { if (j.met) S.elide = null; render(); return; }
+      S.elide.rows = Math.max(0, S.elide.rows - rows.length);   // 省略计数同步递减（块上文案跟着走）
+      if (j.dir === 'dn') {
+        const i = S.rows.findIndex(x => x.n === S.elide.headEnd);
+        if (i < 0) { S.elide = null; render(); return; }   // 账已换（理论不可达）：摘省略号靠快照重同步
+        S.rows.splice(i + 1, 0, ...rows);
+        S.elide.headEnd = rows[rows.length - 1].n;   // 升序块的末行=新的头边界
+      } else {
+        const k = S.rows.findIndex(x => x.n === S.elide.tailStart);
+        if (k < 0) { S.elide = null; render(); return; }
+        S.rows.splice(k, 0, ...rows.slice().reverse());   // up 块到货是倒序：转正序插入才贴合时间轨
+        S.elide.tailStart = rows[rows.length - 1].n;   // 倒序块的末行=最低行号=新的尾边界（记错会插重）
+      }
+      S.elide.bytes = 0;   // 展开过就不再报字节数（页面侧无法精确记账，宁少说不少说错）
+      if (j.met) S.elide = null;   // 中间取空：头尾接上了，省略号退休
+      render();
+      return;
+    }
     if (j.ctrl === 'waiting') { applyWaiting(normWaiting(j.waiting)); return; }
     if (j.ctrl === 'human-input-result') { applyInputResult(j); return; }
     if (j.ctrl === 'print') { dbgAppend(j); return; }          // print 旁路（调试浮层）
@@ -362,11 +445,16 @@ function connect() {
 function retry() { setTimeout(connect, backoff); backoff = Math.min(backoff * 2, 5000); }
 
 // ── boot：全页唯一的「触发」集中地（拆分纪律：模块顶层只准定义与注册）────
-initReload();
+mirrorRow();   // 先镜像后初始化：主题点亮等按类全场刷的逻辑才罩得住页尾克隆
 initTheme();
-initRunCtl();
 initHeartbeat();
 startSessions();
+// 省略段展开按钮（2026-10-08 窗口化）：头侧按钮向下加一块、尾侧按钮向上加
+// 一块，各 1MB（连接预算）；中间没货了 hub 回 met，省略号自动退休。
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('.elide-btn');
+  if (b) requestRange(b.getAttribute('data-elide') === 'up' ? 'up' : 'dn');
+});
 // URL 带整场视角（分享/刷新）：直接拉整场快照（不走 WS 订阅）；hub 不可达
 // 时 dbgLocal 留痕，重连后不自动重试（刷新即重试）。
 if (S.currentView && String(S.currentView).indexOf('chronica:') === 0)

@@ -118,7 +118,7 @@ export function handleProjectionWindows(deps: ProjectionRoutesDeps, req: Incomin
       // 项还在（数据源 /actors 有花名册回退）但点下去解析不到
       // 投影窗 id，只剩 CSS 过滤分支——用户看到「菜单列着窗口、内容完全
       // 不变」。现在先按官方路径把主会话拉活（ensureSessionLive：
-      // agents.resume + 挂 FEMO_PRESET，run/pause 同款兜底），拉活后 cwd
+      // agents.resume，run/pause 同款兜底；2026-10-07 去预设后不再补挂预设），拉活后 cwd
       // 与子代理目录齐备，ensure 才有落点。
       let main = sessionsStore?.get(SessionId(sessionId))
       if (main === undefined) {

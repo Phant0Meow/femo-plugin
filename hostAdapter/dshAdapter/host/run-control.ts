@@ -16,7 +16,6 @@ import { join } from 'node:path'
 import type { FemoBridge } from './bridge'
 import type { ResolvedConfig } from './config'
 import { readBody, writeJson, broadcastSse, type SaveScriptBody } from './http'
-import { FEMO_PRESET, presetOf, injectFemoRoot, femoRootSections } from './persona'
 import { abortAllSubagents } from '../../../femo2host/host/subagent-core.mjs'
 import { dataRootOf } from '../../../femo2host/femoRoot.mjs'   // 数据根单源（含 FEMO_DATA_DIR 分支）
 import { pushDiag } from './diag/diag-feed'
@@ -195,13 +194,14 @@ export async function startJobOnSession(
         throw new Error(`job_start 回执缺 job_id: ${JSON.stringify(res)}`)
       }
       // 编译期警告上浮（2026-09-07 warning 桶）：编译放行但作者应知情。
-      // SSE compile_warnings 事件专供 femoGen 调试窗等前端面板（聊天广播到不了
-      // 调试窗——它只吃引擎事件流）；信封带 sid 供前端按会话过滤。
+      // 【已退役-观察期（2026-10-05 画布直连刀1.5）】SSE compile_warnings 合成
+      // 广播退役——引擎装配段同拍产信（femo_bridge _post_compile_warnings 直发
+      // 事件通道，经通用事件路径盖章 sid 到达画布），宿主合成成了第二份（过渡
+      // 期画布收双份）。观察无误后连块删除；聊天窗逐条广播与主模型滞留件不动。
       const compileWarnings = Array.isArray(res?.warnings) ? res.warnings : []
       startedWarnings = compileWarnings
       if (compileWarnings.length > 0) {
-        console.log(`[femo-plugin] job_start warnings: ${compileWarnings.length} item(s)`)
-        broadcastSse('compile_warnings', { sid, job_id: newJobId, warnings: compileWarnings })
+        console.log(`[femo-plugin] job_start warnings: ${compileWarnings.length} item(s)（SSE 合成广播已退役，引擎事件单源）`)
       }
       await setSessionCurrentJob(resolved.femoRoot, sid, newJobId)
       await appendSessionJob(resolved.femoRoot, sid, newJobId)
@@ -261,11 +261,12 @@ export async function startJobOnSession(
         host_refs: { [hostAddr()]: sid },
       }, 30_000) as { resumed?: boolean; warnings?: Array<{ where?: string; message?: string }> } | undefined
       // 编译期警告上浮（2026-09-07 warning 桶，同 fresh 分支）。
+      // 【已退役-观察期（2026-10-05 画布直连刀1.5）】SSE 合成广播退役，单源
+      // =引擎事件通道（同 job_start 分支注释）。
       const resumeWarnings = Array.isArray(res?.warnings) ? res.warnings : []
       startedWarnings = resumeWarnings
       if (resumeWarnings.length > 0) {
-        console.log(`[femo-plugin] job_resume warnings: ${resumeWarnings.length} item(s)`)
-        broadcastSse('compile_warnings', { sid, job_id: targetJobId, warnings: resumeWarnings })
+        console.log(`[femo-plugin] job_resume warnings: ${resumeWarnings.length} item(s)（SSE 合成广播已退役，引擎事件单源）`)
       }
       // mark_running 已由引擎完成；宿主收口：currentJobId 指向本 Job（续旧
       // Job 时会把它提为当前——femoGen 的暂停/继续按钮跟随）、jobIds 幂等登记
@@ -450,9 +451,9 @@ export async function handleReadScript(req: IncomingMessage, res: ServerResponse
 /** 【原生 0.1.3+ 兜底】store 未命中时把持久化会话拉活。0.1.3 的侧边栏打开
  *  不进内存 store（历史走持久化句柄直读），run/pause/resume 的 store 查找会
  *  未命中；meow fork 上打开即进 store，此兜底永不触发。走官方 agents.resume
- *  （与 web 打开会话同一路径），setup 挂 FEMO_PRESET（与 create-session 同款），
- *  主Agent人设与 femo:root 在拉活后仍在。返回 store 里的活会话；失败返回
- *  undefined（调用方维持原 404 行为）。
+ *  （与 web 打开会话同一路径）。【2026-10-07 去预设】不再挂预设、不再补注入
+ *  femo:root 段——教条经全局 skill 供给、根路径段是全局的，拉活即具备。
+ *  返回 store 里的活会话；失败返回 undefined（调用方维持原 404 行为）。
  *  【2026-09-11 导出】投影窗路径也要用它：宿主重启后主会话不在 store ⇒
  *  子代理目录/描述符都不在 ⇒ 客户端 openSubagent 必被拒（descriptor
  *  unavailable）、投影窗输入 404（用户实测「刷新后窗口不存在/菜单切不过去」）。
@@ -501,18 +502,10 @@ export async function ensureSessionLive(
     await agents.resume({
       resumeSessionId: sessionId,
       ...(agentOptions !== undefined ? { agentOptions } : {}),
-      setup: async (agentCtx: Context): Promise<void> => {
-        const presets = agentCtx.get('agentPresets') as { mount?(agentCtx: Context, id: string): Promise<unknown> } | undefined
-        if (presets?.mount !== undefined) {
-          try {
-            await presets.mount(agentCtx, FEMO_PRESET)
-            const dispose = injectFemoRoot(agentCtx)
-            if (dispose !== undefined) femoRootSections.set(String(sessionId), dispose)
-          } catch (error: unknown) {
-            console.log(`[femo-plugin] preset mount failed: ${String(error)}`)
-          }
-        }
-      },
+      // 【2026-10-07 去预设】不再挂任何预设：教条（skill）与根路径段（femo:root）
+      // 都是全局供给（femo-skill.ts），与「这个会话选了哪个模式」无关——所以
+      // 冷装载会话不再需要 setup 回调补挂预设。原回调还负责给新拉活的会话补
+      // femo:root 段，现在那段是全局的，一并免了。
     })
   } catch (error: unknown) {
     console.log(`[femo-run-diag ${diagTs()}] ${tag} agents.resume FAILED: ${String(error instanceof Error ? error.message : error).slice(0, 200)}`)
@@ -566,8 +559,8 @@ export async function handleRunOnSession(
     // 【原生 0.1.3+ 兜底】0.1.3 起侧边栏打开会话不再进内存 store（历史改走
     // 持久化句柄直读），run 的 store 查找会未命中 → femoGen 点运行"没反应"
     // （2026-09-08 实测）。meow fork 上打开即进 store，此兜底永不触发。
-    // 走官方 agents.resume 把持久化会话拉活（与 web 打开会话同一路径），
-    // setup 挂 FEMO_PRESET（与 create-session 同款），主Agent人设/femo:root 不丢。
+    // 走官方 agents.resume 把持久化会话拉活（与 web 打开会话同一路径）。
+    // 【2026-10-07 去预设】不再补挂预设/补注入根路径段：教条与根路径都是全局供给。
     session = await ensureSessionLive(ctx, sessionId, tag, sessionsStore)
   }
   if (session === undefined) {
@@ -575,10 +568,8 @@ export async function handleRunOnSession(
     writeJson(res, 404, { ok: false, error: `session ${sessionId} not found` })
     return
   }
-  // 【2026-09-19 取消限制】非 FEMO 会话也可启动运行——只留一条信息化日志备查。
-  if (presetOf(session) !== FEMO_PRESET) {
-    console.log(`[femo-run-diag ${diagTs()}] ${tag} NOTE (non-femo preset='${presetOf(session) ?? '-'}' allowed to run)`)
-  }
+  // 【2026-09-19 取消限制】任何会话都能启动运行；【2026-10-07 去预设】这里连
+  // 信息日志都不再需要——「是不是 FEMO 会话」已不决定能不能跑，只影响名册/门卫。
   // GUARD（§8.2 镜像读）：引擎有活跃 Job 即 409，文案带活跃 Job 归属
   // （信息化——跨会话语义：可先暂停或等它挂起）。
   try {
@@ -665,24 +656,11 @@ export async function handleCreateSession(
       sessionId: id,
       meta: {
         cwd,
-        agentPreset: FEMO_PRESET,
+        // 【2026-10-07 去预设】不再标 agentPreset：本插件没有预设了，新会话就是
+        // 普通会话（身份由 host-history 账本判定，见 femoIdentity）；教条经全局
+        // skill 供给、工具全局注册，所以子代理也不必再「加入母会话的预设」。
       },
       ...agentOptions !== undefined ? { agentOptions } : {},
-      // Mount the preset composition (persona + tools) so subagents spawned
-      // under this session join it — without this the child sees no preset
-      // tools and no persona (the RPC create path does this in its setup).
-      setup: async (agentCtx: Context): Promise<void> => {
-        const presets = ctx.get('agentPresets') as { mount?(agentCtx: Context, id: string): Promise<unknown> } | undefined
-        if (presets?.mount === undefined) return
-        try {
-          await presets.mount(agentCtx, FEMO_PRESET)
-          // 注入插件根目录（插件自包含布局，路径随插件位置变化——动态算）。
-          const dispose = injectFemoRoot(agentCtx)
-          if (dispose !== undefined) femoRootSections.set(String(id), dispose)
-        } catch (error: unknown) {
-          console.log(`[femo-plugin] preset mount failed: ${String(error)}`)
-        }
-      },
     })
     console.log(`[femo-plugin] created femo session ${handle.agent.id} (cwd=${cwd})`)
     const femo = typeof body.femo === 'string' && body.femo.trim().length > 0 ? body.femo : undefined

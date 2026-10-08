@@ -1,0 +1,13 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "process", "command": "node", "args": ["${ZCODE_PLUGIN_ROOT}/hooks/mail-context.mjs"], "timeoutMs": 4000, "statusMessage": "femo: 戏中上下文拼装" }] }
+    ],
+    "Stop": [
+      { "hooks": [{ "type": "process", "command": "node", "args": ["${ZCODE_PLUGIN_ROOT}/hooks/stop-intent.mjs"], "timeoutMs": 4000, "statusMessage": "femo: 检查信箱" }] }
+    ],
+    "PostToolUse": [
+      { "hooks": [{ "type": "process", "command": "node", "args": ["${ZCODE_PLUGIN_ROOT}/hooks/turn-collect.mjs"], "timeoutMs": 4000, "statusMessage": "femo: 回合内收集" }] }
+    ]
+  }
+}

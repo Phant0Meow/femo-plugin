@@ -17,6 +17,7 @@ import {
   readSessionScriptText, readSessionCurrentJob,
 } from './state-files'
 import { assertRunAllowed, startJobOnSession, collectLlmModels, pauseJobResolved } from './run-control'
+import { isFemoMainAgent } from './femoIdentity'   // 身份轴（2026-10-07 去预设后唯一尺子）
 import { rememberFemoFile } from './femo-files'
 import { collectDebugRun } from './debug-run'
 import type { DebugRunCollect } from './debug-run'
@@ -199,10 +200,11 @@ export function createFemoToolDeps(deps: {
       const result = await bridge.send('list_jobs', {}, 15000) as { jobs?: Array<{ job_id: number; state: string; reason: string; waiting_human: boolean; femo_session_id: number | null; host_ref: string; host_refs: Record<string, string>; script_name: string; created_at: string; updated_at: string; has_breakpoint: boolean }> } | undefined
       return result?.jobs ?? []
     },
-    // 【2026-09-19 取消限制】femo 工具的调用者校验放宽为「主会话本体」：
-    // 非 FEMO 会话的主模型也能 mount/run 自己的脚本；角色子代理
-    // （parentSession 在场）仍被拒——工具面的角色噪音过滤不放松。
-    isFemoMainSession: (agent) => agent.session.header.parentSession === undefined,
+    // 【2026-10-07 去预设换轴】工具的调用者校验＝**本会话就是 FEMO 会话**
+    // （身份轴 femoIdentity：权威判据=有戏有账，挂过脚本/跑过 Job；旧预设标记
+    //  只作 legacy 命中）。角色子代理（parentSession 在场）仍被拒——工具面的
+    // 角色噪音过滤不放松（作者铁律）。
+    isFemoMainSession: (agent) => isFemoMainAgent(agent),
     // ── 附身工具（femo_possess，2026-09-25 接总纲收编版）──────────────────
     // 执行体在总纲（tools-core createBridgeToolImpls），dsh 只注入 IO 三件：
     // 桥命令直通、引擎根、运行态（本会话有 running Job=启动运行锁冻结绑定）。

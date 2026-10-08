@@ -6,7 +6,7 @@ import time
 # 发言节奏参数（秒）：等待区间 [WAIT_MIN, WAIT_MAX] 与偏斜强度 WAIT_SKEW。
 # WAIT_SKEW 越大，样本越往最短处挤：3 ≈ 约四分之三落在 60~120 秒，
 # 剩下的越接近 300 秒越稀，拖成低概率长尾——像真人偶尔冷场。
-WAIT_MIN = 60.0
+WAIT_MIN = 100.0
 WAIT_MAX = 300.0
 WAIT_SKEW = 3.0
 

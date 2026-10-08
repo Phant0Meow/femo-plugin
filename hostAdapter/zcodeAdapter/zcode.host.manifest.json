@@ -1,0 +1,6 @@
+{
+  "$comment": "宿主能力清单（A2.1 解耦）：femoCompiler/host_manifest.py 在桥启动时读取。zcode 适配侧版本——经桥的 --host-manifest 参数指入（仓库根 host.manifest.json 归 dsh 侧，两互不干扰）。thinking_levels 暂缺省：ZCode 的 thoughtLevel 词汇未从源码确证，缺字段时引擎用内置缺省（standalone 自圆满）；确证后补。",
+  "host": "zcode",
+  "default_user_id": "u001",
+  "god_window": true
+}

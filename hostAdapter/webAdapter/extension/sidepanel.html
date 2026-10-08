@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>FEMO 灵魂</title>
+  <style>
+    /* ───────────────────────── 设计基调：深色 · 玻璃 · 绿为主紫为辅 ───────────────────────── */
+    :root {
+      color-scheme: dark;
+      --bg: #0c0f12;
+      --card: rgba(255, 255, 255, 0.045);
+      --card-hover: rgba(255, 255, 255, 0.075);
+      --line: rgba(255, 255, 255, 0.09);
+      --line-strong: rgba(255, 255, 255, 0.16);
+      --text: #e9eef0;
+      --muted: #8b96a0;
+      --faint: #5d6870;
+      --green: #6fbf3a;
+      --green-bright: #8fdd55;
+      --green-grad: linear-gradient(135deg, #8fdd55 0%, #57b33a 100%);
+      --purple: #a06bff;
+      --ok: #34d399;
+      --busy: #fbbf24;
+      --off: #454f52;
+      --bad: #f87171;
+      --radius: 14px;
+      --radius-sm: 9px;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      font-size: 13px;
+    }
+    /* 生僻字补字字体（character_need）：数据内嵌 @font-face + 链首逐字回退——
+       与 femoGen/src/themes.js 的 FONT_FACE_CSS 同源同口径（重生成方法见该处注释）。 */
+    @font-face {
+      font-family: 'MyCustomFont';
+      src: url('data:font/truetype;charset=utf-8;base64,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') format('truetype');
+      font-display: swap;
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      display: flex;
+      flex-direction: column;
+      background:
+        radial-gradient(1100px 460px at 88% -12%, rgba(111, 191, 58, 0.14), transparent 60%),
+        radial-gradient(850px 400px at -18% 112%, rgba(160, 107, 255, 0.10), transparent 55%),
+        var(--bg);
+      color: var(--text);
+      font: 13px/1.65 'MyCustomFont', system-ui, "Segoe UI", "Microsoft YaHei", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    /* 隐藏滚动条（2026-09-26 用户拍板）：滚动能力保留，视觉不再画条。
+       两条路都要：scrollbar-width 给标准属性，::-webkit-scrollbar 给 Chromium。 */
+    * { scrollbar-width: none; }
+    *::-webkit-scrollbar { display: none; width: 0; height: 0; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.14); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.24); background-clip: content-box; }
+    ::selection { background: rgba(111, 191, 58, 0.35); }
+
+    /* ── 顶栏 ── */
+    header {
+      padding: 13px 14px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .logo { width: 34px; height: 34px; flex: none; display: grid; place-items: center; }
+    .logo svg { width: 100%; height: 100%; filter: drop-shadow(0 2px 8px rgba(111, 191, 58, 0.4)); }
+    .brand-name { font-weight: 700; font-size: 14px; letter-spacing: 0.4px; }
+    .brand-sub { font-size: 10.5px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; }
+    .conn {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; color: var(--muted);
+      border: 1px solid var(--line);
+      background: var(--card);
+      padding: 4px 10px 4px 8px;
+      border-radius: 999px;
+      max-width: 46%;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .conn .dot { margin: 0; }
+    .conn.bad { color: #f3a6a6; border-color: rgba(248, 113, 113, 0.35); background: rgba(248, 113, 113, 0.08); }
+
+    /* ── 状态点 ── */
+    .dot {
+      display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+      background: var(--off); flex: none; position: relative;
+      cursor: pointer; /* 点状态点=立即重连（重新探活+补注入），离线灰点是主用例 */
+    }
+    .dot.on { background: var(--green-bright); }
+    .dot.on::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 1px solid var(--green-bright); opacity: .5; animation: pulse 2s ease-out infinite; }
+    /* 运行中=亮绿呼吸点（2026-10-02 用户拍板：与投影页翡翠主题同批翻案，琥珀退役
+       ——翡翠主题就是本侧栏的同主题，两边 UI 要一致；绿点+绿圈脉冲） */
+    .dot.busy { background: var(--green-bright); }
+    .dot.busy::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 1px solid var(--green-bright); opacity: .5; animation: pulse 1.2s ease-out infinite; }
+    /* 休眠（2026-10-01 按需唤醒）：页开着但被浏览器冻结——中灰（2026-10-02 用户
+       拍板：原暗琥珀与「运行中」撞色，改灰；比「网页未打开」的深灰点亮一档，
+       两档灰不混淆）；轮到它发言会自动唤醒，点它照样可以强制重探。 */
+    .dot.dormant { background: var(--muted); }
+    @keyframes pulse { from { transform: scale(.6); opacity: .7; } to { transform: scale(1.6); opacity: 0; } }
+
+    /* ── 标签（分段控件） ── */
+    .tabs {
+      margin: 0 14px 10px;
+      display: flex; gap: 4px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 3px;
+    }
+    .tab {
+      flex: 1;
+      padding: 6px 0;
+      border: none; background: transparent; border-radius: 8px;
+      color: var(--muted); font-size: 12.5px; font-weight: 600;
+      cursor: pointer;
+      transition: all .18s ease;
+      font-family: inherit;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active {
+      background: var(--green-grad);
+      color: #0d1a08;
+      box-shadow: 0 2px 10px rgba(111, 191, 58, 0.35);
+    }
+
+    main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+    /* ── 灵魂面板 ── */
+    #seatPanel { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; padding: 0 14px 14px; }
+    #seats { display: flex; flex-direction: column; gap: 8px; }
+
+    .seat {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 11px 12px;
+      transition: border-color .15s ease, background .15s ease;
+    }
+    .seat:hover { background: var(--card-hover); border-color: var(--line-strong); }
+    /* 运行中卡=亮绿细框+呼吸灯盒影（2026-10-02 用户拍板：与投影页翡翠 .section.open
+       同值同节奏——当年投影页琥珀值照抄自本卡，如今本卡反过来向投影页对齐；
+       呼吸=边缘光晕 2.4s 一起一伏，两边同一只表） */
+    .seat.running {
+      border-color: rgba(143, 221, 85, 0.5);
+      background: linear-gradient(180deg, rgba(111, 191, 58, 0.05), rgba(255, 255, 255, 0.03));
+      animation: seat-breath 2.4s ease-in-out infinite;
+    }
+    @keyframes seat-breath {
+      0%, 100% { box-shadow: 0 0 0 1px rgba(143, 221, 85, 0.22), 0 0 6px rgba(111, 191, 58, 0.14); }
+      50%      { box-shadow: 0 0 0 1px rgba(143, 221, 85, 0.6), 0 0 18px rgba(111, 191, 58, 0.42); }
+    }
+    .seat-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .seat-title { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+    .badge {
+      flex: none; font-size: 10px; font-weight: 700; letter-spacing: .5px;
+      border-radius: 6px; padding: 1.5px 7px;
+    }
+    .badge.main { background: var(--green-grad); color: #0d1a08; box-shadow: 0 2px 8px rgba(111, 191, 58, 0.35); }
+    .seat-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 5px; font-size: 11.5px; color: var(--muted); }
+    .chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--line);
+      border-radius: 6px; padding: 0.5px 7px;
+      font-family: 'MyCustomFont', ui-monospace, Consolas, monospace; font-size: 10.5px;
+      color: var(--muted);
+    }
+    .chip.soul { color: var(--green-bright); border-color: rgba(111, 191, 58, 0.4); background: rgba(111, 191, 58, 0.09); }
+    /* 状态字（2026-09-30 用户拍板）：纯色字不带底——页上绿底实件已经够多，再加就
+       花了。在线=亮绿字，网页未打开=灰红字，休眠中=中灰字（2026-10-01 按需唤醒
+       加的第四态；2026-10-02 用户拍板改灰）。运行中原琥珀字，2026-10-02 用户拍板
+       随「运行中改绿」改亮绿字（与投影页翡翠主题一致；与在线同色、靠字重分档，
+       卡框呼吸+绿点是运行中的主辨识面）。label 唯一活在 shared/seats-core.seatState。 */
+    .state-run { color: var(--green-bright); font-weight: 600; }
+    .state-on { color: var(--green-bright); font-weight: 700; }
+    .state-off { color: #cf8b8b; font-weight: 600; }
+    .state-dormant { color: var(--muted); font-weight: 600; }
+
+    .seat-actions { display: flex; gap: 6px; margin-top: 9px; align-items: center; }
+    input[type=text] {
+      display: block; width: 100%; height: 32px;   /* 与按钮统一高度（2026-09-26 用户拍板） */
+      background: rgba(0, 0, 0, 0.28);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font: inherit;
+      padding: 0 9px;                              /* 高度锁 32px，垂直居中交给 line-height */
+      outline: none;
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+    textarea {
+      display: block; width: 100%;
+      background: rgba(0, 0, 0, 0.28);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font: inherit;
+      padding: 6px 9px;
+      outline: none;
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+    input[type=text]:focus, textarea:focus {
+      border-color: var(--green);
+      box-shadow: 0 0 0 3px rgba(111, 191, 58, 0.16);
+    }
+    input::placeholder, textarea::placeholder { color: var(--faint); }
+    .soul-input { flex: 1; min-width: 0; width: auto; display: inline-block; font-family: 'MyCustomFont', ui-monospace, Consolas, monospace; }
+
+    button {
+      cursor: pointer; font-family: inherit;
+      border: 1px solid var(--line-strong);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      border-radius: var(--radius-sm);
+      height: 32px; padding: 0 14px;  /* 与输入框统一高度 32px（2026-09-26 用户拍板） */
+      font-size: 12.5px; font-weight: 600;
+      transition: all .15s ease;
+      flex: none;
+    }
+    button:hover { background: rgba(255, 255, 255, 0.12); border-color: var(--line-strong); }
+    button:active { transform: scale(0.96); }
+    button.primary {
+      background: var(--green-grad); border: none; color: #0d1a08;
+      box-shadow: 0 3px 12px rgba(111, 191, 58, 0.3);
+    }
+    button.primary:hover { filter: brightness(1.08); }
+    button.ghost { border-color: transparent; background: transparent; color: var(--muted); }
+    button.ghost:hover { color: var(--text); background: rgba(255, 255, 255, 0.07); }
+    button.danger { color: var(--bad); border-color: rgba(248, 113, 113, 0.35); }
+    button.danger:hover { background: rgba(248, 113, 113, 0.12); border-color: rgba(248, 113, 113, 0.6); }
+    button.danger:disabled { opacity: .55; cursor: default; transform: none; }
+
+    /* ── 卡片（手动发消息 / 设置 / 收话） ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 12px;
+      margin-top: 10px;
+    }
+    .card-title {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 11.5px; font-weight: 700; letter-spacing: 1px;
+      color: var(--muted); text-transform: uppercase;
+      margin-bottom: 9px;
+    }
+    .card-title svg { width: 13px; height: 13px; opacity: .8; flex: none; }
+    .card-note {
+      font-size: 10.5px; color: var(--faint);
+      letter-spacing: 0; text-transform: none; font-weight: 400;
+      margin: -5px 0 9px 20px;
+    }
+
+    #sendbox textarea { margin-top: 7px; min-height: 64px; resize: vertical; }
+    .send-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+    #sendResult { font-size: 11.5px; color: var(--muted); min-height: 1em; }
+    #sendResult.ok { color: var(--ok); }
+    #sendResult.err { color: var(--bad); }
+    /* 手动发消息的目标选择：下拉列出全部席位（站点·短id·标题·灵魂），
+       自动预选当前会话——样式与输入框同族 */
+    #target {
+      display: block; width: 100%; height: 32px; margin-bottom: 7px;
+      background: rgba(0, 0, 0, 0.28);
+      border: 1px solid var(--line); border-radius: var(--radius-sm);
+      color: var(--text); font: inherit; padding: 0 8px; outline: none;
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+    #target:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(111, 191, 58, 0.16); }
+    #target option { background: #14181c; color: var(--text); }
+
+    .quick-row { display: flex; gap: 6px; align-items: center; }
+    .quick-row button { flex: 1; }   /* 三颗常用动作均分一行（2026-09-28 快捷卡） */
+
+    /* ── 收话回显 ── */
+    .reply {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      margin-bottom: 7px;
+      background: rgba(0, 0, 0, 0.18);
+    }
+    .reply:last-child { margin-bottom: 0; }
+    .reply-meta { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--faint); margin-bottom: 4px; }
+    .reply-meta .writing { color: #50fa7b; font-weight: 600; animation: writing-pulse 1.2s ease-in-out infinite; }
+    @keyframes writing-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+    .reply-text { white-space: pre-wrap; word-break: break-word; font-size: 12.5px; max-height: 140px; overflow-y: auto; }
+    details.cot { margin-top: 5px; }
+    details.cot summary {
+      cursor: pointer; list-style: none;
+      font-size: 10.5px; color: var(--purple); letter-spacing: .5px;
+      display: flex; align-items: center; gap: 5px;
+      user-select: none;
+    }
+    details.cot summary::-webkit-details-marker { display: none; }
+    details.cot summary::before { content: "▸"; transition: transform .15s ease; font-size: 9px; }
+    details.cot[open] summary::before { transform: rotate(90deg); }
+    details.cot summary:hover { color: #bd93ff; }
+    .cot-body {
+      margin-top: 5px; padding: 6px 8px;
+      border-left: 2px solid rgba(160, 107, 255, 0.35);
+      font-size: 11.5px; color: var(--muted);
+      white-space: pre-wrap; word-break: break-word;
+      max-height: 90px; overflow-y: auto;
+    }
+
+    /* ── 空态 ── */
+    .empty {
+      text-align: center;
+      padding: 26px 18px;
+      color: var(--faint);
+      font-size: 12px; line-height: 1.8;
+    }
+    .empty svg { width: 40px; height: 40px; margin-bottom: 8px; opacity: .45; }
+
+    /* ── 品牌头只在灵魂标签显示 ── */
+    header.only-seats[hidden] { display: none !important; }
+
+    /* ── 投影中心标签 ── */
+    #debugPanel { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; padding: 0 14px 14px; }   /* 与灵魂标签同款留白（2026-09-26 用户拍板：ui 统一） */
+    #projPanel { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    #projPanel[hidden] { display: none; }
+    #projFrame {
+      flex: 1; width: 100%;
+      border: none;
+      border-radius: 0;
+      background: #fff;
+    }
+
+    /* ── 顶栏刷新按钮（只负责刷新投影中心） ── */
+    .icon-btn {
+      width: 32px; height: 32px; padding: 0;
+      display: grid; place-items: center;
+      border-radius: 9px;
+    }
+    .icon-btn svg { width: 15px; height: 15px; }
+
+    /* ── 断连横幅 ── */
+    .down {
+      margin: 4px 0 2px;
+      border: 1px solid rgba(248, 113, 113, 0.3);
+      background: rgba(248, 113, 113, 0.07);
+      border-radius: var(--radius);
+      padding: 14px;
+      text-align: center; color: #f3b0b0; font-size: 12px; line-height: 1.9;
+    }
+    .down code {
+      background: rgba(0, 0, 0, 0.3); border: 1px solid var(--line);
+      border-radius: 5px; padding: 1px 6px;
+      font-size: 11px; color: #f8c9c9;
+    }
+    .down button {
+      margin-top: 10px; height: 32px; padding: 0 18px; cursor: pointer;
+      border: 1px solid rgba(143, 221, 85, 0.45); border-radius: 8px;
+      background: var(--green-grad); color: #0c1405; font-weight: 600; font-size: 12.5px;
+    }
+    .down button:disabled { opacity: .55; cursor: wait; }
+
+    /* ── FEMO脚本卡 ── */
+    .script-row, .run-row { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }
+    .script-row input { flex: 1; min-width: 0; }
+    .run-row button { flex: 1; }
+    #runState:empty { display: none; }   /* 空徽标不占位 */
+    #mountOut:empty { display: none; }
+    #runState { color: var(--ok); display: block; }   /* 运行态徽标移到结果绿字区（2026-09-26 用户拍板：不占按钮排），与结果各占一行 */
+    .mount-out {
+      font-size: 11px; line-height: 1.55; color: var(--muted);
+      max-height: 110px; overflow-y: auto; white-space: pre-wrap;
+      word-break: break-all; margin-top: 2px;
+    }
+    .mount-out.ok { color: var(--ok); }
+    .mount-out.err { color: var(--bad); }
+
+    /* 绑定钮独绿（解绑回深色）：低频动作不高亮（2026-09-26 用户拍板；设主AGENT钮已移除——网页席位不设主Agent） */
+    .seat-actions button[data-act="bind"] {
+      background: var(--green-grad); border: none; color: #0d1a08;
+      box-shadow: 0 2px 8px rgba(111, 191, 58, 0.22);
+    }
+    .seat-actions button[data-act="bind"]:hover { filter: brightness(1.08); }
+    /* ── 人类发言席 ── */
+    /* 当前要做的事：整卡一点绿调（与 .seat.running 的琥珀高亮同款手法，色换主绿） */
+    #humanCard { margin-bottom: 10px; border-color: rgba(143, 221, 85, 0.28);
+      background: linear-gradient(180deg, rgba(111, 191, 58, 0.05), rgba(255, 255, 255, 0.03)); }
+    /* 节词（showprompt）：场景引文，安静一笔——小字斜体、绿边引块、超长内滚 */
+    .human-showprompt {
+      margin: 1px 0 8px; padding: 7px 10px 8px;
+      border: 1px solid var(--line);
+      border-left: 2px solid rgba(143, 221, 85, 0.45);
+      background: rgba(0, 0, 0, 0.18); border-radius: 8px;
+      color: var(--muted); font-size: 10.5px; line-height: 1.65; font-style: italic;   /* 10.5=与投影中心节词同档（2026-09-28 用户拍板） */
+      white-space: pre-wrap; word-break: break-word;
+      max-height: 110px; overflow-y: auto;
+    }
+    .human-showprompt::before {
+      content: '节词'; display: block;
+      font-style: normal; font-size: 9.5px; font-weight: 700;
+      letter-spacing: 2px; color: var(--faint); margin-bottom: 2px;
+    }
+    /* 输入提示（prompt）：本轮要做的事——亮一点的绿调块 */
+    .human-prompt {
+      margin: 0 0 8px; padding: 7px 10px 8px;
+      border: 1px solid rgba(143, 221, 85, 0.22);
+      background: rgba(111, 191, 58, 0.07);
+      border-radius: var(--radius-sm);
+      color: var(--text); font-size: 10.5px; line-height: 1.65;   /* 10.5=与投影中心提示文字同档（2026-09-28 用户拍板） */
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .human-prompt::before {
+      content: '提示'; display: block;
+      font-size: 9.5px; font-weight: 700;
+      letter-spacing: 2px; color: rgba(143, 221, 85, 0.75); margin-bottom: 2px;
+    }
+    #humanResult { font-size: 11.5px; color: var(--muted); }
+    #humanResult.err { color: var(--bad); }
+    #humanVarsPanel { background: rgba(0,0,0,.25); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+    #humanVarsPanel .var-row { display: flex; gap: 6px; align-items: center; margin-bottom: 5px; }
+    #humanVarsPanel .var-row:last-child { margin-bottom: 0; }
+    #humanVarsPanel .var-name { font: 11px/1.6 ui-monospace, Consolas, monospace; color: var(--green-bright); min-width: 72px; word-break: break-all; }
+    #humanVarsPanel .var-row input { flex: 1; min-width: 0; }
+    #humanVarsPanel .var-actions { display: flex; gap: 6px; margin-top: 6px; }
+
+    /* ── 引擎流水 ── */
+    #runlog {
+      max-height: 240px; overflow-y: auto;
+      font: 11px/1.7 ui-monospace, Consolas, monospace;
+      background: rgba(0, 0, 0, 0.28); border: 1px solid var(--line); border-radius: 8px;
+      padding: 8px 10px; white-space: pre-wrap;   /* 多行报错指引（如缺员名单）分行显示 */
+    }
+    #runlog .rl-t { color: var(--faint); margin-right: 6px; }
+    #runlog .rl-k { color: var(--green-bright); margin-right: 6px; }
+    #runlog .rl-a { color: var(--purple); margin-right: 6px; }
+    #runlog .empty { color: var(--faint); text-align: center; padding: 14px 0; }
+
+    /* ── 服务日志（终端风：最新在下、自动贴底） ── */
+    #svclog {
+      max-height: 200px; overflow-y: auto;
+      font: 10.5px/1.6 ui-monospace, Consolas, monospace;
+      background: rgba(0, 0, 0, 0.34); border: 1px solid var(--line); border-radius: 8px;
+      padding: 8px 10px; word-break: break-all; color: var(--muted);
+    }
+    #svclog .ok { color: var(--ok); }
+    #svclog .warn { color: var(--busy); }
+    #svclog .err { color: var(--bad); }
+    /* ── Toast ── */
+    #toast {
+      position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%) translateY(8px);
+      background: #1a201c; border: 1px solid var(--line-strong);
+      color: var(--text); font-size: 12px;
+      border-radius: 10px; padding: 8px 16px;
+      box-shadow: var(--shadow);
+      opacity: 0; pointer-events: none;
+      transition: all .2s ease;
+      max-width: 86%;
+      z-index: 9;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    #toast.err { border-color: rgba(248, 113, 113, 0.4); color: #f3b0b0; }
+    a { color: var(--green-bright); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <nav class="tabs">
+    <button id="tabSeats" class="tab active">灵魂</button>
+    <button id="tabProj" class="tab">投影中心</button>
+    <button id="tabDebug" class="tab">调试</button>
+  </nav>
+
+  <header class="only-seats">
+    <div class="brand">
+      <div class="logo" id="brandLogo"></div>
+      <div>
+        <div class="brand-name">FEMO 灵魂</div>
+        <div class="brand-sub">FEMO Web</div>
+      </div>
+    </div>
+    <div class="conn" id="status">连接中…</div>
+  </header>
+
+  <main>
+    <!-- 标签一：灵魂（给每个会话绑定哪个灵魂） -->
+    <section id="seatPanel">
+
+      <!-- 人类发言席：引擎等人类节点时亮出，发言寄出后自动收起（默认隐藏） -->
+      <div class="card" id="humanCard" hidden>
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          轮到你发言了
+          <span class="chip amber" id="humanNode" style="margin-left:auto"></span>
+        </div>
+        <div class="card-note" id="humanJobInfo"></div>
+        <div id="humanShowprompt" class="human-showprompt" hidden></div>
+        <div id="humanPrompt" class="human-prompt" hidden></div>
+        <textarea id="humanText" placeholder="以角色身份说出你的话……"></textarea>
+        <div id="humanVarsPanel" hidden style="margin-bottom:6px"></div>
+        <div class="send-row">
+          <button id="humanVarBtn" hidden>变量赋值</button>
+          <span id="humanResult"></span>
+          <button id="humanSend" class="primary" style="margin-left:auto">发送</button>
+        </div>
+      </div>
+
+      <div id="seats"></div>
+
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          FEMO脚本
+        </div>
+        <div class="card-note">运行/继续认输入框里的剧本——改过文件直接运行就是改后版；建议放 user_data/projects/</div>
+        <div class="script-row">
+          <input type="text" id="scriptPath" placeholder="脚本绝对路径（如 D:\…\user_data\projects\xx.femo）" />
+          <button id="browse">浏览</button>
+          <button id="mount" class="primary">挂载</button>
+        </div>
+        <!-- 流程画布住这张卡（2026-09-30 用户拍板，自快捷卡搬来）：挂载/运行的伙伴
+             动作——?mount=1 开页，服务端播种脚本把已挂载脚本自动导入画布（见 server/canvas.mjs） -->
+        <div class="run-row">
+          <button id="runBtn" class="primary">运行</button>
+          <button id="pauseBtn">停止</button>
+          <button id="resumeBtn">继续</button>
+          <button id="lnkCanvas" title="打开流程画布；若已挂载脚本，画布自动载入显示">编辑</button>
+        </div>
+        <div class="mount-out"><span id="runState"></span><span id="mountOut"></span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          快捷
+        </div>
+        <div class="quick-row">
+          <button id="restartService">重启服务</button>
+          <button id="lnkConsole">操作台</button>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- 标签二：投影中心（内嵌本地 hub 页） -->
+    <section id="projPanel" hidden>
+      <iframe id="projFrame" title="投影中心"></iframe>
+    </section>
+    <!-- 标签三：调试（手动测试通道 + 收话链路确认） -->
+    <section id="debugPanel" hidden>
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          手动发消息
+        </div>
+        <div class="card-note">自动选中当前会话，也可换目标；测试用，正式运行由引擎下发</div>
+        <select id="target"></select>
+        <textarea id="text" placeholder="要写进输入框并发送的话……"></textarea>
+        <div class="send-row">
+          <button id="send" class="primary">发送</button>
+          <span id="sendResult"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          引擎流水
+        </div>
+        <div class="card-note">运行/派工/收话的实时记录（最近 30 条）</div>
+        <div id="runlog"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 5h16v14H4zM4 15h16M9 5v10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          服务日志
+          <span style="margin-left:auto;display:flex;gap:6px">
+            <button id="logCopy" style="height:24px;padding:0 10px;font-size:11px">复制</button>
+            <button id="logClear" style="height:24px;padding:0 10px;font-size:11px">清屏</button>
+          </span>
+        </div>
+        <div class="card-note">本地服务/引擎/扩展代理的原始流水（排障用，最新在下）</div>
+        <div id="svclog"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+          最近收到的回答
+        </div>
+        <div id="replies"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast"></div>
+  <!-- 面板逻辑拆在 sidepanel/ 模块（main 总装 + 五张卡 + conn 通道）；判断层共用 shared/ -->
+  <script type="module" src="sidepanel/main.mjs"></script>
+</body>
+</html>

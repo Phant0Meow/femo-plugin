@@ -14,7 +14,8 @@ import { blocksToText } from '../engine-transcript'
 import { hubFeedRow, hubHostSegCurrent, hubHostSegOpen, hubHostSegClose } from './hub-feed' // 投影中心：FEMO外轮=宿主自己开的容器（2026-09-19）；无脑映射兜底用 Current（2026-09-21）
 import { isFemoSession } from '../session-roster' // FEMO 会话判据（唯一尺子，与名册同源）
 import { pluginSourceName } from '../compat/plugin-source' // 插件生产者身份（新旧两形态同判）
-import type { PresetBearingIdentity } from '../persona'
+// FEMO 会话判据的唯一尺子已随身份轴（2026-10-07 去预设）搬进 femoIdentity，
+// 本文件经 session-roster 的再导出消费，与名册同源。
 
 /** 主会话事件白名单（实时监听过滤；镜像半边退役后仍喂 hub 旁挂分派）。
  *  turn 号保持主会话原号（1,2,3…），子代理镜像 turn 从 100001 起，天然不冲突。 */
@@ -287,8 +288,8 @@ export function createGodMirror(deps: {
    * events）只往这里开出的容器里喂字——这里静默，非 FEMO 会话整条直投链就
    * 断了根（hub 那边 feed 首见即收 mains，普通聊天会话混进历届主会话的病根
    * 实锤：session-4101a8e9）。判据与名册同一把尺（isFemoSession）；正向记忆：
-   * FEMO 身份只增不减（选预设/首跑FEMO脚本后不会退回），命中即永久放行；**阴性
-   * 绝不缓存**——会话可能中途变 FEMO（首次 /femo 建 host-history 账），当拍
+   * FEMO 身份只增不减（首跑FEMO脚本/挂过脚本后不会退回），命中即永久放行；**阴性
+   * 绝不缓存**——会话可能中途变 FEMO（首次挂脚本/开 Job 建 host-history 账），当拍
    * 起自然放行。 */
   const femoFedSids = new Set<string>()
   function registerRealtimeListener(ctx: Context): void {
@@ -296,8 +297,7 @@ export function createGodMirror(deps: {
       if (session.header.parentSession !== undefined) return
       if (!MIRROR_MAIN_EVENTS.has(event.type)) return
       const sid = String(session.id)
-      if (!femoFedSids.has(sid)
-        && !isFemoSession(sid, session as unknown as PresetBearingIdentity)) return
+      if (!femoFedSids.has(sid) && !isFemoSession(sid)) return
       femoFedSids.add(sid)
       mirrorMainEventToGod(sid, event)
     })

@@ -180,6 +180,21 @@ export function subscribeCurrent() {
 export function requestJobs() {
   if (S.ws && S.ws.readyState === 1) S.ws.send(JSON.stringify({ ctrl: 'jobs' }));
 }
+// 省略段展开（2026-10-08 快照窗口化配套）：向 hub 要中间的一段。dir 'dn'=头段
+// 向下加一块、'up'=尾段向上加一块，各按连接预算（?win=）切块、跨线行整行带走。
+// 一次一发（_busy 到货才放）防连点刷屏；token 让迟到的应答对不上号时安静作废。
+export function requestRange(dir) {
+  if (!S.elide || S.elide._busy) return;
+  if (!S.ws || S.ws.readyState !== 1) return;
+  S.elide._busy = true;
+  dbgLocal('展开省略段 ' + (dir === 'up' ? '↑（尾侧向上）' : '↓（头侧向下）') + ' …');
+  S.ws.send(JSON.stringify({
+    ctrl: 'range', dir: dir === 'up' ? 'up' : 'dn',
+    head_end: S.elide.headEnd, tail_start: S.elide.tailStart,
+    job: S.selectedJob ? Number(S.selectedJob) : undefined,
+    tok: S.elide.token,
+  }));
+}
 export function requestViews() {
   if (S.ws && S.ws.readyState === 1) S.ws.send(JSON.stringify({ ctrl: 'views', job: S.selectedJob ? Number(S.selectedJob) : undefined }));
 }
@@ -220,10 +235,10 @@ export function applyJobs(j) {
   requestViews();
 }
 export function applyViews(j) {
-  // 视角菜单：stage 等全局视角在最上不分组；god 归宿主组——不同宿主
-  // 的上帝视角将来可以不一样（hub 分家前先挂首个宿主名下；god 自带 host 或
-  // id 形如 god:<host> 时归该宿主）；角色按行上 host 分组；无宿主=「未标来源」
-  // 垫底。组标是「线—名—线」分割线（.dd-group），不是选项。
+  // 视角菜单（2026-10-06 用户拍板简化）：上帝(如有)→纯戏内→整场回放→角色
+  // 一列——一个角色一行（hub views 按基形合并，不再按 (host,角色) 拆席），
+  // 行尾挂 [host] 铭牌（该角色的出场宿主集合，复用场次下拉的 .jhost）。
+  // 不再按宿主分组画分割线；无分组就不存在「未标来源」垫底的问题。
   const views = j.views || [];
   if (!views.some(x => String(x.id) === String(S.currentView))) {
     // 已在整场视角（REST 视图不在本清单）：不动——清单刷新不能把整场视角
@@ -231,7 +246,7 @@ export function applyViews(j) {
     if (S.currentView && String(S.currentView).indexOf('chronica:') === 0) return;
     // 回落优先 god:<host>（「刷新即真上帝视角」配套）：hub 清单挂规范 id——
     // 回落也落成规范 id，选中态高亮、URL、快照回显三者一致。无 god:host 条目
-    // （hub 无任何会话账本）才回落裸 god（=job 账本，老语义）。
+    // （hub 无任何会话账本/开演家没申报上帝窗）才回落裸 god（=job 账本）。
     const was = S.currentView;
     const gh = views.find(x => String(x.id).indexOf('god:') === 0);
     S.currentView = gh ? String(gh.id) : 'god';
@@ -250,32 +265,16 @@ export function applyViews(j) {
         esc(String(v.host || id.slice(4)).trim()) + '</span></span>';
     return '';
   };
-  const viewItem = (v) => ({ v: v.id, label: v.name, side: godSide(v) });
-  const items = [], byHost = new Map(), godFree = [];
-  for (const v of views) {
+  // 角色条目的宿主签（2026-10-06）：出场宿主集合去重并排（常态一家；多宿主
+  // 共演同名角色时并排挂多个）。
+  const side = (v) => {
     const id = String(v.id || '');
-    if (id === 'god' || id.indexOf('god:') === 0) {
-      const h = String(v.host || (id.indexOf('god:') === 0 ? id.slice(4) : '')).trim();
-      if (h) {
-        if (!byHost.has(h)) byHost.set(h, []);
-        byHost.get(h).unshift(v);
-      } else godFree.push(v);
-      continue;
-    }
-    if (id.indexOf('actor:') !== 0) { items.push({ v: v.id, label: v.name }); continue; }
-    const h = String(v.host || '').trim();
-    if (!byHost.has(h)) byHost.set(h, []);
-    byHost.get(h).push(v);
-  }
-  const labels = [];
-  for (const h of (j.hosts || [])) if (byHost.has(h) && labels.indexOf(h) < 0) labels.push(h);
-  if (byHost.has('')) labels.push('');
-  for (const h of byHost.keys()) if (labels.indexOf(h) < 0) labels.push(h);   // hosts 清单外的兜底
-  labels.forEach((h, i) => {
-    const list = (byHost.get(h) || []).slice();
-    if (i === 0) list.unshift(...godFree.splice(0));   // god：暂挂首个宿主组
-    if (list.length) { items.push({ group: h || '未标来源' }); list.forEach(v => items.push(viewItem(v))); }
-  });
-  if (godFree.length) items.unshift(...godFree.map(viewItem));   // 没有宿主组：god 回全局区
+    if (id === 'god' || id.indexOf('god:') === 0) return godSide(v);
+    const hs = Array.isArray(v.hosts) ? v.hosts.filter(h => typeof h === 'string' && h) : [];
+    return hs.length
+      ? '<span class="jhosts">' + hs.map(h => '<span class="jhost">' + esc(h) + '</span>').join('') + '</span>'
+      : '';
+  };
+  const items = views.map(v => ({ v: v.id, label: v.name, side: side(v) }));
   ddView.set(items, cur);
 }

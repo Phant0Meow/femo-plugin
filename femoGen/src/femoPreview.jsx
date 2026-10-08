@@ -4,6 +4,7 @@
 
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { editIndent } from './indentEdit';
 
 // 头排统一芯片配方（2026-09-07）：复制/图到文本/文本到图/恢复四键同构——
 // 浅色同系底 + 1px 同色细边 + 同字号字重，仅用颜色区分语义。可点击态用
@@ -117,6 +118,31 @@ function FemoPreview({ value, onChange, error, warnings = [], dirty, onApply, on
         11 + (errorLine - 1) * lineHeight - scrollTop + 'px';
     }
   }, [errorLine, value]);
+
+  // Tab / Shift+Tab 缩进（2026-10-05）：选中若干行按 Tab 逐行加一级缩进、
+  // Shift+Tab 逐行减一级；无选区时 Tab 在光标处插入一级缩进（浏览器默认把
+  // Tab 让给焦点切换，编辑器里收回自用）。核心计算在 indentEdit.js（纯计算件，
+  // 有 Node 单测），这里只负责把结果写回 DOM。
+  const handleKeyDown = useCallback((e) => {
+    if (e.key !== 'Tab' || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+    e.preventDefault();
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const edit = editIndent(ta.value, ta.selectionStart, ta.selectionEnd, e.shiftKey);
+    if (!edit) return; // 无可增减（如顶格行上 Shift+Tab）：焦点跳转已拦下，文本不动
+
+    // 先选中受影响区间再整体替换——execCommand 走浏览器原生编辑命令，
+    // 撤销栈里记的是一步整块改动，Ctrl+Z 一步退回；个别环境不可用时直改
+    // DOM 值（撤销让位），这条路没有 input 事件，React 状态得手动同步。
+    ta.setSelectionRange(edit.from, edit.to);
+    let ok = false;
+    try { ok = document.execCommand('insertText', false, edit.insert); } catch { ok = false; }
+    if (!ok) {
+      ta.value = edit.text;
+      onChange(edit.text);
+    }
+    ta.setSelectionRange(edit.selStart, edit.selEnd);
+  }, [onChange]);
 
   return (
     <div
@@ -255,6 +281,7 @@ function FemoPreview({ value, onChange, error, warnings = [], dirty, onApply, on
             onChange={(e) => {
               onChange(e.target.value);
             }}
+            onKeyDown={handleKeyDown}
             onScroll={handleScroll}
             spellCheck={false}
             style={{

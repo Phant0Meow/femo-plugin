@@ -22,7 +22,7 @@ h1 {
   font-family: var(--serif); font-size: clamp(15px, 2.55vw + 5.5px, 28px); font-weight: 400; text-align: center;
   letter-spacing: .18em; margin: 16px 0 8px; color: var(--ink);
 }
-h1 .amp { color: var(--gold); }
+h1 .amp { color: var(--gold); }   /* 2026-10-08 标题改「FEMO投影中心」后无人使用；中点装饰符的画法留作后用 */
 .sub { text-align: center; color: var(--ink-2); font-size: 13px; }
 
 /* ── 控制台条 + 遥测带 ──────────────────────────────────────────── */
@@ -535,7 +535,7 @@ h1 .amp { color: var(--gold); }
 :root[data-theme="jade"] .conn.on .dot::after { border-color: var(--gold); }
 :root[data-theme="jade"] .topbtn:active,
 :root[data-theme="jade"] .topbtn.on { color: var(--gold); }
-:root[data-theme="jade"] .topbtn.on .tb-badge { color: var(--gold); background: var(--gold-faint); }
+/* 翡翠徽章私账随 2026-10-08 计数徽章退役一并清退。 */
 /* 翡翠·字号（2026-09-27 用户拍板，两轮收紧）：消息流对齐侧栏标签页的精致
    小字——12px 台词 / 11.5px 状态行 / 10.5px 机器等宽字，底 12.5。只动翡翠。 */
 :root[data-theme="jade"] body { font-size: 12.5px; }
@@ -761,20 +761,9 @@ h1 .amp { color: var(--gold); }
   box-shadow: var(--topbtn-press);
 }
 .topbtn .tb-ico { display: inline-flex; opacity: .8; }
-.topbtn .tb-badge {
-  font-size: 10px; color: var(--gold); background: var(--gold-faint);
-  border-radius: 8px; padding: 0 7px; line-height: 16px;
-  box-shadow: var(--topbtn-badge-shadow);
-}
-.topbtn.on .tb-badge { color: var(--teal); background: var(--teal-faint); }
-/* 纯图标钮的徽章（2026-10-04 顶栏图标化随刀）：钉在右下角、不占版面——
-   带徽章的钮与无徽章的兄弟钮尺寸完全一致（用户拍板「各个按钮样式大小都一致」）；
-   不钉右上是因为顶栏贴页顶（留白退役），往上戳会被视口裁掉。 */
-.topbtn.iconbtn { position: relative; }
-.topbtn.iconbtn .tb-badge {
-  position: absolute; bottom: -5px; right: -5px;
-  font-size: 9px; line-height: 12px; padding: 0 4px;
-}
+/* 计数徽章退役（2026-10-08 用户拍板）：print log 钮上的数字小牌整件摘除，
+   顶栏与页尾镜像两处钮都只留图标；theme.css 的 --topbtn-badge-shadow
+   令牌随徽章清退。 */
 /* ── 悬停名牌（2026-10-05 用户拍板）：纯图标钮没有字，悬停浮出按钮名称。
    data-tip 存名、::after 画牌；出现在按钮**下方**——顶栏贴页顶（留白退役
    拍板），往上是视口外必被裁；0.35s 延迟防鼠标扫过一排钮时闪成跑马灯，

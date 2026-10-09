@@ -5,6 +5,9 @@
  * 数据面纪律（2026-09-22 修过 bug，注释有案底）：dbgClearAll 必须**整体替换**、
  * dbgSetItems 是「按 seq 合并」语义（拉历史用）——清空按钮曾被合并语义两头吃掉，
  * 这两个函数不许被后人「统一」。
+ * 计数徽章（2026-10-08 用户拍板退役）：print log 钮上的数字小牌整件摘掉——
+ * 顶栏与页尾镜像两处按钮都不再显示数字，钮上只剩虫子图标；行数账本（dbgItems）
+ * 原样保留，浮层内容与容量上限不变，只是不再往外报数。
  */
 import { S } from './state.mjs';
 import { esc, hhmmss } from './util.mjs';
@@ -13,14 +16,12 @@ let dbgOpen = false;
 let dbgItems = [];            // [{seq,t,stream,text}] 时间正序；上限与 hub 环同款
 const DBG_CAP = 500;
 // 双实例（2026-10-05 页尾镜像行）：这排钮在顶栏和页尾各住一份（页尾是
-// main.mjs mirrorRow 的克隆、id 已剥）——面板/徽章/清空/复制一律按类名
+// main.mjs mirrorRow 的克隆、id 已剥）——面板/按钮/清空/复制一律按类名
 // 全场查询、逐实例写，不认 id；开合状态只有一份（dbgOpen），两处同步开合。
 const dbgWraps  = () => document.querySelectorAll('.dbg-wrap');
 const dbgBtns   = () => document.querySelectorAll('.topbtn[data-act="dbg"]');
-const dbgCnts   = () => document.querySelectorAll('.tb-badge.cnt');
 const dbgBodies = () => document.querySelectorAll('.dbg-body');
 
-function dbgCntText(n) { return n > 999 ? '999+' : String(n); }
 function dbgLineHtml(it) {
   const err = it.stream === 'stderr';
   return '<div class="dbg-line' + (err ? ' stderr' : '') + '"><span class="lt">' +
@@ -31,8 +32,6 @@ export function dbgAppend(it) {
   if (!it || typeof it.text !== 'string') return;
   dbgItems.push(it);
   while (dbgItems.length > DBG_CAP) dbgItems.shift();
-  const cnt = dbgCntText(dbgItems.length);
-  for (const el of dbgCnts()) el.textContent = cnt;
   if (!dbgOpen) return;                    // 关着时只记数，不动 DOM
   for (const body of dbgBodies()) {
     const empty = body.querySelector('.dbg-empty');
@@ -59,11 +58,9 @@ export function dbgSetItems(items) {
     .sort((a, b) => (a.local ? 1e18 + (a.seq || 0) : (a.seq || 0)) -
                      (b.local ? 1e18 + (b.seq || 0) : (b.seq || 0)))
     .slice(-DBG_CAP);
-  const cnt = dbgCntText(dbgItems.length);
   const html = dbgItems.length
     ? dbgItems.map(dbgLineHtml).join('')
     : '<div class="dbg-empty">暂无 print。桥进程里任何 print / stderr 行都会出现在这里。</div>';
-  for (const el of dbgCnts()) el.textContent = cnt;
   for (const body of dbgBodies()) {
     body.innerHTML = html;
     body.scrollTop = body.scrollHeight;
@@ -79,7 +76,6 @@ function dbgRequestHistory() {
 export function dbgClearAll() {
   dbgItems = [];
   const empty = '<div class="dbg-empty">暂无 print。桥进程里任何 print / stderr 行都会出现在这里。</div>';
-  for (const el of dbgCnts()) el.textContent = '0';
   for (const body of dbgBodies()) {
     body.innerHTML = empty;
     body.scrollTop = 0;

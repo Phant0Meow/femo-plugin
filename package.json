@@ -1,6 +1,6 @@
 {
   "name": "femo-plugin",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "femo (Flow Emerges Mag Opus) — 用写脚本的方式编排多智能体世界。dsh 插件版：引擎、桥接器、可视化编辑器全在一个文件夹里，自包含，整个文件夹搬走即用。",
   "keywords": [
     "deepseek-harness",

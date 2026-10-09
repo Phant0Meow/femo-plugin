@@ -192,7 +192,7 @@ export function requestRange(dir) {
     ctrl: 'range', dir: dir === 'up' ? 'up' : 'dn',
     head_end: S.elide.headEnd, tail_start: S.elide.tailStart,
     job: S.selectedJob ? Number(S.selectedJob) : undefined,
-    tok: S.elide.token,
+    tok: S.elide.etok,
   }));
 }
 export function requestViews() {

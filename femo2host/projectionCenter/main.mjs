@@ -26,7 +26,7 @@ const WS_URL = location.host
   ? (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/?win=' + WIN_BYTES
   : 'ws://127.0.0.1:8790/?win=' + WIN_BYTES;
 let backoff = 500;
-let elideSeq = 0;   // 省略段对账 token：每次快照 +1，rows-range 应答按它对号
+let elideSeq = 0;   // 省略段对账 etok：每次快照 +1，rows-range 应答按它对号
 
 // ── 心跳看门狗（2026-10-03）：半死连接的页面侧探活 ─────────────────────────
 // 手机经 tailscale 反代直接看戏时，链路会「无声死掉」（息屏冻结、切网、中继
@@ -111,7 +111,9 @@ function setConn(on, text) {
 // 2026-09-22 改版：主题收进顶栏一个按钮（不用下拉）；点击轮着切。
 // 按钮文案 2026-09-27 用户拍板：显示**当前**主题的名字（三主题后「下一个」
 // 的读法对不上号），点下去换下一个、按钮跟着变成新的当前名。
-const THEMES = [['nocturne', '剧场'], ['porcelain', '素瓷'], ['jade', '翡翠']];
+// 主题键曾是那个夜间音乐术语（2026-10-08 用户拍板全局弃词）：现名 theater，直接
+// 对应中文名「剧场」；浏览器里存下的旧键在 initTheme 里一次性迁移。
+const THEMES = [['theater', '剧场'], ['porcelain', '素瓷'], ['jade', '翡翠']];
 function applyTheme(t) {
   document.documentElement.dataset.theme = t;
   try { localStorage.setItem('pc-theme', t); } catch (e) {}
@@ -161,6 +163,7 @@ function initTheme() {
   const qp = new URLSearchParams(location.search);
   let t = qp.get('theme') || '';
   if (!t) { try { t = localStorage.getItem('pc-theme') || ''; } catch (e) {} }
+  if (t === 'nocturne') t = 'theater';   // 旧存档迁移（applyTheme 会把新键写回去）
   if (!THEMES.some(x => x[0] === t)) t = document.documentElement.dataset.theme || 'porcelain';
   applyTheme(t);
   syncThemeBtns();
@@ -288,40 +291,53 @@ async function showMountMenu(btn) {
     document.addEventListener('keydown', close);
   }, 0);
 }
-// 继续=续「当前显示的这场」（2026-10-04 用户拍板）：当前场在跑→当没按
-// （判断在 flash 之前，按钮连禁用都不走）；没在跑才从断点续跑。
+// 继续=续「场次下拉选中的这场」（2026-10-09 用户拍板，改判 2026-10-04「当前显示场」：
+// 双胞胎同跑时「跟最新」会把显示面拽向新场，按钮跟着拽走就停错戏——按钮只认用户
+// 手选的下拉项；下拉选「最新」时才退回当前显示场）：目标场在跑→响亮说一句
+// 「已在跑」，不再无声吞按；没在跑才从断点续跑。
+function actionTargetJob() {
+  const sel = S.selectedJob ? Number(S.selectedJob) : NaN;
+  if (!Number.isNaN(sel) && sel > 0) return sel;
+  return S.currentJobId == null ? null : Number(S.currentJobId);
+}
 async function actResume(btn) {
-  const target = S.currentJobId == null ? null : Number(S.currentJobId);
-  if (target == null) { dbgLocal('继续：当前没有对准的场次，不动作'); return; }
+  const target = actionTargetJob();
+  if (target == null) { dbgLocal('继续：没有对准的场次（下拉未选、当前也无显示场），不动作'); return; }
   let runners = [];
   try {
     const h = await fetch('/engine/health').then(x => x.json());
     runners = Array.isArray(h.runners) ? h.runners : [];
   } catch (e) { dbgLocal('继续：引擎状态拉不到（' + (e && e.message ? e.message : e) + '）'); return; }
-  if (runners.map(Number).includes(target)) return;   // 在跑：当没按
+  if (runners.map(Number).includes(target)) { dbgLocal('继续 → j' + target + ' 本来就在跑，不用继续'); return; }   // 在跑：响亮不动作
   await flashBtn(btn, async () => {
     const st = await engineCmd('get_job_state', { job_id: target });
     if (!st || !st.script_text) throw new Error('档案里没有剧本原文（j' + target + '），无法续跑');
     await engineCmd('job_resume', {
       femo: st.script_text, job_id: target, host_ai_backend: true,
     });
-    dbgLocal('继续 → j' + target + '（当前显示场）从断点续跑');
+    dbgLocal('继续 → j' + target + '（下拉选中场）从断点续跑');
   });
 }
-// 停止=停「当前显示的这场」（2026-10-04 用户拍板）：当前场没在跑（本来就
-// 挂着）→当没按（判断在 flash 之前，按钮连禁用都不走）；在跑才挂起。
+// 停止=停「场次下拉选中的这场」（2026-10-09 用户拍板，沿革见 actResume 头注）：
+// 目标场不在引擎在跑清单→响亮留痕（含 runners 现值——2026-10-08 实案：引擎强杀
+// 重启后档案停在 running 的僵尸场不在 runners 里，旧版静默 return，用户按了
+// 以为停了其实什么都没发生）；在跑才挂起。
 async function actStop(btn) {
-  const target = S.currentJobId == null ? null : Number(S.currentJobId);
-  if (target == null) { dbgLocal('停止：当前没有对准的场次，不动作'); return; }
+  const target = actionTargetJob();
+  if (target == null) { dbgLocal('停止：没有对准的场次（下拉未选、当前也无显示场），不动作'); return; }
   let runners = [];
   try {
     const h = await fetch('/engine/health').then(x => x.json());
     runners = Array.isArray(h.runners) ? h.runners : [];
   } catch (e) { dbgLocal('停止：引擎状态拉不到（' + (e && e.message ? e.message : e) + '）'); return; }
-  if (!runners.map(Number).includes(target)) return;   // 本来就挂着：当没按
+  if (!runners.map(Number).includes(target)) {
+    dbgLocal('停止 → j' + target + ' 不在引擎在跑清单里（runners=[' + runners.join(',') + ']），未动作。'
+      + '若这场档案显示 running 却停不了，多半是上次引擎强杀重启留下的僵尸档案，重开一局即可');
+    return;
+  }
   await flashBtn(btn, async () => {
     const r = await engineCmd('job_pause', { job_id: target });
-    dbgLocal('停止 → j' + target + '（当前显示场）' + (r && r.paused ? '已挂起，断点保留' : '未挂起'));
+    dbgLocal('停止 → j' + target + '（下拉选中场）' + (r && r.paused ? '已挂起，断点保留' : '未挂起'));
   });
 }
 
@@ -374,7 +390,7 @@ function connect() {
           headEnd: j.elided.head_end, tailStart: j.elided.tail_start,
           headEnd0: j.elided.head_end, tailStart0: j.elided.tail_start,
           rows: j.elided.rows || 0, bytes: j.elided.bytes || 0,
-          token: ++elideSeq, _busy: false,
+          etok: ++elideSeq, _busy: false,
         };
         dbgLocal('快照窗口化：中间省略 ' + S.elide.rows + ' 条（约 ' +
                  Math.max(1, Math.round(S.elide.bytes / 1024)) + 'KB），点省略号两侧可展开');
@@ -407,7 +423,7 @@ function connect() {
       return;
     }
     if (j.ctrl === 'rows-range') {   // 省略段展开到货（2026-10-08）：按 token 对号，头尾各归各位
-      if (!S.elide || j.tok !== S.elide.token || !Array.isArray(j.rows)) return;
+      if (!S.elide || j.tok !== S.elide.etok || !Array.isArray(j.rows)) return;
       S.elide._busy = false;
       const rows = j.rows;
       if (!rows.length) { if (j.met) S.elide = null; render(); return; }

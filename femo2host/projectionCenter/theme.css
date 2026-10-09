@@ -7,10 +7,10 @@
 }
 /* 主题层（#theme-*）：只有设计 token——颜色/字体/整值复合量。
    换主题 = 新加一个 :root[data-theme="…"] token 块（页面顶栏按钮或 ?theme= 切换）。
-   现有主题：nocturne 剧场 / porcelain 素瓷 / jade 翡翠。结构层预留了浮影钩子
+   现有主题：theater 剧场 / porcelain 素瓷 / jade 翡翠。结构层预留了浮影钩子
    （--raise-lg/--raise-sm/--press-in/--rail-line），不吃影子的主题把它们定义为 none。
    本文件必须在 app.css 之前加载（素瓷覆盖块依赖 token 已定义）。*/
-/* ═══ 主题「剧场 · Nocturne」═══════════════════════════════════
+/* ═══ 主题「剧场 · Theater」═══════════════════════════════════
    深夜剧场：池座是墨蓝的黑，舞台被金光照着，仪表在暗处发青光。
    色彩纪律：金=舞台事件，青=遥测/思考链，琥珀=耳语/重试，红=失败，
    绿/紫=工具调用/结果，蓝=输入提示。
@@ -20,7 +20,7 @@
      --glow-X   节点灯光晕（整条 box-shadow 值）
    其余为整值复合 token（整条渐变/整圈光环照搬值）。加主题时
    同名覆盖即可，结构层一个字都不用动。 */
-:root[data-theme="nocturne"] {
+:root[data-theme="theater"] {
   color-scheme: dark;
   /* 纸墨：底色与字色 */
   --bg0: #0a0d14; --bg1: #0e1219;
@@ -76,7 +76,6 @@
   --topbtn-raise: inset 0 0 0 1px rgba(232,228,216,.1);
   --topbtn-press: inset 0 0 0 1px rgba(111,211,196,.35), 0 0 12px rgba(111,211,196,.1);
   --topbtn-hover-ink: var(--gold);
-  --topbtn-badge-shadow: none;
   --scroll-thumb: rgba(232,228,216,.14);
   --fail-ink: #d8a49c;
   --dbg-bg: rgba(10,13,20,.92); --dbg-btn-bg: rgba(14,18,25,.85);
@@ -87,18 +86,18 @@
   --mono: 'MyCustomFont', 'Cascadia Code', 'JetBrains Mono', Consolas, 'SFMono-Regular', Menlo, monospace;
 }
 /* 舞台光晕与星图点阵：主题的底画 */
-:root[data-theme="nocturne"] body {
+:root[data-theme="theater"] body {
   background:
     radial-gradient(1100px 480px at 50% -140px, var(--spot-warm), transparent 62%),
     radial-gradient(900px 420px at 84% 110%, var(--spot-cool), transparent 60%),
     var(--bg0);
 }
-:root[data-theme="nocturne"] body::before {
+:root[data-theme="theater"] body::before {
   content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
   background-image: radial-gradient(var(--star) 1px, transparent 1.4px);
   background-size: 26px 26px;
 }
-:root[data-theme="nocturne"] ::selection { background: var(--selection); }
+:root[data-theme="theater"] ::selection { background: var(--selection); }
 /* ═══ 主题「素瓷 · Porcelain」════════════════════════════
    一整块素瓷：万物与底同色，凹凸全靠双向柔影（光源固定左上：
    高光往左上、投影往右下）。无框（--line 整组透明=「外面的框不显示」）、
@@ -150,7 +149,6 @@
   --topbtn-raise: 5px 5px 12px rgba(167,158,140,.55), -5px -5px 12px rgba(255,255,255,.92), inset 0 1px 0 rgba(255,255,255,.85);
   --topbtn-press: inset 4px 4px 9px rgba(167,158,140,.48), inset -4px -4px 9px rgba(255,255,255,.85);
   --topbtn-hover-ink: var(--ink);
-  --topbtn-badge-shadow: inset 1px 1px 2px rgba(0,0,0,.08), inset -1px -1px 2px rgba(255,255,255,.5);
   --scroll-thumb: rgba(122,114,98,.35);
   --fail-ink: #96453c;
   --dbg-bg: #e8e4da; --dbg-btn-bg: #e8e4da;
@@ -227,7 +225,6 @@
   --topbtn-raise: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
   --topbtn-press: inset 0 0 0 1px rgba(111, 191, 58, 0.45), 0 0 12px rgba(111, 191, 58, 0.18);
   --topbtn-hover-ink: var(--gold-bright);
-  --topbtn-badge-shadow: none;
   --scroll-thumb: rgba(255, 255, 255, 0.14);
   --fail-ink: #f3b0b0;
   --dbg-bg: rgba(12, 15, 18, 0.92); --dbg-btn-bg: rgba(255, 255, 255, 0.06);
